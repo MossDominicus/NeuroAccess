@@ -1,0 +1,117 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useLang } from "@/lib/language-context";
+import SettingsPanel from "./SettingsPanel";
+import {
+  LayoutDashboard,
+  FileText,
+  BookOpen,
+  Stethoscope,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+} from "lucide-react";
+
+const menuKeys = [
+  { key: "dashboard", href: "/", icon: LayoutDashboard },
+  { key: "reports", href: "/reports", icon: FileText },
+  { key: "sidebarGuide", href: "/guide", icon: BookOpen },
+  { key: "cases", href: "/cases", icon: Stethoscope },
+];
+
+export default function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const pathname = usePathname();
+  const { lang, t } = useLang();
+
+  // 语言变化时重新计算菜单标签
+  const menuItems = useMemo(() => {
+    return menuKeys.map(item => ({
+      ...item,
+      label: t(item.key),
+    }));
+  }, [lang]);
+
+  return (
+    <aside
+      className={`bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col transition-all duration-300 ${
+        collapsed ? "w-[68px]" : "w-[240px]"
+      }`}
+    >
+      {/* Logo */}
+      <div className="h-14 flex items-center px-4 border-b border-[var(--color-border)]">
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/neuroaccess-logo.jpg"
+            alt="NeuroAccess"
+            className="w-8 h-8 rounded-xl object-cover"
+          />
+          {!collapsed && (
+            <span className="font-bold tracking-tight text-[var(--color-text)]">NeuroAccess</span>
+          )}
+        </div>
+      </div>
+
+      {/* 导航菜单 */}
+      <nav className="flex-1 py-4 overflow-y-auto">
+        <ul className="space-y-1 px-2">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                    isActive
+                      ? "bg-[var(--color-primary)] text-[var(--color-surface)] shadow-lg shadow-[var(--color-primary)_/10]"
+                      : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
+                  }`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!collapsed && <span className="font-medium">{item.label}</span>}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {/* 底部：设置 + 折叠 */}
+      <div className="p-4 border-t border-[var(--color-border)] space-y-1">
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+            collapsed ? "justify-center" : ""
+          } ${
+            settingsOpen
+              ? "bg-[var(--color-primary)] text-[var(--color-surface)]"
+              : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
+          }`}
+        >
+          <Settings className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span className="font-medium">{t("settings") || "设置"}</span>}
+        </button>
+
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="w-full flex items-center justify-center p-2 rounded-xl hover:bg-[var(--color-bg)] transition-colors"
+        >
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4 text-[var(--color-text-secondary)]" />
+          ) : (
+            <ChevronLeft className="w-4 h-4 text-[var(--color-text-secondary)]" />
+          )}
+        </button>
+      </div>
+
+      {/* 设置面板 */}
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </aside>
+  );
+}
