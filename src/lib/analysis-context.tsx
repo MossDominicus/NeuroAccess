@@ -103,7 +103,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     setFiles((prev) => [
       ...prev,
       ...valid.map((file) => ({
-        id: crypto.randomUUID(),
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${Math.random().toString(36).slice(2, 8)}`,
         file,
         name: file.name,
         size: file.size,
