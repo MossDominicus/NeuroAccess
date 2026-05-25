@@ -182,15 +182,15 @@ def root():
 @app.get("/health")
 def health():
     try:
-        from explanations import call_ollama
+        from explanations import call_openrouter
     except:
         return {"success": False, "error": "explanations module failed to import"}
     try:
-        tags_resp = call_ollama("ping", timeout=5)
-        ollama_ok = tags_resp.get("success") == True or "empty" in str(tags_resp.get("error","")).lower()
+        test_resp = call_openrouter("ping", timeout=10)
+        openrouter_ok = test_resp.get("success") == True
     except:
-        ollama_ok = False
-    return {"success": True, "ollama": ollama_ok, "analysis_available": analyze_edf is not None}
+        openrouter_ok = False
+    return {"success": True, "ollama": openrouter_ok, "openrouter": openrouter_ok, "analysis_available": analyze_edf is not None}
 
 @app.post("/api/analyze")
 async def analyze(file: UploadFile = File(...), language: str = Form("zh")):

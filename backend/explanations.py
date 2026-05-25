@@ -1,6 +1,6 @@
 """
 NeuroAccess Backend — AI 解释生成模块
-Ollama 调用 / prompt 构建 / 三层解释
+OpenRouter API 调用 / prompt 构建 / 三层解释
 """
 import os
 import json
@@ -10,11 +10,10 @@ from typing import Any, Dict
 
 from utils import safe_float, to_jsonable
 
-# ── Ollama 配置 ──────────────────────────────────────
-OLLAMA_HOST    = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_TAGS    = f"{OLLAMA_HOST}/api/tags"
-OLLAMA_GENERATE = f"{OLLAMA_HOST}/api/generate"
-MODEL_NAME     = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+# ── OpenRouter 配置 ─────────────────────────────────────
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen-2.5-7b-instruct")
+OPENROUTER_URL   = "https://openrouter.ai/api/v1/chat/completions"
 
 # Beginner 禁止术语（中英文）
 FORBIDDEN = [
@@ -33,44 +32,40 @@ def contains_beginner_jargon(text: str) -> bool:
     return count >= 3
 
 
-def call_ollama(prompt: str, timeout: int = 120) -> Dict[str, Any]:
-    """调用 Ollama，带超时；失败返回 { success: False, error }"""
+def call_openrouter(prompt: str, timeout: int = 60) -> Dict[str, Any]:
+    """调用 OpenRouter API；失败返回 { success: False, error }"""
+    if not OPENROUTER_API_KEY:
+        return {"success": False, "error": "OpenRouter API key not configured"}
     try:
-        try:
-            tags = requests.get(OLLAMA_TAGS, timeout=5)
-        except requests.exceptions.Timeout:
-            return {"success": False, "error": "Ollama service timeout: cannot connect within 5 seconds. Is Ollama running?"}
-        except requests.exceptions.ConnectionError:
-            return {"success": False, "error": "Ollama service not available: connection refused. Start Ollama with 'ollama serve'."}
-
-        if tags.status_code != 200:
-            return {"success": False, "error": f"Ollama tags failed: {tags.text[:200]}"}
-        models = [m.get("name", "") for m in tags.json().get("models", [])]
-        if MODEL_NAME not in models:
-            return {"success": False, "error": f"Model {MODEL_NAME} not found. Run: ollama pull {MODEL_NAME}"}
-
         resp = requests.post(
-            OLLAMA_GENERATE,
+            OPENROUTER_URL,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
             json={
-                "model": MODEL_NAME,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.15, "num_predict": 700},
+                "model": OPENROUTER_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 700,
+                "temperature": 0.15,
             },
             timeout=(10, timeout),
         )
         if resp.status_code != 200:
-            return {"success": False, "error": f"Ollama generate failed (HTTP {resp.status_code}): {resp.text[:500]}"}
-        text = str(resp.json().get("response", "")).strip()
+            return {"success": False, "error": f"OpenRouter failed (HTTP {resp.status_code}): {resp.text[:500]}"}
+        text = str(resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")).strip()
         if not text:
-            return {"success": False, "error": "Ollama returned empty response"}
+            return {"success": False, "error": "OpenRouter returned empty response"}
         return {"success": True, "text": text}
     except requests.exceptions.Timeout:
-        return {"success": False, "error": f"Ollama request timed out after {timeout} seconds. Check Ollama server load."}
-    except requests.exceptions.ConnectionError:
-        return {"success": False, "error": "Ollama service connection error during generation. Is Ollama still running?"}
+        return {"success": False, "error": f"OpenRouter request timed out after {timeout} seconds."}
     except Exception as e:
-        return {"success": False, "error": f"Ollama unexpected error: {str(e)}"}
+        return {"success": False, "error": f"OpenRouter unexpected error: {str(e)}"}
+
+
+def call_ollama(prompt: str, timeout: int = 120) -> Dict[str, Any]:
+    """兼容旧接口，内部调用 OpenRouter"""
+    return call_openrouter(prompt, timeout=timeout)
 
 
 def _quality_level(score: Any, lang: str) -> str:
