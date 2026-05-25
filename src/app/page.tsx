@@ -233,10 +233,9 @@ export default function UploadAnalysisCenter() {
   } = useAnalysis();
 
   // ── 启动动画状态 ─────────────────────────────────────
-  // showIntro: null = 还在检查 localStorage（返回 null 避免闪烁）
-  // showIntro: true = 显示动画
-  // showIntro: false = 显示主界面
-  const [showIntro, setShowIntro] = useState<boolean | null>(null);
+  // showIntro: false = 显示主界面（SSR 默认，避免空白）
+  // showIntro: true  = 显示动画
+  const [showIntro, setShowIntro] = useState(false);
 
   // 客户端挂载后检查 localStorage 或 URL 参数
   useEffect(() => {
@@ -246,7 +245,9 @@ export default function UploadAnalysisCenter() {
       setShowIntro(true);
     } else {
       const played = window.sessionStorage.getItem("neuroaccess-intro-played");
-      setShowIntro(played !== "true");
+      if (played !== "true") {
+        setShowIntro(true);
+      }
     }
   }, []);
 
@@ -266,8 +267,6 @@ export default function UploadAnalysisCenter() {
     return () => { delete (window as any).__replayIntro; };
   }, [replayIntro]);
 
-  // 仍在检查 → 返回 null 避免主界面闪烁
-  if (showIntro === null) return null;
   // 显示动画
   if (showIntro) return <IntroAnimation onComplete={handleIntroComplete} />;
 
