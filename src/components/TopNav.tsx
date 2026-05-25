@@ -20,8 +20,7 @@ export default function TopNav() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const base = process.env.NEXT_PUBLIC_API_URL || "";
-        const res = await fetch(`${base}/health`);
+        const res = await fetch("/health");
         const data = await res.json();
         setStatus({
           ollama_running: data.ollama === true,

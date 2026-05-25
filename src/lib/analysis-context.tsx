@@ -18,7 +18,7 @@ export interface FileJob {
 }
 
 // ── safeJsonFetch ───────────────────────────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE = ""; // 使用相对路径，由nginx代理到后端
 const FETCH_TIMEOUT = 360_000; // 6分钟，覆盖 MNE(120s) + Ollama 并行(120s)
 
 async function safeJsonFetch(url: string, options: RequestInit = {}): Promise<any> {
