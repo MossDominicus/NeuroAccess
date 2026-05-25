@@ -204,7 +204,7 @@ function FileCard({
             <ExplanationCards analysis={item.result} />
           )}
           {!item.result?.explanations && item.status === "completed" && (
-            <div className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-[var(--color-text-secondary)]">
+            <div className="rounded-xl bg-gray-50 dark:bg-[var(--color-surface)] px-4 py-3 text-xs text-[var(--color-text-secondary)]">
               {t("noExplanationYet")}
             </div>
           )}

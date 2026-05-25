@@ -20,32 +20,32 @@ export default function DashboardCards({ analysisResult }: DashboardCardsProps) 
       title: t("signalQualityCard"),
       value: quality ? `${quality.signal_quality_score}/100` : "-",
       icon: Activity,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
+      color: "text-green-600 dark:text-green-400",
+      bgColor: "bg-green-50 dark:bg-green-950/30",
       description: quality ? `${t("noisyChannelsDesc")}: ${quality.noisy_channels?.length || 0}` : "-",
     },
     {
       title: t("readabilityScoreCard"),
       value: literacy ? `${literacy.learning_readability_score}/100` : "-",
       icon: Brain,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-50 dark:bg-blue-950/30",
       description: literacy ? `${t("beginnerFriendlinessDesc")}: ${literacy.beginner_friendliness_score}/100` : "-",
     },
     {
       title: t("confidenceCard"),
       value: confidence ? t(`confidence${confidence.level}`) : "-",
       icon: TrendingUp,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      color: "text-purple-600 dark:text-purple-400",
+      bgColor: "bg-purple-50 dark:bg-purple-950/30",
       description: confidence ? (confidence.reason || confidence.confidence_reason || "").slice(0, 50) + "..." : "-",
     },
     {
       title: t("dataLimitsCard"),
       value: analysisResult?.what_this_data_cannot_tell?.length || 0,
       icon: ShieldCheck,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-50 dark:bg-orange-950/30",
       description: t("eegCannotTellDesc"),
     },
   ], [t, quality, literacy, confidence, analysisResult]);
@@ -57,16 +57,16 @@ export default function DashboardCards({ analysisResult }: DashboardCardsProps) 
         return (
           <div
             key={i}
-            className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300"
+            className="bg-white dark:bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-10 h-10 rounded-xl ${card.bgColor} flex items-center justify-center`}>
                 <Icon className={`w-5 h-5 ${card.color}`} />
               </div>
-              <span className="text-sm text-gray-500">{card.title}</span>
+              <span className="text-sm text-[var(--color-text-secondary)]">{card.title}</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{card.value}</div>
-            <div className="text-xs text-gray-400 mt-2">{card.description}</div>
+            <div className="text-2xl font-bold text-[var(--color-text)]">{card.value}</div>
+            <div className="text-xs text-[var(--color-text-secondary)] mt-2">{card.description}</div>
           </div>
         );
       })}

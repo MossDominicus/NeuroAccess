@@ -9,12 +9,12 @@ export default function LanguageToggle() {
     <button
       onClick={toggleLang}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-        bg-gray-100 text-gray-600 hover:bg-gray-200"
+        bg-gray-100 dark:bg-[var(--color-surface)] text-gray-600 dark:text-[var(--color-text-secondary)] hover:bg-gray-200 dark:hover:bg-[var(--color-border)] border border-transparent dark:border-[var(--color-border)]"
       title={t("langSwitch")}
     >
-      <span className={lang === "zh" ? "text-gray-900 font-semibold" : "text-gray-400"}>中文</span>
-      <span className="text-gray-300">/</span>
-      <span className={lang === "en" ? "text-gray-900 font-semibold" : "text-gray-400"}>EN</span>
+      <span className={lang === "zh" ? "text-gray-900 dark:text-[var(--color-text)] font-semibold" : "text-gray-400 dark:text-[var(--color-text-secondary)]"}>中文</span>
+      <span className="text-gray-300 dark:text-[var(--color-text-secondary)]">/</span>
+      <span className={lang === "en" ? "text-gray-900 dark:text-[var(--color-text)] font-semibold" : "text-gray-400 dark:text-[var(--color-text-secondary)]"}>EN</span>
     </button>
   );
 }
