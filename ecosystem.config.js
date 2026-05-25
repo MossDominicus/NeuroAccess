@@ -13,7 +13,7 @@ module.exports = {
     },
     {
       name: "neuroaccess-backend",
-      script: "python3",
+      script: "/home/ubuntu/NeuroAccess/backend/venv/bin/python3",
       args: "-m uvicorn app:app --host 0.0.0.0 --port 8000 --reload",
       cwd: "/home/ubuntu/NeuroAccess/backend",
       env: {
