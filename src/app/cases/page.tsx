@@ -18,8 +18,12 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
+import type { Lang } from "@/lib/translations";
 
-/* 案例数据类型（中英双语） */
+/* 案例数据类型（多语言） */
+type LangString = Partial<Record<Lang, string>>;
+type LangStringArray = Partial<Record<Lang, string[]>>;
+
 interface CaseStudy {
   id: string;
   categoryKey: string;
@@ -28,15 +32,15 @@ interface CaseStudy {
   learning_readability_score: number;
   tags: string[];
   readTime: string;
-  // 双语字段
-  title: { zh: string; en: string };
-  description: { zh: string; en: string };
-  details: { zh: string; en: string };
-  beginner_explanation: { zh: string; en: string };
-  student_explanation: { zh: string; en: string };
-  research_explanation: { zh: string; en: string };
-  limitations: { zh: string[]; en: string[] };
-  what_this_data_cannot_tell: { zh: string[]; en: string[] };
+  // 多语言字段
+  title: LangString;
+  description: LangString;
+  details: LangString;
+  beginner_explanation: LangString;
+  student_explanation: LangString;
+  research_explanation: LangString;
+  limitations: LangStringArray;
+  what_this_data_cannot_tell: LangStringArray;
 }
 
 const cases: CaseStudy[] = [
@@ -493,11 +497,11 @@ export default function CasesPage() {
             const title = c.title[lang];
             const description = c.description[lang];
             const details = c.details[lang];
-            const beginnerExp = c.beginner_explanation[lang];
-            const studentExp = c.student_explanation[lang];
-            const researchExp = c.research_explanation[lang];
-            const limitations = c.limitations[lang];
-            const cannotTell = c.what_this_data_cannot_tell[lang];
+            const beginnerExp = c.beginner_explanation[lang] ?? "";
+            const studentExp = c.student_explanation[lang] ?? "";
+            const researchExp = c.research_explanation[lang] ?? "";
+            const limitations = c.limitations[lang] ?? [];
+            const cannotTell = c.what_this_data_cannot_tell[lang] ?? [];
 
             return (
               <motion.div

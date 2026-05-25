@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { getText, Lang } from "@/lib/translations";
 
+const LANGUAGES: Lang[] = ["zh", "en", "es", "fr", "de", "ja", "ko"];
+
 type LangContextType = {
   lang: Lang;
   setLang: (lang: Lang) => void;
@@ -20,8 +22,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("neuroaccess-language");
-      if (saved === "zh" || saved === "en") {
-        setLangState(saved);
+      if (saved && LANGUAGES.includes(saved as Lang)) {
+        setLangState(saved as Lang);
       }
     } catch {}
   }, []);
@@ -33,11 +35,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [lang]);
 
+  // 循环切换语言
+  const toggleLang = () => {
+    setLangState((prev) => {
+      const idx = LANGUAGES.indexOf(prev);
+      return LANGUAGES[(idx + 1) % LANGUAGES.length];
+    });
+  };
+
   const value = useMemo<LangContextType>(
     () => ({
       lang,
       setLang: setLangState,
-      toggleLang: () => setLangState((prev) => (prev === "zh" ? "en" : "zh")),
+      toggleLang,
       t: (key: string) => getText(lang, key),
     }),
     [lang],

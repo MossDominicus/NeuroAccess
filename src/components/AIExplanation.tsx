@@ -40,7 +40,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
 
   // disclaimer 兼容字符串和对象
   const disclaimerText: string = data?.disclaimer
-    ? (typeof data.disclaimer === "string" ? data.disclaimer : (data.disclaimer[lang] || data.disclaimer.en || ""))
+    ? (typeof data.disclaimer === "string" ? data.disclaimer : (((data.disclaimer as Record<string, string | undefined>)[lang]) || data.disclaimer.en || ""))
     : "";
 
   const modes = [

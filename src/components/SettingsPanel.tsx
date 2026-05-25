@@ -100,12 +100,15 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
                   {t("language") || "语言"}
                 </h3>
-                <button
-                  onClick={() => setLang(lang === "en" ? "zh" : "en")}
-                  className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold transition-all bg-[var(--color-bg)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-border)]"
-                >
-                  {t("langSwitch")}
-                </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <LangBtn code="zh" label="中文" active={lang === "zh"} onClick={() => setLang("zh")} />
+                  <LangBtn code="en" label="English" active={lang === "en"} onClick={() => setLang("en")} />
+                  <LangBtn code="es" label="Español" active={lang === "es"} onClick={() => setLang("es")} />
+                  <LangBtn code="fr" label="Français" active={lang === "fr"} onClick={() => setLang("fr")} />
+                  <LangBtn code="de" label="Deutsch" active={lang === "de"} onClick={() => setLang("de")} />
+                  <LangBtn code="ja" label="日本語" active={lang === "ja"} onClick={() => setLang("ja")} />
+                  <LangBtn code="ko" label="한국어" active={lang === "ko"} onClick={() => setLang("ko")} />
+                </div>
               </section>
 
               {/* Ollama 模型 */}
@@ -205,6 +208,32 @@ function ThemeOption({
     >
       {icon}
       <span className="font-medium">{label}</span>
+    </button>
+  );
+}
+
+function LangBtn({
+  code,
+  label,
+  active,
+  onClick,
+}: {
+  code: string;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+        active
+          ? "bg-gray-900 text-white shadow-lg shadow-gray-900/10"
+          : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-border)]"
+      }`}
+    >
+      <span className="block text-[10px] opacity-60 uppercase leading-none mb-0.5">{code}</span>
+      <span>{label}</span>
     </button>
   );
 }

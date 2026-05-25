@@ -3,11 +3,12 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
+import type { Lang } from "@/lib/translations";
 import KnowledgeCard, { KnowledgeCardData } from "@/components/KnowledgeCard";
 import { BookOpen, Search, Filter } from "lucide-react";
 
-// ── 知识卡片双语数据 ─────────────────────────────────
-function getCards(lang: "zh" | "en"): KnowledgeCardData[] {
+// ── 知识卡片多语言数据 ────────────────────────────────
+function getCards(lang: Lang): KnowledgeCardData[] {
   return [
     {
       id: "alpha", category: "brainwaves", icon: "α", iconColor: "#059669",
