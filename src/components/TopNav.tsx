@@ -57,7 +57,7 @@ export default function TopNav() {
       {/* Left: page title */}
       <div className="flex items-center gap-3">
         <span className="text-sm font-semibold text-[var(--color-text)]">NeuroAccess</span>
-        <span className="text-xs text-[var(--color-text-secondary)]">v1.0 RC</span>
+        <span className="text-xs text-[var(--color-text-secondary)]">v1.0</span>
       </div>
 
       {/* Right: AI status + language toggle */}

@@ -194,20 +194,14 @@ function FileCard({
         </div>
       )}
 
-      {expanded && (
-        <div className="space-y-6 border-t border-[var(--color-border)] px-5 py-5">
-          {item.result && <OverviewCard analysis={item.result} />}
-          {item.result?.eeg_literacy_scores && (
-            <LiteracyScores scores={item.result.eeg_literacy_scores} />
-          )}
-          {item.result?.explanations && (
-            <ExplanationCards analysis={item.result} />
-          )}
-          {!item.result?.explanations && item.status === "completed" && (
-            <div className="rounded-xl bg-gray-50 dark:bg-[var(--color-surface)] px-4 py-3 text-xs text-[var(--color-text-secondary)]">
-              {t("noExplanationYet")}
-            </div>
-          )}
+      {expanded && item.status === "completed" && !item.error && (
+        <div className="border-t border-[var(--color-border)] px-5 py-4 text-center">
+          <a
+            href="/reports"
+            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+          >
+            {t("viewInReports") || "查看报告 →"}
+          </a>
         </div>
       )}
     </div>
