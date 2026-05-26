@@ -311,7 +311,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           id="export-pdf-bottom"
           onClick={handleExportPDF}
           disabled={exporting}
-          className="inline-flex items-center gap-2 rounded-2xl bg-[var(--color-primary)] px-8 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:scale-100"
+          className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 dark:bg-white px-8 py-3 text-sm font-semibold text-white dark:text-gray-900 shadow-lg transition-all hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:scale-100"
         >
           {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           {exporting ? "Exporting..." : `${t("exportPdf")} — ${report.fileName}`}

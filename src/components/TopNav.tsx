@@ -8,6 +8,7 @@ interface OllamaStatus {
   ollama_running: boolean;
   target_model_available: boolean;
   gpu_available: boolean;
+  openrouter: boolean;
   model_name: string;
   error: string | null;
 }
@@ -26,6 +27,7 @@ export default function TopNav() {
           ollama_running: data.ollama === true,
           target_model_available: data.ollama === true,
           gpu_available: false,
+          openrouter: data.openrouter === true,
           model_name: data.model || "qwen2.5:7b",
           error: null,
         });
@@ -92,10 +94,10 @@ export default function TopNav() {
               </div>
             )}
 
-            {/* GPU/CPU status */}
+            {/* GPU/CPU/API status */}
             <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
               <Cpu className="w-3.5 h-3.5" />
-              <span>{status.gpu_available ? t("gpuAvailable") : t("cpuMode")}</span>
+              <span>{status.openrouter ? "API 模式" : (status.gpu_available ? t("gpuAvailable") : t("cpuMode"))}</span>
             </div>
           </>
         ) : null}
