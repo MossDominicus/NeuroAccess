@@ -36,6 +36,7 @@ export default function TopNav() {
           ollama_running: false,
           target_model_available: false,
           gpu_available: false,
+          openrouter: false,
           model_name: "qwen2.5:7b",
           error: "Cannot connect to backend",
         });
