@@ -1,185 +1,94 @@
 # NeuroAccess
 
-**AI-powered EEG Literacy Platform**
+EEG 科普教育平台 — 让每个人都能读懂自己的脑电数据。
 
-> NeuroAccess helps non-expert users understand EEG data through multi-level AI explanations while preserving scientific and non-medical boundaries.
+![NeuroAccess](https://img.shields.io/badge/version-v1.0%20RC-green) ![License](https://img.shields.io/badge/license-MIT-blue) ![Status](https://img.shields.io/badge/status-Public%20Preview-orange)
 
----
+## 项目简介
 
-## Project Overview
+NeuroAccess 是一个面向公众的 EEG（脑电图）数据分析教育平台。用户上传 EEG 文件（EDF 格式），系统通过 MNE-Python 进行信号处理，并通过 AI（OpenRouter API）生成三层个性化解释（初学者 / 学生 / 研究者），帮助用户理解自己的脑电数据。
 
-NeuroAccess is an open EEG literacy platform that converts raw brainwave recordings into readable, structured educational reports. Users upload EEG files (EDF, BDF, GDF, CSV), and the platform automatically extracts signal quality metrics, frequency band analysis, and AI-generated explanations at three comprehension levels — Beginner, Student, and Research.
+**非医疗用途**：本平台仅用于教育培训，不提供医疗诊断建议。
 
-## Core Idea
+## 在线体验
 
-The core philosophy of NeuroAccess is **Human-Centered AI for Neuroscience Education**.
+- **生产环境**: http://43.160.238.2
+- **Vercel 预览**: https://neuroaccess-v1-rc.vercel.app（国内可能无法访问）
 
-We do **not** aim to replace clinical EEG interpretation. Instead, we bridge the gap between complex electrophysiological data and human understanding by providing **multi-level AI explanations** tailored to different audiences. The same EEG recording is explained differently: in simple analogies for beginners, in structured analysis for students, and in technical detail for research learners.
+## 核心功能
 
-AI is the translator, not the diagnostician.
+- 📊 **EEG 文件上传与分析** — 支持 EDF 格式，自动进行信号质量评估、频带功率分析
+- 🤖 **AI 三层解释** — 初学者模式（类比生活）、学生模式（概念解析）、研究者模式（专业术语）
+- 📈 **交互式图表** — 频带功率柱状图、频率分布折线图
+- 🌐 **多语言支持** — 中文、英文、西班牙语、法语、德语、日语、韩语
+- 🌙 **深色模式** — 完整的深色主题支持
+- 📄 **PDF 导出** — 一键导出分析报告
+- 💬 **反馈系统** — 用户对分析结果进行评分和反馈
 
-## Target Users
+## 技术栈
 
-- Non-expert users who are curious about brain activity
-- Students in neuroscience, psychology, or biomedical engineering
-- EEG beginners learning signal interpretation
-- Educators demonstrating EEG concepts in classrooms
-- Research learners exploring electrophysiology data
-- EEG technicians and professional auxiliary scenarios
+| 层级 | 技术 |
+|------|------|
+| 前端 | Next.js 14 (App Router) + React 18 + TypeScript + Tailwind CSS 4 |
+| 后端 | FastAPI + Python 3.11 + MNE-Python |
+| AI | OpenRouter API (qwen/qwen-2.5-7b-instruct) |
+| 部署 | Nginx + PM2 + 腾讯云（新加坡） |
 
----
+## 快速开始
 
-## Non-Medical Disclaimer
-
-> ⚠️ **NeuroAccess is not a medical diagnosis tool.**
-
-This platform is designed **solely for EEG education and literacy**. It does not:
-- Provide clinical diagnosis or treatment recommendations
-- Replace professional medical interpretation
-- Constitute medical advice of any kind
-
-EEG data alone cannot diagnose any disease. For health concerns, consult a qualified physician.
-
----
-
-## Core Features
-
-| Feature | Description |
-|---------|-------------|
-| EDF Upload & Analysis | Single and batch EDF/BDF/GDF/CSV upload, up to 500MB per file |
-| Signal Quality Summary | Automatic detection of noisy channels, clipping, artifacts, high-frequency noise |
-| Frequency Band Analysis | Delta, Theta, Alpha, Beta band power with PSD visualization |
-| Three-level AI Explanations | Beginner / Student / Research modes — same data, different depth |
-| Reports Page | Save, browse, and manage all analysis reports (localStorage) |
-| PDF Export | One-click export of full 8-section report |
-| Case Studies | Curated real-world EEG examples with difficulty filtering |
-| EEG Literacy Guide | 10 interactive knowledge cards covering core EEG concepts |
-| Local AI with Ollama | Privacy-first: all AI inference runs locally via Ollama (qwen2.5:7b) |
-| Language Switching | Full bilingual support: Chinese (中文) and English |
-| Intro Animation | EEG waveform drawing animation on first visit |
-
----
-
-## Known Limitations
-
-| Limitation | Detail |
-|------------|--------|
-| **Interpretation Uncertainty** | EEG interpretation remains inherently uncertain and subject to inter-rater variability |
-| **Cross-Subject Variability** | EEG patterns vary significantly across individuals; no single "normal" template exists |
-| **Recording Quality** | Consumer-grade or non-clinical EEG recordings may contain substantial environmental and physiological noise |
-| **Educational, Not Diagnostic** | All AI explanations are educational in nature and must not be used for clinical decision-making |
-| **Signal Quality Dependency** | Interpretation confidence is strongly affected by electrode placement, impedance, and environmental factors |
-| **Scope Limitation** | This platform cannot determine disease, intelligence, personality, emotions, ADHD, depression, or health risk |
-| **AI Model Variability** | Explanation quality depends on the local Ollama model; results may vary between runs |
-| **Frontend Storage** | Reports are stored in browser localStorage; clearing browser data will delete reports |
-| **CPU-Only Inference** | Local LLM inference is CPU-bound unless GPU acceleration is configured for Ollama |
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16, React 19, TypeScript |
-| Styling | Tailwind CSS v4, CSS Variables (dark mode) |
-| Animation | Framer Motion, SVG animation |
-| Charts | Recharts |
-| PDF Export | dom-to-image-more, jsPDF |
-| Backend | FastAPI (Python) |
-| EEG Processing | MNE-Python, NumPy, SciPy, Matplotlib |
-| AI / LLM | Ollama, qwen2.5:7b |
-| Storage | localStorage (frontend report persistence) |
-
----
-
-## Local Setup
-
-### Prerequisites
-
-- Node.js ≥ 18
-- Python ≥ 3.10
-- Ollama installed
-
-### 1. Start Ollama
+### 前端开发
 
 ```bash
-ollama serve                          # Start Ollama (default: localhost:11434)
-ollama pull qwen2.5:7b               # Pull the AI model (one-time)
+git clone https://github.com/MossDominicus/NeuroAccess.git
+cd NeuroAccess
+npm install
+npm run dev  # → localhost:3000
 ```
 
-### 2. Start Backend
+### 后端开发
 
 ```bash
 cd NeuroAccess/backend
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+# 设置环境变量
+export OPENROUTER_API_KEY="sk-or-v1-..."
+export OPENROUTER_MODEL="qwen/qwen-2.5-7b-instruct"
+python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend runs at `http://localhost:8000`. Verify with `GET /health`.
-
-### 3. Start Frontend
-
-```bash
-cd NeuroAccess
-npm install
-npm run dev
-```
-
-Frontend runs at `http://localhost:3000`.
-
----
-
-## Demo Workflow
+## 项目结构
 
 ```
-Upload EDF → Analyze EEG → View Explanations → Generate Report → Export PDF
+NeuroAccess/
+├── src/                  # 前端源码 (Next.js)
+│   ├── app/             # App Router 页面
+│   ├── components/       # React 组件
+│   └── lib/            # 工具函数、Context
+├── backend/             # 后端源码 (FastAPI)
+│   ├── app.py          # FastAPI 主应用
+│   ├── analysis.py     # EEG 分析核心
+│   ├── explanations.py  # AI 解释生成
+│   └── requirements.txt
+├── scripts/             # 部署脚本
+│   └── health-check.sh # 服务器健康监控
+├── deploy/              # 部署配置
+│   └── nginx.conf      # Nginx 配置模板
+└── DEPLOYMENT.md       # 部署文档
 ```
 
-1. Open the dashboard at `http://localhost:3000`
-2. Drag-and-drop or click to upload an EDF file
-3. Click "Start Analysis" and wait for processing
-4. Expand the file card to see Beginner / Student / Research explanations
-5. Browse Reports at `/reports` to see all saved analyses
-6. Open a report detail to view the full 8-section report
-7. Click "Export PDF" to download a professional report
+## 部署
 
----
+详见 [DEPLOYMENT.md](./DEPLOYMENT.md)
 
-## Future Roadmap
+## 作者
 
-- More sample EEG datasets for educational comparison
-- Better report templates with customizable layouts
-- User understanding feedback study to improve explanation quality
-- Optional private deployment for schools, labs, and educational institutions
-- More robust signal quality metrics and artifact rejection
-- Multi-file EEG comparison view
-- Time-frequency (spectrogram) visualization
-- Remote Ollama connection support for shared deployments
+**wmz (MossDominicus)** — EEG 研究员 / 全栈开发者
 
----
+- GitHub: [@MossDominicus](https://github.com/MossDominicus)
+- 项目始于 2026 年，为大学申请（NUS/NTU CS/AI/Neuroscience）准备的作品集项目
 
-## Project Value
+## 许可证
 
-### Human-Centered AI
-
-NeuroAccess positions AI as a **bridge**, not a barrier. Three explanation levels ensure accessibility across radically different audiences — from curious beginners to technical researchers.
-
-### Scientific Accessibility
-
-EEG is one of the oldest brain imaging techniques, yet its learning curve remains steep. NeuroAccess lowers that barrier: no programming required, no math background needed, and no specialized equipment beyond a browser.
-
-### Open & Reproducible
-
-Data sourced from PhysioNet public datasets. Analysis powered by the open-source MNE-Python ecosystem. AI driven by locally-run Ollama. Every component can be independently verified, reproduced, and improved.
-
----
-
-## License
-
-[MIT License](LICENSE)
-
----
-
-<p align="center">
-  <sub>Built for the EEG education community</sub>
-</p>
+MIT License — 详见 [LICENSE](./LICENSE)（如不存在可自行添加）
