@@ -4,7 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
-import { Settings, Moon, Sun, Monitor, User, X } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Settings, Moon, Sun, Monitor, User, X, AlertTriangle, LogOut } from "lucide-react";
 
 type SettingsPanelProps = {
   open: boolean;
@@ -14,6 +15,7 @@ type SettingsPanelProps = {
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { lang, setLang, t } = useLang();
   const { theme, setTheme } = useTheme();
+  const { user, logout } = useAuth();
 
   // 点击遮罩关闭
   function handleOverlay(e: React.MouseEvent) {
@@ -129,23 +131,58 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
                   {t("account") || "账号"}
                 </h3>
+                {user ? (
+                  <div className="w-full p-3 rounded-xl bg-[var(--color-bg)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                        <User className="w-4 h-4 text-blue-500" />
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--color-text)] truncate">{user.username}</p>
+                        <p className="text-xs text-[var(--color-text-secondary)] truncate">{user.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { logout(); onClose(); }}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>{t("logout") || "退出登录"}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { window.location.href = "/login"; }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)] transition-colors"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                      <User className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-[var(--color-text)]">
+                        {t("notLoggedIn") || "暂未登录"}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">
+                        {lang === "zh" ? "点击登录以同步数据" : "Click to sign in & sync"}
+                      </p>
+                    </div>
+                  </button>
+                )}
+              </section>
+
+              {/* 免责声明 */}
+              <section>
+                <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+                  {t("disclaimer") || "免责声明"}
+                </h3>
                 <button
                   onClick={() => {
-                    alert(t("notLoggedIn") || "暂未登录");
+                    window.dispatchEvent(new Event("__openDisclaimer"));
                   }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)] transition-colors"
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)] transition-colors text-sm text-[var(--color-text)]"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    <User className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-[var(--color-text)]">
-                      {t("notLoggedIn") || "暂未登录"}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-secondary)]">
-                      {lang === "zh" ? "点击登录以同步数据" : "Click to sign in & sync"}
-                    </p>
-                  </div>
+                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                  <span>{t("viewDisclaimer") || "查看免责声明"}</span>
                 </button>
               </section>
 

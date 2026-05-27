@@ -22,6 +22,17 @@ const API_BASE = ""; // 使用相对路径，由nginx代理到后端
 const FETCH_TIMEOUT = 360_000; // 6分钟，覆盖 MNE(120s) + Ollama 并行(120s)
 
 async function safeJsonFetch(url: string, options: RequestInit = {}): Promise<any> {
+  // Attach JWT token if available
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("neuroaccess-token");
+    if (token) {
+      options.headers = {
+        ...(options.headers as Record<string, string> || {}),
+        "Authorization": `Bearer ${token}`,
+      };
+    }
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 

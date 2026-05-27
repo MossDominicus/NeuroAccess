@@ -9,7 +9,7 @@ import json
 from typing import Any, Optional, List, Dict
 
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils import safe_float, to_jsonable, safe_name, normalize_language
@@ -193,7 +193,19 @@ def health():
     return {"success": True, "ollama": openrouter_ok, "openrouter": openrouter_ok, "analysis_available": analyze_edf is not None}
 
 @app.post("/api/analyze")
-async def analyze(file: UploadFile = File(...), language: str = Form("zh")):
+async def analyze(request: Request, file: UploadFile = File(...), language: str = Form("zh")):
+    # ── Auth: must be logged in ──────────────────────────────────
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"success": False, "error": "Authentication required. Please login to analyze files."}
+    token = auth_header.split(" ", 1)[1]
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": f"Auth module not available: {AUTH_IMPORT_ERROR}"}
+    payload = verify_token(token)
+    if not payload:
+        return {"success": False, "error": "Invalid or expired token. Please login again."}
+    user_id = int(payload["sub"])
+    # ── Analysis ─────────────────────────────────────────────────
     lang = normalize_language(language)
     saved = save_upload(file)
     if not saved.get("success"):
@@ -216,3 +228,65 @@ async def analyze(file: UploadFile = File(...), language: str = Form("zh")):
         error_detail = traceback.format_exc() if os.getenv("DEBUG") else "Enable DEBUG=1 for details"
         file_name = saved.get("file_name")
         return {"success": False, "file_name": file_name, "error": f"Internal server error: {str(e)}", "detail": error_detail if os.getenv("DEBUG") else "Enable DEBUG=1 for details"}
+
+
+# =================================================================
+# Auth routes
+# =================================================================
+
+try:
+    from auth import create_user, authenticate_user, create_access_token, verify_token, get_user_by_id
+    AUTH_AVAILABLE = True
+except Exception as _auth_e:
+    AUTH_AVAILABLE = False
+    AUTH_IMPORT_ERROR = str(_auth_e)
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+def get_current_user():
+    """Get current user from JWT token"""
+    if not AUTH_AVAILABLE:
+        return None
+    # This is a simplified version - in production, get token from cookie or header
+    return None  # Placeholder
+
+@app.post("/api/auth/register")
+def auth_register(username: str = Form(...), email: str = Form(...), password: str = Form(...)):
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": f"Auth module not available: {AUTH_IMPORT_ERROR}"}
+    try:
+        user = create_user(username, email, password)
+        token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
+        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/auth/login")
+def auth_login(username_or_email: str = Form(...), password: str = Form(...)):
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": f"Auth module not available: {AUTH_IMPORT_ERROR}"}
+    user = authenticate_user(username_or_email, password)
+    if not user:
+        return {"success": False, "error": "Invalid credentials"}
+    token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
+    return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+
+@app.get("/api/auth/me")
+def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "Auth module not available"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user = get_user_by_id(int(payload["sub"]))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    return {"success": True, "message": "Logged out"}

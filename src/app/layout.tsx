@@ -3,9 +3,11 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import PublicPreviewFooter from "@/components/PublicPreviewFooter";
+import DisclaimerModal from "@/components/DisclaimerModal";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AnalysisProvider } from "@/lib/analysis-context";
+import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
   title: "NeuroAccess - EEG Literacy Platform",
@@ -45,22 +47,25 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
-        <ThemeProvider>
-          <LanguageProvider>
-            <AnalysisProvider>
-              <div className="flex h-screen overflow-hidden">
-                <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <TopNav />
-                  <main className="flex-1 overflow-y-auto">
-                    {children}
-                  </main>
-                  <PublicPreviewFooter />
+        <AuthProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <AnalysisProvider>
+                <DisclaimerModal />
+                <div className="flex h-screen overflow-hidden">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <TopNav />
+                    <main className="flex-1 overflow-y-auto">
+                      {children}
+                    </main>
+                    <PublicPreviewFooter />
+                  </div>
                 </div>
-              </div>
-            </AnalysisProvider>
-          </LanguageProvider>
-        </ThemeProvider>
+              </AnalysisProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

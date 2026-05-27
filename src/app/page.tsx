@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 import { useAnalysis } from "@/lib/analysis-context";
 import IntroAnimation from "@/components/IntroAnimation";
 import {
@@ -221,6 +222,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 export default function UploadAnalysisCenter() {
   const { t } = useLang();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { user } = useAuth();
   const {
     files, running, expandId, setExpandId,
     handleFileSelect, removeFile, clearAll, startAnalysis,
@@ -316,11 +318,14 @@ export default function UploadAnalysisCenter() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={startAnalysis}
-                disabled={running || files.length === 0}
+                onClick={() => {
+                  if (!user) { window.location.href = "/login"; return; }
+                  startAnalysis();
+                }}
+                disabled={running || files.length === 0 || !user}
                 className="rounded-2xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-40"
               >
-                {running ? t("processing") : t("startAnalysis")}
+                {!user ? (t("pleaseLogin") || "Please login to analyze") : (running ? t("processing") : t("startAnalysis"))}
               </button>
               <button
                 onClick={clearAll}

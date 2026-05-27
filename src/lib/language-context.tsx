@@ -15,15 +15,18 @@ type LangContextType = {
 const LangContext = createContext<LangContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  // 初始值 "en"，避免 SSR 不匹配
   const [lang, setLangState] = useState<Lang>("en");
 
-  // Mount 后从 localStorage 读取保存的语言
+  // Mount 后检测：优先 localStorage，否则检测系统语言
   useEffect(() => {
     try {
       const saved = localStorage.getItem("neuroaccess-language");
       if (saved && LANGUAGES.includes(saved as Lang)) {
         setLangState(saved as Lang);
+      } else {
+        // 首次访问：检测系统语言
+        const sysLang = navigator.language || "en";
+        setLangState(sysLang.toLowerCase().startsWith("zh") ? "zh" : "en");
       }
     } catch {}
   }, []);
@@ -58,6 +61,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 export function useLang(): LangContextType {
   const ctx = useContext(LangContext);
-  if (!ctx) throw new Error("useLang must be used within LanguageProvider");
+  if (!ctx) {
+    // SSR fallback: return default en context without throwing
+    return {
+      lang: "en",
+      setLang: () => {},
+      toggleLang: () => {},
+      t: (key: string) => getText("en", key),
+    };
+  }
   return ctx;
 }
