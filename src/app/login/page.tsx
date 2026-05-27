@@ -4,14 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/language-context";
-import { useTheme } from "@/lib/theme-context";
 import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, loading } = useAuth();
   const { t } = useLang();
-  const { theme } = useTheme();
 
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,44 +29,42 @@ export default function LoginPage() {
     }
   };
 
-  const isDark = theme === "dark";
-
   return (
-    <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-[#0a0a0f]" : "bg-[#f8f9fb]"}`}>
-      <div className={`w-full max-w-md p-8 rounded-2xl ${isDark ? "bg-[#12121a] border border-[#1e1e2e]" : "bg-white border border-gray-100"}`}>
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f]">
+      <div className="w-full max-w-md p-8 rounded-2xl bg-[#12121a] border border-[#1e1e2e]">
         <div className="text-center mb-8">
-          <h1 className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+          <h1 className="text-2xl font-bold text-white">
             NeuroAccess
           </h1>
-          <p className={`mt-2 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+          <p className="mt-2 text-sm text-gray-400">
             {t("login") || "Login"}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label className="block text-sm font-medium mb-1.5 text-gray-300">
               {t("username") || "Username"} / {t("email") || "Email"}
             </label>
             <input
               type="text"
               value={usernameOrEmail}
               onChange={(e) => setUsernameOrEmail(e.target.value)}
-              className={`w-full px-3.5 py-2.5 rounded-xl border transition-colors ${isDark ? "bg-[#1a1a2e] border-[#2a2a4a] text-white placeholder-gray-500" : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"} focus:outline-none focus:border-gray-400`}
+              className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[#1a1a2e] border-[#2a2a4a] text-white placeholder-gray-500 focus:outline-none focus:border-gray-400"
               placeholder={t("username") || "Username"}
               required
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label className="block text-sm font-medium mb-1.5 text-gray-300">
               {t("password") || "Password"}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`w-full px-3.5 py-2.5 rounded-xl border transition-colors ${isDark ? "bg-[#1a1a2e] border-[#2a2a4a] text-white placeholder-gray-500" : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"} focus:outline-none focus:border-gray-400`}
+              className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[#1a1a2e] border-[#2a2a4a] text-white placeholder-gray-500 focus:outline-none focus:border-gray-400"
               placeholder={t("password") || "Password"}
               required
             />
@@ -83,13 +79,13 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className={`w-full py-2.5 px-4 rounded-2xl font-semibold text-sm transition-colors disabled:opacity-40 ${isDark ? "bg-white text-gray-900 hover:bg-gray-100" : "bg-gray-900 text-white hover:bg-gray-800"}`}
+            className="w-full py-2.5 px-4 rounded-2xl bg-white text-gray-900 font-semibold text-sm hover:bg-gray-100 disabled:opacity-40 transition-colors"
           >
             {submitting ? "..." : (t("loginButton") || "Login")}
           </button>
         </form>
 
-        <div className={`mt-6 text-center text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+        <div className="mt-6 text-center text-sm text-gray-400">
           {t("noAccount") || "Don't have an account?"}{" "}
           <Link href="/register" className="font-medium underline underline-offset-2 hover:opacity-70 transition-opacity">
             {t("register") || "Register"}
