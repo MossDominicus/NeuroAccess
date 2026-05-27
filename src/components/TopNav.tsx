@@ -28,7 +28,7 @@ export default function TopNav() {
           target_model_available: data.ollama === true,
           gpu_available: false,
           openrouter: data.openrouter === true,
-          model_name: data.model || "qwen2.5:7b",
+          model_name: data.openrouter ? "qwen-2.5-7b" : (data.model || "qwen2.5:7b"),
           error: null,
         });
       } catch (err) {
@@ -71,26 +71,26 @@ export default function TopNav() {
           <>
             {/* Ollama status */}
             <div className="flex items-center gap-1.5 text-xs">
-              {status.ollama_running ? (
+              {status.ollama_running || status.openrouter ? (
                 <CheckCircle className="w-3.5 h-3.5 text-green-500" />
               ) : (
                 <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
               )}
-              <span className={status.ollama_running ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
-                {status.ollama_running ? t("aiOnline") : t("aiOffline")}
+              <span className={status.ollama_running || status.openrouter ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                {status.ollama_running || status.openrouter ? t("aiOnline") : t("aiOffline")}
               </span>
             </div>
 
             {/* Model status */}
-            {status.ollama_running && (
+            {(status.ollama_running || status.openrouter) && (
               <div className="flex items-center gap-1.5 text-xs">
-                {status.target_model_available ? (
+                {status.target_model_available || status.openrouter ? (
                   <CheckCircle className="w-3.5 h-3.5 text-green-500" />
                 ) : (
                   <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
                 )}
                 <span className="text-[var(--color-text-secondary)]">
-                  {status.target_model_available ? status.model_name : t("modelNotLoaded")}
+                  {status.target_model_available || status.openrouter ? status.model_name : t("modelNotLoaded")}
                 </span>
               </div>
             )}
