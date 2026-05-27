@@ -83,7 +83,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 rounded-2xl bg-gray-900 text-white font-semibold text-sm hover:bg-gray-800 disabled:opacity-40 transition-colors dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+            className={`w-full py-2.5 px-4 rounded-2xl font-semibold text-sm transition-colors disabled:opacity-40 ${isDark ? "bg-white text-gray-900 hover:bg-gray-100" : "bg-gray-900 text-white hover:bg-gray-800"}`}
           >
             {submitting ? "..." : (t("loginButton") || "Login")}
           </button>
