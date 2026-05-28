@@ -235,7 +235,10 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
 # =================================================================
 
 try:
-    from auth import create_user, authenticate_user, create_access_token, verify_token, get_user_by_id
+    from auth import (
+        create_user, authenticate_user, create_access_token, verify_token, get_user_by_id,
+        generate_verification_code, verify_verification_code, update_password,
+    )
     AUTH_AVAILABLE = True
 except Exception as _auth_e:
     AUTH_AVAILABLE = False
@@ -290,3 +293,50 @@ def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
 @app.post("/api/auth/logout")
 def auth_logout():
     return {"success": True, "message": "Logged out"}
+
+
+@app.post("/api/auth/verification-code")
+def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Generate a 6-digit verification code for password change."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "Auth module not available"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    code = generate_verification_code(user_id, purpose="password_change")
+    return {"success": True, "code": code, "message": "Verification code generated", "expires_in": 600}
+
+
+@app.post("/api/auth/change-password")
+def auth_change_password(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    verification_code: str = Form(...),
+    new_password: str = Form(...),
+):
+    """Change password with verification code."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "Auth module not available"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Verify the code
+    if not verify_verification_code(user_id, verification_code, purpose="password_change"):
+        return {"success": False, "error": "Invalid or expired verification code"}
+    # Update password
+    try:
+        updated = update_password(user_id, new_password)
+        if updated:
+            return {"success": True, "message": "Password updated successfully"}
+        return {"success": False, "error": "Failed to update password"}
+    except ValueError as e:
+        return {"success": False, "error": str(e)}

@@ -5,6 +5,7 @@ NeuroAccess Auth Module
 - JWT token authentication
 """
 import os
+import random
 import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -32,7 +33,7 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db():
-    """Initialize users table"""
+    """Initialize users and verification_codes tables"""
     conn = get_db()
     conn.execute(
         """
@@ -42,6 +43,20 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS verification_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            code TEXT NOT NULL,
+            purpose TEXT NOT NULL DEFAULT 'password_change',
+            expires_at TIMESTAMP NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
         """
     )
@@ -147,6 +162,65 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
         if row:
             return dict(row)
         return None
+    finally:
+        conn.close()
+
+
+def generate_verification_code(user_id: int, purpose: str = "password_change") -> str:
+    """Generate a 6-digit verification code for the user. Returns the code."""
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    conn = get_db()
+    try:
+        # Invalidate any existing unused codes for this user + purpose
+        conn.execute(
+            "UPDATE verification_codes SET used = 1 WHERE user_id = ? AND purpose = ? AND used = 0",
+            (user_id, purpose),
+        )
+        conn.execute(
+            "INSERT INTO verification_codes (user_id, code, purpose, expires_at) VALUES (?, ?, ?, ?)",
+            (user_id, code, purpose, expires_at.isoformat()),
+        )
+        conn.commit()
+        return code
+    finally:
+        conn.close()
+
+
+def verify_verification_code(user_id: int, code: str, purpose: str = "password_change") -> bool:
+    """Verify a 6-digit code for the user. Marks it as used if valid."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, expires_at FROM verification_codes WHERE user_id = ? AND code = ? AND purpose = ? AND used = 0",
+            (user_id, code, purpose),
+        ).fetchone()
+        if not row:
+            return False
+        # Check expiry
+        expires = datetime.fromisoformat(row["expires_at"])
+        if datetime.utcnow() > expires:
+            return False
+        # Mark as used
+        conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def update_password(user_id: int, new_password: str) -> bool:
+    """Update user password. Returns True on success."""
+    if len(new_password) < 6:
+        raise ValueError("Password must be at least 6 characters")
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()
 
