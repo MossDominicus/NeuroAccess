@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/language-context";
 import Link from "next/link";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://43.160.220.53:8000";
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loading } = useAuth();
   const { t } = useLang();
 
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -20,12 +20,25 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
-    const result = await login(usernameOrEmail, password);
-    setSubmitting(false);
-    if (result.success) {
-      router.push("/");
-    } else {
-      setError(result.error || "Login failed");
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username_or_email: usernameOrEmail, password }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        localStorage.setItem("neuroaccess-token", data.token);
+        localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
+        router.push("/");
+      } else {
+        setError(data.error || "Login failed");
+      }
+    } catch (err: any) {
+      setError(err.message || "Network error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
