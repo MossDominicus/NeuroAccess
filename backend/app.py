@@ -376,6 +376,7 @@ Message:
         log_path = os.path.join(BASE_DIR, "feedback.log")
         with open(log_path, "a") as f2:
             f2.write("\n=== " + ts + " ===\n" + email_body + "\n")
+        return {"success": True, "message": "Feedback received"}
     except Exception as e:
         print(f"[Feedback] Error: {e}")
         return {"success": False, "error": str(e)}
