@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Moon, Sun, Monitor, User, X, AlertTriangle, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, User, X, AlertTriangle, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import FeedbackPanel from "@/components/FeedbackPanel";
 
 type SettingsPanelProps = {
   open: boolean;
@@ -28,6 +29,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -368,6 +370,30 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   <AlertTriangle className="w-4 h-4 text-yellow-500" />
                   <span>{t("viewDisclaimer") || "查看免责声明"}</span>
                 </button>
+              </section>
+
+              {/* 反馈 */}
+              <section>
+                <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+                  {t("feedback") || "反馈"}
+                </h3>
+                <div className="rounded-xl bg-[var(--color-bg)]">
+                  <button
+                    onClick={() => setShowFeedback(!showFeedback)}
+                    className="w-full flex items-center justify-between p-3 text-sm text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors rounded-xl"
+                  >
+                    <span className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                      {t("helpImprove") || "帮助改进 NeuroAccess"}
+                    </span>
+                    {showFeedback ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                  {showFeedback && (
+                    <div className="px-3 pb-3">
+                      <FeedbackPanel />
+                    </div>
+                  )}
+                </div>
               </section>
 
               {/* 关于 */}

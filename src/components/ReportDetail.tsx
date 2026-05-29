@@ -5,7 +5,6 @@ import { useLang } from "@/lib/language-context";
 import { StoredReport } from "@/lib/reports-storage";
 import FrequencyChart from "@/components/FrequencyChart";
 import AIExplanation from "@/components/AIExplanation";
-import FeedbackPanel from "@/components/FeedbackPanel";
 import {
   FileText, Activity, BarChart3, Brain, TrendingUp,
   Shield, AlertTriangle, CheckCircle, XCircle, Zap,
@@ -319,7 +318,6 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
       </div>
 
       {/* ── Section 9: Understanding Feedback ─────────── */}
-      <FeedbackPanel reportId={report.id} />
     </div>
   );
 }

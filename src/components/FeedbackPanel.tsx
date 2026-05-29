@@ -41,7 +41,7 @@ export function getFeedbackStats(): { total: number; readabilityRate: number; he
 }
 
 interface FeedbackPanelProps {
-  reportId: string;
+  reportId?: string;
 }
 
 export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
@@ -75,8 +75,8 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
 
   const handleSubmit = () => {
     const entry: FeedbackEntry = {
-      id: `${reportId}_${Date.now()}`,
-      reportId,
+      id: `${reportId || "general"}_${Date.now()}`,
+      reportId: reportId || "general",
       q1: q1 || "no",
       q2: q2 || "no",
       q3: q3 as FeedbackEntry["q3"],
