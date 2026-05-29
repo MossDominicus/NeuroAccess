@@ -321,28 +321,8 @@ export default function ReportsPage() {
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const { lang, t } = useLang();
 
-  // 加载时从 localStorage 读取，并自动清理旧假数据
+  // 加载时从 localStorage 读取报告
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("neuroaccess-reports");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const hasMock = parsed.some(
-            (r: any) =>
-              r.fileName === "S001R01.edf" ||
-              r.fileName === "S002R01.edf" ||
-              r.fileName === "S003R01.edf" ||
-              r.id === "r1" ||
-              r.id === "r2" ||
-              r.id === "r3",
-          );
-          if (hasMock) {
-            localStorage.removeItem("neuroaccess-reports");
-          }
-        }
-      }
-    } catch {}
     setReports(loadReports());
   }, []);
 
