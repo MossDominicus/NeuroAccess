@@ -372,27 +372,7 @@ Rating: {rating or "N/A"}
 Message:
 {message}
 """
-        resend_key = os.getenv("RESEND_API_KEY", "")
-        if resend_key:
-            try:
-                import urllib.request, urllib.error, json
-                payload = json.dumps({
-                    "from": "NeuroAccess <onboarding@resend.dev>",
-                    "to": ["moss.dominicus@gmail.com"],
-                    "subject": f"[NeuroAccess Feedback] {type_ or 'General'}",
-                    "text": email_body,
-                }).encode()
-                req = urllib.request.Request(
-                    "https://api.resend.com/emails",
-                    data=payload,
-                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    result = json.loads(resp.read().decode())
-                    print(f"[Feedback] Email sent: {result}")
-            except Exception as mail_err:
-                print(f"[Feedback] Email failed: {mail_err}")
+        # Email sending disabled - feedback logged to file only
         log_path = os.path.join(BASE_DIR, "feedback.log")
         with open(log_path, "a") as f2:
             f2.write("\n=== " + ts + " ===\n" + email_body + "\n")
