@@ -340,3 +340,62 @@ def auth_change_password(
         return {"success": False, "error": "Failed to update password"}
     except ValueError as e:
         return {"success": False, "error": str(e)}
+
+# =================================================================
+# Feedback API
+# =================================================================
+
+@app.post("/api/feedback")
+async def submit_feedback(request: Request):
+    """Receive user feedback and send email notification."""
+    try:
+        try:
+            body_json = await request.json()
+        except:
+            body_json = {}
+        name = body_json.get("name", "")
+        email = body_json.get("email", "")
+        type_ = body_json.get("type", "")
+        message = body_json.get("message", "")
+        rating = body_json.get("rating", "")
+        
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        email_body = f"""New Feedback Received
+
+Time: {ts}
+Type: {type_}
+Name: {name or "Anonymous"}
+Email: {email or "Not provided"}
+Rating: {rating or "N/A"}
+
+Message:
+{message}
+"""
+        resend_key = os.getenv("RESEND_API_KEY", "")
+        if resend_key:
+            try:
+                import urllib.request, urllib.error, json
+                payload = json.dumps({
+                    "from": "NeuroAccess <onboarding@resend.dev>",
+                    "to": ["moss.dominicus@gmail.com"],
+                    "subject": f"[NeuroAccess Feedback] {type_ or 'General'}",
+                    "text": email_body,
+                }).encode()
+                req = urllib.request.Request(
+                    "https://api.resend.com/emails",
+                    data=payload,
+                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    result = json.loads(resp.read().decode())
+                    print(f"[Feedback] Email sent: {result}")
+            except Exception as mail_err:
+                print(f"[Feedback] Email failed: {mail_err}")
+        log_path = os.path.join(BASE_DIR, "feedback.log")
+        with open(log_path, "a") as f2:
+            f2.write("\n=== " + ts + " ===\n" + email_body + "\n")
+    except Exception as e:
+        print(f"[Feedback] Error: {e}")
+        return {"success": False, "error": str(e)}

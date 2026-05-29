@@ -73,19 +73,36 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
     return dict[key]?.[lang] || key;
   };
 
-  const handleSubmit = () => {
-    const entry: FeedbackEntry = {
-      id: `${reportId || "general"}_${Date.now()}`,
-      reportId: reportId || "general",
-      q1: q1 || "no",
-      q2: q2 || "no",
-      q3: q3 as FeedbackEntry["q3"],
-      q4,
-      timestamp: new Date().toISOString(),
+  const handleSubmit = async () => {
+    const payload = {
+      name: "",
+      email: "",
+      type: reportId ? "report" : "general",
+      message: `Q1: ${q1}\nQ2: ${q2}\nQ3: ${q3}\nQ4: ${q4}`,
+      rating: "",
     };
-    const entries = loadFeedback();
-    entries.unshift(entry);
-    saveFeedback(entries);
+    try {
+      const resp = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error("API failed");
+    } catch {
+      // fallback: save to localStorage if API fails
+      const entry: FeedbackEntry = {
+        id: `${reportId || "general"}_${Date.now()}`,
+        reportId: reportId || "general",
+        q1: q1 || "no",
+        q2: q2 || "no",
+        q3: q3 as FeedbackEntry["q3"],
+        q4,
+        timestamp: new Date().toISOString(),
+      };
+      const entries = loadFeedback();
+      entries.unshift(entry);
+      saveFeedback(entries);
+    }
     setSubmitted(true);
   };
 
