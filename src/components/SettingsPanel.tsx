@@ -45,8 +45,8 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       });
       const data = await resp.json();
       if (data.success) {
-        setApiCode(data.code);
-        setPwSuccess(t("codeGenerated") || "验证码已生成，10分钟内有效");
+        setApiCode(null); // backend no longer returns code
+        setPwSuccess(t("codeSentToEmail") || "Verification code sent to your email, valid for 10 minutes");
       } else {
         setPwError(data.error || "Failed to generate code");
       }
@@ -260,15 +260,6 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                           </button>
                         </div>
 
-                        {apiCode && (
-                          <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
-                            <p className="text-xs text-amber-700 dark:text-amber-400">{t("yourCode") || "您的验证码"}</p>
-                            <p className="text-lg font-mono font-bold text-amber-800 dark:text-amber-300 tracking-widest">{apiCode}</p>
-                            <p className="text-[10px] text-amber-600 dark:text-amber-500">{t("codeValidFor10Min") || "10分钟内有效"}</p>
-                          </div>
-                        )}
-
-                        {/* Code input */}
                         <input
                           type="text"
                           inputMode="numeric"

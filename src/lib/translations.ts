@@ -4,6 +4,7 @@ export type Lang = "zh" | "en" | "es" | "fr" | "de" | "ja" | "ko";
 export const translations: Record<Lang, Record<string, string>> = {
   zh: {
 
+
     pdfExportFailed: "PDF 导出失败：",
     popupBlocked: "请允许浏览器弹窗以导出 PDF，或在地址栏点击允许弹窗后重试。",
 
@@ -310,7 +311,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "修改密码",
     getCode: "获取验证码",
     yourCode: "您的验证码",
-    codeValidFor10Min: "10分钟内有效",
+      codeSentToEmail: "验证码已发送到您的邮箱，10分钟内有效",
+      codeValidFor10Min: "10分钟内有效",
     enterCode: "输入验证码",
     newPassword: "新密码",
     confirmNewPassword: "确认新密码",
@@ -361,6 +363,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   },
 
   en: {
+
 
     pdfExportFailed: "PDF export failed: ",
     popupBlocked: "Please allow browser popup to export PDF, or click allow in address bar and retry.",
@@ -669,7 +672,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "Change Password",
     getCode: "Get Code",
     yourCode: "Your Code",
-    codeValidFor10Min: "Valid for 10 minutes",
+      codeSentToEmail: "Verification code sent to your email, valid for 10 minutes",
+      codeValidFor10Min: "Valid for 10 minutes",
     enterCode: "Enter code",
     newPassword: "New Password",
     confirmNewPassword: "Confirm New Password",
@@ -723,6 +727,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   // Spanish (es)
   // ─────────────────────────────────────────────
   es: {
+
 
     pdfExportFailed: "Error al exportar PDF: ",
     popupBlocked: "Por favor permita las ventanas emergentes para exportar PDF, o haga clic en permitir en la barra de direcciones y reintente.",
@@ -1006,7 +1011,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "Cambiar contraseña",
     getCode: "Obtener código",
     yourCode: "Su código",
-    codeValidFor10Min: "Válido por 10 minutos",
+      codeSentToEmail: "Código de verificación enviado a su correo, válido por 10 minutos",
+      codeValidFor10Min: "Válido por 10 minutos",
     enterCode: "Ingrese el código",
     newPassword: "Nueva contraseña",
     confirmNewPassword: "Confirmar nueva contraseña",
@@ -1060,6 +1066,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   // French (fr)
   // ─────────────────────────────────────────────
   fr: {
+
 
     pdfExportFailed: "Échec de l'exportation PDF : ",
     popupBlocked: "Veuillez autoriser les fenêtres pop-up pour exporter le PDF, ou cliquez sur autoriser dans la barre d'adresse et réessayez.",
@@ -1343,7 +1350,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "Changer le mot de passe",
     getCode: "Obtenir le code",
     yourCode: "Votre code",
-    codeValidFor10Min: "Valide pendant 10 minutes",
+      codeSentToEmail: "Code de vérification envoyé à votre email, valable 10 minutes",
+      codeValidFor10Min: "Valable 10 minutes",
     enterCode: "Entrez le code",
     newPassword: "Nouveau mot de passe",
     confirmNewPassword: "Confirmer le nouveau mot de passe",
@@ -1397,6 +1405,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   // German (de)
   // ─────────────────────────────────────────────
   de: {
+
 
     pdfExportFailed: "PDF-Export fehlgeschlagen: ",
     popupBlocked: "Bitte erlauben Sie Browser-Popups zum PDF-Export, oder klicken Sie auf erlauben in der Adressleiste und versuchen Sie es erneut.",
@@ -1680,7 +1689,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "Passwort ändern",
     getCode: "Code erhalten",
     yourCode: "Ihr Code",
-    codeValidFor10Min: "10 Minuten gültig",
+      codeSentToEmail: "Verifizierungscode an Ihre E-Mail gesendet, 10 Minuten gültig",
+      codeValidFor10Min: "Gültig für 10 Minuten",
     enterCode: "Code eingeben",
     newPassword: "Neues Passwort",
     confirmNewPassword: "Neues Passwort bestätigen",
@@ -1734,6 +1744,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   // Japanese (ja)
   // ─────────────────────────────────────────────
   ja: {
+
 
     pdfExportFailed: "PDFエクスポート失敗：",
     popupBlocked: "PDFをエクスポートするためにブラウザのポップアップを許可してください。またはアドレスバーで許可をクリックして再試行してください。",
@@ -2017,7 +2028,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "パスワードを変更",
     getCode: "認証コードを取得",
     yourCode: "認証コード",
-    codeValidFor10Min: "10分間有効",
+      codeSentToEmail: "確認コードがメールに送信されました、10分間有効です",
+      codeValidFor10Min: "10分間有効",
     enterCode: "認証コードを入力",
     newPassword: "新しいパスワード",
     confirmNewPassword: "新しいパスワード（確認）",
@@ -2071,6 +2083,7 @@ export const translations: Record<Lang, Record<string, string>> = {
   // Korean (ko)
   // ─────────────────────────────────────────────
   ko: {
+
 
     pdfExportFailed: "PDF 내보내기 실패: ",
     popupBlocked: "PDF를 내보내기 위해 브라우저 팝업을 허용하거나, 주소 표시줄에서 허용을 클릭하고 다시 시도하십시오.",
@@ -2354,7 +2367,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     changePassword: "비밀번호 변경",
     getCode: "인증 코드 받기",
     yourCode: "인증 코드",
-    codeValidFor10Min: "10분간 유효",
+      codeSentToEmail: "확인 코드가 이메일로 전송되었습니다, 10분간 유효함",
+      codeValidFor10Min: "10분간 유효함",
     enterCode: "인증 코드 입력",
     newPassword: "새 비밀번호",
     confirmNewPassword: "새 비밀번호 확인",

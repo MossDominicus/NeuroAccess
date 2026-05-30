@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Cpu, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 
 interface OllamaStatus {
   ollama_running: boolean;
@@ -15,6 +16,7 @@ interface OllamaStatus {
 
 export default function TopNav() {
   const { t } = useLang();
+  const { user } = useAuth();
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -71,18 +73,18 @@ export default function TopNav() {
           <>
             {/* Ollama status */}
             <div className="flex items-center gap-1.5 text-xs">
-              {status.ollama_running || status.openrouter ? (
+              {user && (status.ollama_running || status.openrouter) ? (
                 <CheckCircle className="w-3.5 h-3.5 text-green-500" />
               ) : (
                 <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
               )}
-              <span className={status.ollama_running || status.openrouter ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
-                {status.ollama_running || status.openrouter ? t("aiOnline") : t("aiOffline")}
+              <span className={user && (status.ollama_running || status.openrouter) ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                {user && (status.ollama_running || status.openrouter) ? t("aiOnline") : t("aiOffline")}
               </span>
             </div>
 
             {/* Model status */}
-            {(status.ollama_running || status.openrouter) && (
+            {user && (status.ollama_running || status.openrouter) && (
               <div className="flex items-center gap-1.5 text-xs">
                 {status.target_model_available || status.openrouter ? (
                   <CheckCircle className="w-3.5 h-3.5 text-green-500" />

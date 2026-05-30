@@ -15,6 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from utils import safe_float, to_jsonable, safe_name, normalize_language
 from explanations import generate_explanations, template_beginner, template_student, template_research
 import i18n
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 BASE_DIR   = os.path.dirname(__file__)
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -293,6 +297,52 @@ def auth_logout():
     return {"success": True, "message": "Logged out"}
 
 
+
+def send_verification_email(to_email: str, code: str) -> bool:
+    """Send verification code to user's email. Returns True on success."""
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    from_addr = os.getenv("SMTP_FROM", smtp_user)
+    
+    if not smtp_user or not smtp_pass:
+        print(f"[Email] SMTP not configured, skipping email send. Code for {to_email}: {code}")
+        return False
+    
+    subject = "NeuroAccess - Password Change Verification Code"
+    body = f"""Hello,
+
+You requested to change your password on NeuroAccess.
+
+Your verification code is: {code}
+
+This code expires in 10 minutes.
+
+If you did not request this, please ignore this email.
+
+Best regards,
+NeuroAccess Team
+"""
+    
+    msg = MIMEMultipart()
+    msg["From"] = from_addr
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+    
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.starttls(context=context)
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(from_addr, [to_email], msg.as_string())
+        print(f"[Email] Verification code sent to {to_email}")
+        return True
+    except Exception as e:
+        print(f"[Email] Failed to send email to {to_email}: {e}")
+        return False
+
 @app.post("/api/auth/verification-code")
 def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Generate a 6-digit verification code for password change."""
@@ -307,7 +357,9 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     code = generate_verification_code(user_id, purpose="password_change")
-    return {"success": True, "code": code, "message": "Verification code generated", "expires_in": 600}
+    # Send email with verification code
+    email_sent = send_verification_email(user["email"], code)
+    return {"success": True, "message": "Verification code sent to your email" if email_sent else "Verification code generated (email not configured, check server logs)", "expires_in": 600}
 
 
 @app.post("/api/auth/change-password")
