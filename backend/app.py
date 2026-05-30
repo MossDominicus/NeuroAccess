@@ -15,10 +15,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from utils import safe_float, to_jsonable, safe_name, normalize_language
 from explanations import generate_explanations, template_beginner, template_student, template_research
 import i18n
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 BASE_DIR   = os.path.dirname(__file__)
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -299,19 +295,19 @@ def auth_logout():
 
 
 def send_verification_email(to_email: str, code: str) -> bool:
-    """Send verification code to user's email. Returns True on success."""
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_pass = os.getenv("SMTP_PASS", "")
-    from_addr = os.getenv("SMTP_FROM", smtp_user)
-    
-    if not smtp_user or not smtp_pass:
-        print(f"[Email] SMTP not configured, skipping email send. Code for {to_email}: {code}")
+    """Send verification code via Resend API. Returns True on success."""
+    resend_key = os.getenv("RESEND_API_KEY", "")
+    if not resend_key:
+        print(f"[Email] RESEND_API_KEY not configured. Code for {to_email}: {code}")
         return False
     
-    subject = "NeuroAccess - Password Change Verification Code"
-    body = f"""Hello,
+    import json, urllib.request, urllib.error
+    url = "https://api.resend.com/emails"
+    payload = json.dumps({
+        "from": "NeuroAccess <noreply@neuroaccess.cloud>",
+        "to": [to_email],
+        "subject": "NeuroAccess - Password Change Verification Code",
+        "text": f"""Hello,
 
 You requested to change your password on NeuroAccess.
 
@@ -324,23 +320,23 @@ If you did not request this, please ignore this email.
 Best regards,
 NeuroAccess Team
 """
-    
-    msg = MIMEMultipart()
-    msg["From"] = from_addr
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-    
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {resend_key}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
     try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-            server.starttls(context=context)
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(from_addr, [to_email], msg.as_string())
-        print(f"[Email] Verification code sent to {to_email}")
-        return True
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            print(f"[Email] Resend success: {result}")
+            return True
     except Exception as e:
-        print(f"[Email] Failed to send email to {to_email}: {e}")
+        print(f"[Email] Resend failed: {e}")
         return False
 
 @app.post("/api/auth/verification-code")
