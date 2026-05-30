@@ -320,7 +320,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     )}
 
                     <button
-                      onClick={() => { logout(); onClose(); }}
+                      onClick={() => { logout(); window.location.href = "/"; }}
                       className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                     >
                       <LogOut className="w-3.5 h-3.5" />
