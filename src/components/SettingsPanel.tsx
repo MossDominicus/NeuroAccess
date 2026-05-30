@@ -396,6 +396,16 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 </div>
               </section>
 
+              {/* 移动端提示 */}
+              <section>
+                <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex items-start gap-3">
+                  <Monitor className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                    {t("mobileNotOptimized") || "This website is not optimized for mobile devices."}
+                  </p>
+                </div>
+              </section>
+
               {/* 关于 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
