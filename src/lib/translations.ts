@@ -33,6 +33,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "上传与分析中心",
     batchAnalysis: "批量分析",
     cases: "案例库",
+    casesSearchPlaceholder: "搜索案例标题、描述或标签...",
+    casesSortDefault: "默认排序",
+    casesSortDifficulty: "难度",
     guide: "使用指南",
     sidebarGuide: "EEG 知识",
     reports: "报告",
@@ -151,6 +154,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "删除后无法恢复，是否继续？",
     batchDelete: "批量删除",
     batchDeleteCount: "批量删除 ({count} 条)",
+    batchDeleteConfirm: "将删除 {count} 条报告，此操作不可恢复，是否继续？",
     viewDetail: "查看详情",
     reportDetail: "报告详情",
     bandpower: "频段能量",
@@ -448,6 +452,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "Upload & Analysis Center",
     batchAnalysis: "Batch Analysis",
     cases: "Case Studies",
+    casesSearchPlaceholder: "Search case title, description, or tags...",
+    casesSortDefault: "Default",
+    casesSortDifficulty: "Difficulty",
     guide: "Guide",
     sidebarGuide: "EEG Knowledge",
     reports: "Reports",
@@ -553,7 +560,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     cpuMode: "CPU Mode",
 
     // Language switch button
-    langSwitch: "中文",
+    langSwitch: "EN",
 
     // Error messages
     cannotConnectBackend: "Cannot connect to backend server. Please ensure backend is running.",
@@ -590,6 +597,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "This action cannot be undone. Continue?",
     batchDelete: "Batch Delete",
     batchDeleteCount: "Batch Delete ({count})",
+    batchDeleteConfirm: "This will delete {count} reports. This action cannot be undone. Continue?",
     viewDetail: "View Detail",
     reportDetail: "Report Detail",
     bandpower: "Bandpower",
@@ -839,6 +847,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   es: {
 
 
+
+    title: "NeuroAccess",
     pdfExportFailed: "Error al exportar PDF: ",
     popupBlocked: "Por favor permita las ventanas emergentes para exportar PDF, o haga clic en permitir en la barra de direcciones y reintente.",
 
@@ -866,6 +876,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "Centro de Carga y Análisis",
     batchAnalysis: "Análisis por Lotes",
     cases: "Casos de Estudio",
+    casesSearchPlaceholder: "Buscar título, descripción o etiquetas del caso...",
+    casesSortDefault: "Predeterminado",
+    casesSortDifficulty: "Dificultad",
     guide: "Guía",
     sidebarGuide: "Conocimiento de EEG",
     reports: "Informes",
@@ -958,7 +971,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     gpuAvailable: "GPU Disponible",
     cpuMode: "Modo CPU",
 
-    langSwitch: "中文",
+    langSwitch: "ES",
 
     cannotConnectBackend: "No se puede conectar al servidor backend. Por favor asegúrate de que el backend esté ejecutándose.",
     invalidJsonFromBackend: "El backend devolvió una respuesta no JSON",
@@ -992,6 +1005,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "Esta acción no se puede deshacer. ¿Continuar?",
     batchDelete: "Eliminación por Lotes",
     batchDeleteCount: "Eliminación por Lotes ({count})",
+    batchDeleteConfirm: "Esto eliminará {count} informes. Esta acción no se puede deshacer. ¿Continuar?",
     viewDetail: "Ver Detalle",
     reportDetail: "Detalle del Informe",
     bandpower: "Potencia de Banda",
@@ -1233,6 +1247,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   fr: {
 
 
+
+    title: "NeuroAccess",
     pdfExportFailed: "Échec de l'exportation PDF : ",
     popupBlocked: "Veuillez autoriser les fenêtres pop-up pour exporter le PDF, ou cliquez sur autoriser dans la barre d'adresse et réessayez.",
 
@@ -1260,6 +1276,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "Centre de Téléchargement et Analyse",
     batchAnalysis: "Analyse par Lots",
     cases: "Études de Cas",
+    casesSearchPlaceholder: "Rechercher titre, description ou étiquettes du cas...",
+    casesSortDefault: "Par défaut",
+    casesSortDifficulty: "Dificulté",
     guide: "Guide",
     sidebarGuide: "Connaissances EEG",
     reports: "Rapports",
@@ -1352,7 +1371,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     gpuAvailable: "GPU Disponible",
     cpuMode: "Mode CPU",
 
-    langSwitch: "中文",
+    langSwitch: "FR",
 
     cannotConnectBackend: "Impossible de se connecter au serveur backend. Veuillez vous assurer que le backend est en cours d'exécution.",
     invalidJsonFromBackend: "Le backend a renvoyé une réponse non JSON",
@@ -1386,6 +1405,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "Cette action ne peut pas être annulée. Continuer?",
     batchDelete: "Suppression par Lots",
     batchDeleteCount: "Suppression par Lots ({count})",
+    batchDeleteConfirm: "Cela supprimera {count} rapports. Cette action ne peut pas être annulée. Continuer?",
     viewDetail: "Voir le Détail",
     reportDetail: "Détail du Rapport",
     bandpower: "Puissance de Bande",
@@ -1627,6 +1647,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   de: {
 
 
+
+    title: "NeuroAccess",
     pdfExportFailed: "PDF-Export fehlgeschlagen: ",
     popupBlocked: "Bitte erlauben Sie Browser-Popups zum PDF-Export, oder klicken Sie auf erlauben in der Adressleiste und versuchen Sie es erneut.",
 
@@ -1654,6 +1676,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "Upload- und Analysezentrum",
     batchAnalysis: "Stapelanalyse",
     cases: "Fallstudien",
+    casesSearchPlaceholder: "Falltitel, Beschreibung oder Tags suchen...",
+    casesSortDefault: "Standard",
+    casesSortDifficulty: "Schwierigkeit",
     guide: "Leitfaden",
     sidebarGuide: "EEG-Wissen",
     reports: "Berichte",
@@ -1746,7 +1771,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     gpuAvailable: "GPU Verfügbar",
     cpuMode: "CPU-Modus",
 
-    langSwitch: "中文",
+    langSwitch: "DE",
 
     cannotConnectBackend: "Kann keine Verbindung zum Backend-Server herstellen. Bitte stellen Sie sicher, dass das Backend läuft.",
     invalidJsonFromBackend: "Backend hat eine Nicht-JSON-Antwort zurückgegeben",
@@ -1780,6 +1805,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "Diese Aktion kann nicht rückgängig gemacht werden. Fortfahren?",
     batchDelete: "Stapellöschen",
     batchDeleteCount: "Stapellöschen ({count})",
+    batchDeleteConfirm: "Dies wird {count} Berichte löschen. Diese Aktion kann nicht rückgängig gemacht werden. Fortfahren?",
     viewDetail: "Details Anzeigen",
     reportDetail: "Berichtdetails",
     bandpower: "Bandpower",
@@ -2021,6 +2047,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   ja: {
 
 
+
+    title: "NeuroAccess",
     pdfExportFailed: "PDFエクスポート失敗：",
     popupBlocked: "PDFをエクスポートするためにブラウザのポップアップを許可してください。またはアドレスバーで許可をクリックして再試行してください。",
 
@@ -2048,6 +2076,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "アップロードと分析センター",
     batchAnalysis: "バッチ分析",
     cases: "ケーススタディ",
+    casesSearchPlaceholder: "ケースのタイトル、説明、タグを検索...",
+    casesSortDefault: "デフォルトソート",
+    casesSortDifficulty: "難易度",
     guide: "ガイド",
     sidebarGuide: "EEG知識",
     reports: "レポート",
@@ -2140,7 +2171,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     gpuAvailable: "GPU利用可能",
     cpuMode: "CPUモード",
 
-    langSwitch: "中文",
+    langSwitch: "日本語",
 
     cannotConnectBackend: "バックエンドサーバーに接続できません。バックエンドが実行されていることを確認してください。",
     invalidJsonFromBackend: "バックエンドが非JSON応答を返しました",
@@ -2174,6 +2205,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "この操作は元に戻せません。続行しますか？",
     batchDelete: "バッチ削除",
     batchDeleteCount: "バッチ削除（{count}件）",
+    batchDeleteConfirm: "{count}件のレポートを削除します。この操作は取り消せません。続行しますか？",
     viewDetail: "詳細表示",
     reportDetail: "レポート詳細",
     bandpower: "バンドパワー",
@@ -2415,6 +2447,8 @@ export const translations: Record<Lang, Record<string, string>> = {
   ko: {
 
 
+
+    title: "NeuroAccess",
     pdfExportFailed: "PDF 내보내기 실패: ",
     popupBlocked: "PDF를 내보내기 위해 브라우저 팝업을 허용하거나, 주소 표시줄에서 허용을 클릭하고 다시 시도하십시오.",
 
@@ -2442,6 +2476,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadEEG: "업로드 및 분석 센터",
     batchAnalysis: "배치 분석",
     cases: "케이스 스터디",
+    casesSearchPlaceholder: "케이스 제목, 설명 또는 태그 검색...",
+    casesSortDefault: "기본 정렬",
+    casesSortDifficulty: "난이도",
     guide: "가이드",
     sidebarGuide: "EEG 지식",
     reports: "리포트",
@@ -2534,7 +2571,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     gpuAvailable: "GPU 사용 가능",
     cpuMode: "CPU 모드",
 
-    langSwitch: "中文",
+    langSwitch: "한국어",
 
     cannotConnectBackend: "백엔드 서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인하십시오.",
     invalidJsonFromBackend: "백엔드가 JSON이 아닌 응답을 반환했습니다",
@@ -2568,6 +2605,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     confirmDeleteDesc: "이 작업은 취소할 수 없습니다. 계속하시겠습니까?",
     batchDelete: "일괄 삭제",
     batchDeleteCount: "일괄 삭제 ({count}건)",
+    batchDeleteConfirm: "{count}개의 리포트를 삭제합니다. 이 작업은 취소할 수 없습니다. 계속하시겠습니까?",
     viewDetail: "상세 보기",
     reportDetail: "리포트 상세",
     bandpower: "대역 전력",

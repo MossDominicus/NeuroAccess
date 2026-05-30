@@ -420,7 +420,7 @@ export default function CasesPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={lang === "zh" ? "搜索案例标题、描述或标签..." : "Search case title, description, or tags..."}
+              placeholder={t("casesSearchPlaceholder")}
               className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-2.5 pl-10 pr-4 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 focus:border-[var(--color-primary)]/30 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10"
             />
           </div>
@@ -471,9 +471,9 @@ export default function CasesPage() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="text-xs rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-[var(--color-text)] focus:outline-none"
               >
-                <option value="default">{lang === "zh" ? "默认排序" : "Default"}</option>
+                <option value="default">{t("casesSortDefault")}</option>
                 <option value="quality">{t("quality")}</option>
-                <option value="difficulty">{lang === "zh" ? "难度" : "Difficulty"}</option>
+                <option value="difficulty">{t("casesSortDifficulty")}</option>
               </select>
             </div>
           </div>

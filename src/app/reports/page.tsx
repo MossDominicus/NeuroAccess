@@ -580,9 +580,7 @@ export default function ReportsPage() {
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-[var(--color-text)]">{t("batchDelete")}</h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                  {lang === "zh"
-                    ? `将删除 ${selected.length} 条报告，此操作不可恢复，是否继续？`
-                    : `This will delete ${selected.length} reports. This action cannot be undone. Continue?`}
+                  {t("batchDeleteConfirm").replace("{count}", String(selected.length))}
                 </p>
               </div>
               <div className="flex items-center gap-2 border-t border-[var(--color-border)] px-6 py-4">
