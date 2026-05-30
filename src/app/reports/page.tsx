@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 import {
   StoredReport,
   loadReports,
@@ -320,6 +321,7 @@ export default function ReportsPage() {
   const [deleteTarget, setDeleteTarget] = useState<StoredReport | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const { lang, t } = useLang();
+  const { user } = useAuth();
 
   // 加载时从 localStorage 读取报告
   useEffect(() => {
@@ -378,6 +380,21 @@ export default function ReportsPage() {
   const statCards = [
     { labelKey: "totalReports", value: reports.length, icon: FileText },
   ];
+
+  if (!user) {
+    return (
+      <motion.div
+        className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] text-[var(--color-text)]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <div className="text-center">
+          <FileText className="mx-auto mb-4 h-12 w-12 text-[var(--color-text-secondary)]/50" />
+          <p className="text-lg font-medium text-[var(--color-text)]">{t("pleaseLogin")}</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
