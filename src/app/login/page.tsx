@@ -32,7 +32,7 @@ export default function LoginPage() {
       if (data.success) {
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        router.push("/");
+        window.location.href = "/";
       } else {
         setError(data.error || "Login failed");
       }
@@ -119,6 +119,9 @@ export default function LoginPage() {
             {t("register") || "Register"}
           </Link>
         </div>
+        <p className="mt-3 text-center text-xs text-gray-500">
+          {t("refreshAfterLogin") || "After logging in, the page will auto-refresh. If not, please manually refresh."}
+        </p>
       </div>
     </div>
   );

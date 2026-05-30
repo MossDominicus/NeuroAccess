@@ -40,7 +40,7 @@ export default function RegisterPage() {
       if (data.success) {
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        router.push("/");
+        window.location.href = "/";
       } else {
         setError(data.error || "Registration failed");
       }

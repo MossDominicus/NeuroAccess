@@ -304,6 +304,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "登录",
     noAccount: "没有账号？",
+    refreshAfterLogin: "登录后请刷新页面",
     username: "用户名",
     email: "邮箱",
     password: "密码",
@@ -725,6 +726,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "Login",
     noAccount: "Don't have an account?",
+    refreshAfterLogin: "After logging in, please refresh the page",
     username: "Username",
     email: "Email",
     password: "Password",
@@ -1126,6 +1128,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "Iniciar sesión",
     noAccount: "¿No tiene cuenta?",
+    refreshAfterLogin: "Después de iniciar sesión, actualice la página",
     username: "Nombre de usuario",
     email: "Correo electrónico",
     password: "Contraseña",
@@ -1527,6 +1530,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "Connexion",
     noAccount: "Pas de compte ?",
+    refreshAfterLogin: "Après connexion, actualisez la page",
     username: "Nom d'utilisateur",
     email: "Email",
     password: "Mot de passe",
@@ -1928,6 +1932,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "Anmelden",
     noAccount: "Kein Konto?",
+    refreshAfterLogin: "Nach dem Login bitte Seite aktualisieren",
     username: "Benutzername",
     email: "E-Mail",
     password: "Passwort",
@@ -2329,6 +2334,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "ログイン",
     noAccount: "アカウントをお持ちでないですか？",
+    refreshAfterLogin: "ログイン後、ページを更新してください",
     username: "ユーザー名",
     email: "メールアドレス",
     password: "パスワード",
@@ -2730,6 +2736,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 登录/注册
     loginButton: "로그인",
     noAccount: "계정이 없으신가요?",
+    refreshAfterLogin: "로그인 후 페이지를 새로고침하세요",
     username: "사용자 이름",
     email: "이메일",
     password: "비밀번호",
