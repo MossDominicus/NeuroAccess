@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from utils import safe_float, to_jsonable, safe_name, normalize_language
 from explanations import generate_explanations, template_beginner, template_student, template_research
+import i18n
 
 BASE_DIR   = os.path.dirname(__file__)
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -98,23 +99,20 @@ def _compute_literacy_scores(data: Dict, quality: Dict, bp: Dict) -> Dict[str, A
 def _compute_confidence(data: Dict, sq: Any, quality: Dict, lang: str) -> Dict[str, str]:
     s = safe_float(sq, -1)
     reasons = []
-    if s < 55: reasons.append("low signal quality" if lang == "en" else "信号质量较低")
-    if s >= 80: reasons.append("stable waveform" if lang == "en" else "波形稳定")
+    if s < 55: reasons.append(i18n.get_signal_quality_text(lang, "low_signal_quality"))
+    if s >= 80: reasons.append(i18n.get_signal_quality_text(lang, "stable_waveform"))
     nc = len(quality.get("noisy_channels") or data.get("noisy_channels") or [])
-    if nc > 3: reasons.append("multiple noisy channels" if lang == "en" else "多个噪声通道")
+    if nc > 3: reasons.append(i18n.get_signal_quality_text(lang, "multiple_noisy_channels"))
     dur = data.get("overview", {}).get("duration") or data.get("duration") or "Unknown"
     if "sec" in str(dur).lower() or "秒" in str(dur):
-        if lang == "en": reasons.append("short recording")
-        else: reasons.append("记录时间短")
-    if s >= 90: level = "High" if lang == "en" else "较高"
-    elif s >= 55: level = "Moderate" if lang == "en" else "中等"
-    else: level = "Low" if lang == "en" else "较低"
-    return {"level": level, "reason": "; ".join(reasons) or ("stable metrics" if lang == "en" else "指标稳定")}
+        reasons.append(i18n.get_signal_quality_text(lang, "short_recording"))
+    if s >= 90: level = i18n.get_signal_quality_text(lang, "high")
+    elif s >= 55: level = i18n.get_signal_quality_text(lang, "moderate")
+    else: level = i18n.get_signal_quality_text(lang, "low")
+    return {"level": level, "reason": "; ".join(reasons) or i18n.get_signal_quality_text(lang, "stable_metrics")}
 
 def _get_limitations(lang: str) -> List[str]:
-    if lang == "en":
-        return ["Basic artifact rejection", "Montage metadata may be incomplete", "No task labels assumed", "Qualified reviewer should inspect raw traces"]
-    return ["基本的 artifact 处理", "Montage 元数据可能不完整", "无任务标签假设", "若用于研究，应由专业人员检查原始波形"]
+    return i18n.get_limitations(lang)
 
 def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any]:
     data = raw.get("data", raw)
@@ -214,7 +212,7 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
         if analyze_edf is None:
             return {"success": False, "file_name": saved.get("file_name"), "error": f"analyze_edf not available: {ANALYSIS_IMPORT_ERROR}"}
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(analyze_edf, saved["path"])
+            future = pool.submit(analyze_edf, saved["path"], lang)
             try:
                 raw_result = future.result(timeout=120)
             except concurrent.futures.TimeoutError:

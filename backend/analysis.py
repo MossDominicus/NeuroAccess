@@ -8,6 +8,7 @@ import numpy as np
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 import json
+import i18n
 
 
 @dataclass
@@ -72,8 +73,9 @@ class InterpretationConfidence:
 class EEGAnalyzer:
     """EEG 分析主引擎"""
 
-    def __init__(self, edf_path: str):
+    def __init__(self, edf_path: str, lang: str = "zh"):
         self.edf_path = edf_path
+        self.lang = lang
         self.raw = None
         self.overview = None
         self.quality = None
@@ -126,10 +128,11 @@ class EEGAnalyzer:
 
         # 检测伪影（简单启发式）
         possible_artifacts = []
+        lang = self.lang
         if len(noisy_channels) > len(ch_names) * 0.2:
-            possible_artifacts.append("过多噪声通道，可能存在肌电伪影")
+            possible_artifacts.append(i18n.get_artifact_text(lang, "many_noisy_channels"))
         if np.any(np.abs(data) > 1e-4):  # 异常大值
-            possible_artifacts.append("检测到异常大值，可能存在工频干扰")
+            possible_artifacts.append(i18n.get_artifact_text(lang, "large_values"))
 
         # 检测缺失数据
         missing_data = np.any(np.isnan(data)) or np.any(np.isinf(data))
@@ -308,31 +311,32 @@ class EEGAnalyzer:
 
         reasons = []
         limitations = []
+        lang = self.lang
 
         # 判断可信度
         if self.quality.signal_quality_score >= 80:
             level = "High"
-            reasons.append("信号质量评分较高")
+            reasons.append(i18n.get_confidence_reason(lang, "high_quality"))
         elif self.quality.signal_quality_score >= 50:
             level = "Moderate"
-            reasons.append("信号质量中等，部分通道存在噪声")
+            reasons.append(i18n.get_confidence_reason(lang, "moderate_quality"))
         else:
             level = "Low"
-            reasons.append("信号质量较低，存在较多噪声或伪影")
+            reasons.append(i18n.get_confidence_reason(lang, "low_quality"))
 
         if len(self.quality.noisy_channels) > 0:
-            limitations.append(f"存在 {len(self.quality.noisy_channels)} 个噪声通道，可能影响解释准确性")
+            limitations.append(i18n.get_confidence_limitation(lang, "noisy_channels", len(self.quality.noisy_channels)))
 
         if self.overview.recording_duration_seconds < 60:
-            limitations.append("记录时长较短（< 1分钟），统计结果可能不稳定")
+            limitations.append(i18n.get_confidence_limitation(lang, "short_duration"))
 
         if self.overview.channel_count < 8:
-            limitations.append("通道数较少，可能无法反映全脑活动")
+            limitations.append(i18n.get_confidence_limitation(lang, "few_channels"))
 
-        limitations.append("EEG 数据不能用于判断智商、性格、心理健康、疾病诊断")
-        limitations.append("EEG 数据不能用于判断情绪状态、注意力缺陷（如 ADHD）、抑郁症")
+        limitations.append(i18n.get_confidence_limitation(lang, "not_for_diagnosis_1"))
+        limitations.append(i18n.get_confidence_limitation(lang, "not_for_diagnosis_2"))
 
-        confidence_reason = "；".join(reasons)
+        confidence_reason = "; ".join(reasons)
 
         return InterpretationConfidence(
             level=level,
@@ -434,7 +438,7 @@ class EEGAnalyzer:
         return result
 
 
-def analyze_edf(edf_path: str) -> Dict[str, Any]:
+def analyze_edf(edf_path: str, lang: str = "zh") -> Dict[str, Any]:
     """便捷函数：分析单个 EDF 文件"""
-    analyzer = EEGAnalyzer(edf_path)
+    analyzer = EEGAnalyzer(edf_path, lang=lang)
     return analyzer.run_full_analysis()
