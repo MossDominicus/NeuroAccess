@@ -3,6 +3,7 @@
  * 使用 jsPDF 将 NeuroAccess 分析结果导出为 PDF
  */
 import jspdf from "jspdf";
+import type { Lang } from "@/lib/translations";
 
 export interface BatchPDFData {
   files: {
@@ -15,19 +16,38 @@ export interface BatchPDFData {
     analysisResult?: any;
     explainText?: string;
   }[];
-  lang?: "zh" | "en";
+  lang?: Lang;
 }
 
-const DISCLAIMER_ZH =
-  "本报告仅用于 EEG 科普、学习和辅助理解，不构成医学诊断、医疗建议或治疗建议。" +
-  "EEG 数据的专业解释需要由合格专业人员结合完整背景进行判断。" +
-  "本平台不会判断疾病、心理状态、智力、人格或健康风险。";
-
-const DISCLAIMER_EN =
-  "This report is intended only for EEG literacy, education, and assisted understanding. " +
-  "It is not medical advice, diagnosis, or treatment guidance. " +
-  "Professional EEG interpretation requires qualified experts and full clinical or research context. " +
-  "This platform does not determine disease, mental state, intelligence, personality, or health risk.";
+const DISCLAIMERS: Record<Lang, string> = {
+  zh: "本报告仅用于 EEG 科普、学习和辅助理解，不构成医学诊断、医疗建议或治疗建议。" +
+    "EEG 数据的专业解释需要由合格专业人员结合完整背景进行判断。" +
+    "本平台不会判断疾病、心理状态、智力、人格或健康风险。",
+  en: "This report is intended only for EEG literacy, education, and assisted understanding. " +
+    "It is not medical advice, diagnosis, or treatment guidance. " +
+    "Professional EEG interpretation requires qualified experts and full clinical or research context. " +
+    "This platform does not determine disease, mental state, intelligence, personality, or health risk.",
+  es: "Este informe tiene como único objetivo la alfabetización en EEG, educación y comprensión asistida. " +
+    "No es un consejo médico, diagnóstico ni guía de tratamiento. " +
+    "La interpretación profesional de EEG requiere expertos calificados y contexto clínico o de investigación completo. " +
+    "Esta plataforma no determina enfermedades, estado mental, inteligencia, personalidad o riesgo para la salud.",
+  fr: "Ce rapport est destiné uniquement à l'alphabétisation EEG, à l'éducation et à la compréhension assistée. " +
+    "Ce n'est pas un conseil médical, un diagnosstic ou une orientation de traitement. " +
+    "L'interprétation professionelle de l'EEG nécessite des experts qualifiés et un contexte clinique ou de recherche complet. " +
+    "Cette plateforme ne détermine pas la maladie, l'état mental, l'intelligence, la personalité ou le risque pour la santé.",
+  de: "Dieser Bericht dient ausschließlich der EEG-Alphabetisierung, Bildung und unterstützten Verständnis. " +
+    "Er ist keine ärztliche Beratung, Diagnose oder Behandlungsleitfaden. " +
+    "Die professionelle EEG-Interpretation erfordert qualifizierte Experten und vollständigen klinischen oder Forschungskontext. " +
+    "Diese Plattform bestimmt keine Krankheit, psychischen Zustand, Intelligenz, Persönlichkeit oder Gesundheitsrisiko.",
+  ja: "このレポートはEEGリテラシー、教育、支援付き理解のみを目的としています。" +
+    "医学的アドバイス、診断、または治療ガイダンスではありません。" +
+    "専門的なEEG解釈には、資格のある専門家と完全な臨床または研究コンテキストが必要です。" +
+    "このプラットフォームは病気、心の状態、知能、人格、または健康リスクを判定しません。",
+  ko: "이 보고서는 EEG 리터러시、교육、보조 이해만을 목적으로 합니다。" +
+    "의학적 조언、진단、또는 치료 지침이 아닙니다。" +
+    "전문적인 EEG 해석에는 자격을 갖춘 전문가와 완전한 임상 또는 연구 맥락이 필요합니다。" +
+    "이 플랫폼은 질병、정신 상태、지능、성격、또는 건강 위험을 판단하지 않습니다。",
+};
 
 export function generatePDF(data: BatchPDFData): jspdf {
   const doc = new jspdf({
@@ -37,7 +57,7 @@ export function generatePDF(data: BatchPDFData): jspdf {
   });
 
   const lang = data.lang || "zh";
-  const disclaimer = lang === "zh" ? DISCLAIMER_ZH : DISCLAIMER_EN;
+  const disclaimer = DISCLAIMERS[lang] || DISCLAIMERS["en"];
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 20;
