@@ -208,7 +208,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <div className="rounded-xl bg-[var(--color-bg)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
                   qwen2.5:7b
                   <p className="mt-1 text-xs text-[var(--color-text-secondary)] opacity-60">
-                    {lang === "zh" ? "在终端运行 ollama pull <模型名> 可切换模型" : "Run ollama pull <model> in terminal to switch"}
+                    {t("ollamaPullHint") || "在终端运行 ollama pull <模型名> 可切换模型"}
                   </p>
                 </div>
               </section>
@@ -340,7 +340,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         {t("notLoggedIn") || "暂未登录"}
                       </p>
                       <p className="text-xs text-[var(--color-text-secondary)]">
-                        {lang === "zh" ? "点击登录以同步数据" : "Click to sign in & sync"}
+                        {t("clickToSignIn") || "点击登录以同步数据"}
                       </p>
                     </div>
                   </button>
@@ -411,17 +411,16 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[var(--color-text-secondary)]">
-                      {lang === "zh" ? "项目定位" : "Project"}
+                      {t("projectPositioning") || "项目定位"}
                     </span>
                     <span className="text-sm text-[var(--color-text)] text-right max-w-[60%]">
-                      {lang === "zh" ? "EEG 科普教育平台" : "EEG Education Platform"}
+                      {t("projectDescZh") || "EEG 科普教育平台"}
                     </span>
                   </div>
                   <div className="pt-2 border-t border-[var(--color-border)]">
                     <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                      {lang === "zh"
-                        ? "NeuroAccess 是一个面向EEG初学者的科普教育工具，帮助理解脑电图数据的基本概念。本平台不提供医疗诊断建议。"
-                        : "NeuroAccess is an EEG education tool for beginners to understand basic EEG concepts. This platform does not provide medical diagnostic advice."}
+                      {t("projectDescLong") || "NeuroAccess 是一个面向EEG初学者的科普教育工具，帮助理解脑电图数据的基本概念。本平台不提供医疗诊断建议。"}
+                    </p>
                     </p>
                   </div>
                 </div>
