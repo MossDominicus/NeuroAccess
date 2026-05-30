@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLang } from "@/lib/language-context";
 
 function generateEeg(seed: number, len: number): number[] {
   let s = seed;
@@ -65,6 +66,7 @@ function generateEeg(seed: number, len: number): number[] {
 
 export default function IntroAnimation({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase] = useState(0);
+  const { t } = useLang();
   const pathRef = useRef<SVGPathElement>(null);
   const animating = useRef(false);
 
@@ -148,7 +150,7 @@ export default function IntroAnimation({ onComplete }: { onComplete: () => void 
       <div className="mt-4 flex items-center gap-2"
         style={{ opacity: phase >= 3 ? 1 : 0, transition: "opacity 0.4s 0.3s ease-out" }}>
         <span className="h-2 w-2 rounded-full bg-emerald-400" />
-        <span className="text-sm text-slate-400">就绪</span>
+        <span className="text-sm text-slate-400">{t("ready")}</span>
       </div>
     </div>
   );

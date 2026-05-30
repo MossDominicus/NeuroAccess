@@ -98,7 +98,7 @@ export default function TopNav() {
             {/* GPU/CPU/API status */}
             <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
               <Cpu className="w-3.5 h-3.5" />
-              <span>{status.openrouter ? "API 模式" : (status.gpu_available ? t("gpuAvailable") : t("cpuMode"))}</span>
+              <span>{status.openrouter ? t("apiMode") : (status.gpu_available ? t("gpuAvailable") : t("cpuMode"))}</span>
             </div>
           </>
         ) : null}

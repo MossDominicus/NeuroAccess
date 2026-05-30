@@ -174,7 +174,7 @@ function FileCard({
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-[var(--color-text)]">{item.name}</div>
             <div className="text-xs text-[var(--color-text-secondary)]">
-              {(item.size / 1024 / 1024).toFixed(2)} MB
+              {(item.size / 1024 / 1024).toFixed(2)} {t("mb")}
             </div>
           </div>
         </div>

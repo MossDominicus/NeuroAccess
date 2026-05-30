@@ -217,10 +217,10 @@ export default function GuidePage() {
   const cards = useMemo(() => getCards(lang), [lang]);
 
   const categories = [
-    { key: "all", label: lang === "zh" ? "全部" : "All" },
-    { key: "brainwaves", label: lang === "zh" ? "脑电波" : "Brainwaves" },
-    { key: "technical", label: lang === "zh" ? "技术基础" : "Technical" },
-    { key: "artifacts", label: lang === "zh" ? "伪迹" : "Artifacts" },
+    { key: "all", label: t("all") },
+    { key: "brainwaves", label: t("guideCatBrainwaves") },
+    { key: "technical", label: t("guideCatTechnical") },
+    { key: "artifacts", label: t("guideCatArtifacts") },
   ];
 
   const filtered = useMemo(() => {

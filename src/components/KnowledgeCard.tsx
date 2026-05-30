@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { useLang } from "@/lib/language-context";
 
 export interface KnowledgeCardData {
   id: string;
@@ -22,6 +23,7 @@ export interface KnowledgeCardData {
 
 export default function KnowledgeCard({ card }: { card: KnowledgeCardData }) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useLang();
 
   return (
     <div className={`rounded-2xl border transition-all duration-300 ${
@@ -47,7 +49,7 @@ export default function KnowledgeCard({ card }: { card: KnowledgeCardData }) {
               <span className="text-[11px] font-mono text-[var(--color-text)]/60">{card.frequency}</span>
             )}
             <span className="rounded-full bg-[var(--color-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text)]/70">
-              {card.category}
+              {t("guideCat" + card.category.charAt(0).toUpperCase() + card.category.slice(1))}
             </span>
           </div>
         </div>
@@ -66,20 +68,20 @@ export default function KnowledgeCard({ card }: { card: KnowledgeCardData }) {
           <p className="text-sm leading-relaxed text-[var(--color-text)]/80">{card.description}</p>
 
           <div className="space-y-3">
-            <DetailBlock label="What it is" text={card.details.what} />
-            <DetailBlock label="Why it matters" text={card.details.why} />
+            <DetailBlock label={t("whatItIs")} text={card.details.what} />
+            <DetailBlock label={t("whyItMatters")} text={card.details.why} />
             {card.details.ranges && (
-              <DetailBlock label="Common ranges" text={card.details.ranges} />
+              <DetailBlock label={t("commonRanges")} text={card.details.ranges} />
             )}
             {card.details.pattern && (
-              <DetailBlock label="Typical EEG pattern" text={card.details.pattern} />
+              <DetailBlock label={t("typicalEegPattern")} text={card.details.pattern} />
             )}
             <div className="rounded-xl border border-amber-100 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-900/30 p-3">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
                 <div>
                   <div className="text-xs font-medium text-amber-800 dark:text-amber-400">
-                    What it cannot tell you
+                    {t("whatItCannotTell")}
                   </div>
                   <p className="mt-0.5 text-xs leading-relaxed text-amber-700/80 dark:text-amber-400/80">
                     {card.details.cannotTell}

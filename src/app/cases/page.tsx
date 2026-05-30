@@ -79,7 +79,7 @@ const cases: CaseStudy[] = [
       zh: ["智商高低", "是否患有精神疾病", "具体的情绪状态"],
       en: ["Intelligence level", "Whether the person has a mental illness", "Specific emotional state"],
     },
-    tags: ["Alpha", "静息态", "健康成人", "高质量"],
+    tags: ["alpha", "resting", "healthyAdult", "highQuality"],
     readTime: "5 分钟",
   },
   {
@@ -117,7 +117,7 @@ const cases: CaseStudy[] = [
       zh: ["真实的脑活动模式", "准确的频段能量分布", "任何与认知相关的信息"],
       en: ["True brain activity patterns", "Accurate band power distribution", "Any cognition-related information"],
     },
-    tags: ["噪声", "伪影", "EOG", "EMG", "质量控制"],
+    tags: ["noise", "artifact", "eog", "emg", "qualityCtrl"],
     readTime: "8 分钟",
   },
   {
@@ -155,7 +155,7 @@ const cases: CaseStudy[] = [
       zh: ["可靠的频段能量分布", "Alpha 阻断反应", "任何时序相关的变化"],
       en: ["Reliable band power distribution", "Alpha blocking response", "Any time-series related changes"],
     },
-    tags: ["短程", "教学示例", "功率谱估计"],
+    tags: ["shortRec", "teachingEx", "psd"],
     readTime: "4 分钟",
   },
   {
@@ -193,7 +193,7 @@ const cases: CaseStudy[] = [
       zh: ["高频脑活动（Gamma 振荡）", "精确的 ERP 成分", "超过 64 Hz 的任何信号"],
       en: ["High-frequency brain activity (Gamma oscillations)", "Precise ERP components", "Any signal above 64 Hz"],
     },
-    tags: ["低采样率", "奈奎斯特", "混叠", "技术限制"],
+    tags: ["lowSR", "nyquist", "aliasing", "techLimit"],
     readTime: "6 分钟",
   },
   {
@@ -231,7 +231,7 @@ const cases: CaseStudy[] = [
       zh: ["全脑活动模式", "精确的皮层源位置", "通道间的功能连接"],
       en: ["Whole-brain activity patterns", "Precise cortical source locations", "Functional connectivity between channels"],
     },
-    tags: ["通道缺失", "10-20 系统", "空间采样", "源定位"],
+    tags: ["missingCh", "sys1020", "spatSamp", "srcLoc"],
     readTime: "7 分钟",
   },
   {
@@ -269,7 +269,7 @@ const cases: CaseStudy[] = [
       zh: ["智商或认知能力", "情绪状态的具体细节", "是否患有神经系统疾病"],
       en: ["IQ or cognitive ability", "Specific details of emotional state", "Whether the person has a neurological disease"],
     },
-    tags: ["Alpha", "静息态", "放松", "节律"],
+    tags: ["alpha", "resting", "relax", "rhythm"],
     readTime: "6 分钟",
   },
   {
@@ -307,7 +307,7 @@ const cases: CaseStudy[] = [
       zh: ["可靠的脑活动模式", "任何与认知或临床相关的信息", "准确的频段功率或 connectivity"],
       en: ["Reliable brain activity patterns", "Any cognition- or clinically-related information", "Accurate band power or connectivity"],
     },
-    tags: ["复杂噪声", "ICA", "预处理", "伪影去除", "高级"],
+    tags: ["complexNoise", "ica", "preprocess", "artRemoval", "advanced"],
     readTime: "10 分钟",
   },
   {
@@ -345,7 +345,7 @@ const cases: CaseStudy[] = [
       zh: ["临床或诊断信息", "复杂的认知状态", "个体差异或疾病标记"],
       en: ["Clinical or diagnostic information", "Complex cognitive states", "Individual differences or disease markers"],
     },
-    tags: ["教学", "初学者", "基础解读", "Alpha", "Theta"],
+    tags: ["teaching", "beginnerTag", "basicInterp", "alpha", "theta"],
     readTime: "10 分钟",
   },
 ];
@@ -481,9 +481,9 @@ export default function CasesPage() {
           {/* 标签筛选（仅在有选中标签时显示清除按钮） */}
           {selectedTag && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--color-text-secondary)]">{lang === "zh" ? "标签：" : "Tag:"}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">{t("tags")}</span>
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/30 px-2.5 py-0.5 text-xs text-blue-700 dark:text-blue-400">
-                {selectedTag}
+                {t("tag" + selectedTag.charAt(0).toUpperCase() + selectedTag.slice(1))}
                 <button onClick={() => setSelectedTag(null)} className="ml-1 hover:text-blue-900 dark:hover:text-blue-200">×</button>
               </span>
             </div>
@@ -653,7 +653,7 @@ export default function CasesPage() {
                                   : "bg-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-text)]/10"
                               }`}
                             >
-                              {tag}
+                              {t("tag" + tag.charAt(0).toUpperCase() + tag.slice(1))}
                             </button>
                           ))}
                         </div>

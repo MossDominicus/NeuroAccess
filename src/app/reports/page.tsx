@@ -346,7 +346,7 @@ export default function ReportsPage() {
       printWin.document.close();
     } else {
       // 弹窗被拦截，提示用户允许弹窗
-      alert("请允许浏览器弹窗以导出 PDF，或在地址栏点击允许弹窗后重试。");
+      alert(t("popupBlocked"));
     }
   };
 

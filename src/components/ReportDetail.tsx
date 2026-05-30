@@ -79,7 +79,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
       pdf.save(`${report.fileName.replace(/\.[^.]+$/, "")}_NeuroAccess_Report.pdf`);
     } catch (err: any) {
       console.error("PDF export failed:", err);
-      alert("PDF export failed: " + (err?.message || "Unknown error"));
+      alert(t("pdfExportFailed") + (err?.message || "Unknown error"));
     } finally {
       setExporting(false);
     }

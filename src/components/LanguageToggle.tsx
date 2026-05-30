@@ -12,9 +12,9 @@ export default function LanguageToggle() {
         bg-gray-100 dark:bg-[var(--color-surface)] text-gray-600 dark:text-[var(--color-text-secondary)] hover:bg-gray-200 dark:hover:bg-[var(--color-border)] border border-transparent dark:border-[var(--color-border)]"
       title={t("langSwitch")}
     >
-      <span className={lang === "zh" ? "text-gray-900 dark:text-[var(--color-text)] font-semibold" : "text-gray-400 dark:text-[var(--color-text-secondary)]"}>中文</span>
+      <span className={lang === "zh" ? "text-gray-900 dark:text-[var(--color-text)] font-semibold" : "text-gray-400 dark:text-[var(--color-text-secondary)]"}>{t("chinese")}</span>
       <span className="text-gray-300 dark:text-[var(--color-text-secondary)]">/</span>
-      <span className={lang === "en" ? "text-gray-900 dark:text-[var(--color-text)] font-semibold" : "text-gray-400 dark:text-[var(--color-text-secondary)]"}>EN</span>
+      <span className={lang === "en" ? "text-gray-900 dark:text-[var(--color-text)] font-semibold" : "text-gray-400 dark:text-[var(--color-text-secondary)]"}>{t("english")}</span>
     </button>
   );
 }
