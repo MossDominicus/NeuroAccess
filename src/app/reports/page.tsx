@@ -321,12 +321,14 @@ export default function ReportsPage() {
   const [deleteTarget, setDeleteTarget] = useState<StoredReport | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const { lang, t } = useLang();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   // 加载时从 localStorage 读取报告
   useEffect(() => {
-    setReports(loadReports());
-  }, []);
+    if (!loading) {
+      setReports(loadReports());
+    }
+  }, [loading]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
@@ -380,6 +382,18 @@ export default function ReportsPage() {
   const statCards = [
     { labelKey: "totalReports", value: reports.length, icon: FileText },
   ];
+
+  if (loading) {
+    return (
+      <motion.div
+        className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-primary)] border-t-transparent" />
+      </motion.div>
+    );
+  }
 
   if (!user) {
     return (

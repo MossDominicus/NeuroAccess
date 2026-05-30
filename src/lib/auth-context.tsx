@@ -88,7 +88,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem("neuroaccess-token");
     localStorage.removeItem("neuroaccess-user");
-    localStorage.removeItem("neuroaccess-reports");
   };
 
   return (
