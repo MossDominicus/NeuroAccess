@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { t } = useLang();
+  const { register } = useAuth();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -31,18 +31,11 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      const resp = await fetch(`${API_BASE}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ username, email, password }),
-      });
-      const data = await resp.json();
-      if (data.success) {
-        localStorage.setItem("neuroaccess-token", data.token);
-        localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        window.location.href = "/";
+      const result = await register(username, email, password);
+      if (result.success) {
+        router.push("/");
       } else {
-        setError(data.error || "Registration failed");
+        setError(result.error || "Registration failed");
       }
     } catch (err: any) {
       setError(err.message || "Network error");

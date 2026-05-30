@@ -444,7 +444,6 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
                       {t("projectDescLong") || "NeuroAccess 是一个面向EEG初学者的科普教育工具，帮助理解脑电图数据的基本概念。本平台不提供医疗诊断建议。"}
                     </p>
-                    </p>
                   </div>
                 </div>
               </section>

@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useLang();
+  const { login } = useAuth();
 
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,18 +23,11 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const resp = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ username_or_email: usernameOrEmail, password }),
-      });
-      const data = await resp.json();
-      if (data.success) {
-        localStorage.setItem("neuroaccess-token", data.token);
-        localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        window.location.href = "/";
+      const result = await login(usernameOrEmail, password);
+      if (result.success) {
+        router.push("/");
       } else {
-        setError(data.error || "Login failed");
+        setError(result.error || "Login failed");
       }
     } catch (err: any) {
       setError(err.message || "Network error");
@@ -120,7 +113,7 @@ export default function LoginPage() {
           </Link>
         </div>
         <p className="mt-3 text-center text-xs text-gray-500">
-          {t("refreshAfterLogin") || "After logging in, the page will auto-refresh. If not, please manually refresh."}
+          {t("loginHint") || "After logging in, you will be redirected automatically."}
         </p>
       </div>
     </div>
