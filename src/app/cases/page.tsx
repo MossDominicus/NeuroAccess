@@ -46,7 +46,15 @@ interface CaseStudy {
 const cases: CaseStudy[] = [
   {
     id: "c1",
-    title: { zh: "高质量 EEG 示例（Clean EEG）", en: "Clean EEG Example" },
+    title: {
+      zh: "高质量 EEG 示例（Clean EEG）",
+      en: "Clean EEG Example",
+      es: "Ejemplo de EEG Limpio",
+      fr: "Exemple d'EEG Propre",
+      de: "Sauberes EEG-Beispiel",
+      ja: "クリーンEEGの例",
+      ko: "깨끗한 EEG 예시",
+    },
     categoryKey: "quality",
     difficultyKey: "beginner",
     description: {
@@ -84,7 +92,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c2",
-    title: { zh: "高噪声 EEG 示例（Noisy EEG）", en: "Noisy EEG Example" },
+    title: {
+      zh: "高噪声 EEG 示例（Noisy EEG）",
+      en: "Noisy EEG Example",
+      es: "Ejemplo de EEG Ruidoso",
+      fr: "Exemple d'EEG Bruyant",
+      de: "Verrauschtes EEG-Beispiel",
+      ja: "ノイジーEEGの例",
+      ko: "노이지 EEG 예시",
+    },
     categoryKey: "quality",
     difficultyKey: "intermediate",
     description: {
@@ -122,7 +138,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c3",
-    title: { zh: "短记录示例（Short Recording）", en: "Short Recording Example" },
+    title: {
+      zh: "短记录示例（Short Recording）",
+      en: "Short Recording Example",
+      es: "Ejemplo de Grabación Corta",
+      fr: "Exemple d'Enregistrement Court",
+      de: "Kurzaufnahme-Beispiel",
+      ja: "短い記録の例",
+      ko: "짧은 녹음 예시",
+    },
     categoryKey: "duration",
     difficultyKey: "beginner",
     description: {
@@ -160,7 +184,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c4",
-    title: { zh: "低采样率示例（Low Sampling Rate）", en: "Low Sampling Rate Example" },
+    title: {
+      zh: "低采样率示例（Low Sampling Rate）",
+      en: "Low Sampling Rate Example",
+      es: "Ejemplo de Baja Tasa de Muestreo",
+      fr: "Exemple de Faible Fréquence d'Échantillonnage",
+      de: "Niedrige Abtastrate-Beispiel",
+      ja: "低サンプリングレートの例",
+      ko: "낮은 샘플링 레이트 예시",
+    },
     categoryKey: "technical",
     difficultyKey: "intermediate",
     description: {
@@ -198,7 +230,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c5",
-    title: { zh: "缺失通道示例（Missing Channels）", en: "Missing Channels Example" },
+    title: {
+      zh: "缺失通道示例（Missing Channels）",
+      en: "Missing Channels Example",
+      es: "Ejemplo de Canales Faltantes",
+      fr: "Exemple de Canaux Manquants",
+      de: "Fehlende Kanäle-Beispiel",
+      ja: "欠損チャンネルの例",
+      ko: "누락된 채널 예시",
+    },
     categoryKey: "technical",
     difficultyKey: "intermediate",
     description: {
@@ -236,7 +276,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c6",
-    title: { zh: "强 Alpha 活动示例（Strong Alpha）", en: "Strong Alpha Activity Example" },
+    title: {
+      zh: "强 Alpha 活动示例（Strong Alpha）",
+      en: "Strong Alpha Activity Example",
+      es: "Ejemplo de Fuerte Actividad Alfa",
+      fr: "Exemple de Forte Activité Alpha",
+      de: "Starke Alpha-Aktivität-Beispiel",
+      ja: "強いアルファ活動の例",
+      ko: "강한 알파 활동 예시",
+    },
     categoryKey: "patterns",
     difficultyKey: "beginner",
     description: {
@@ -274,7 +322,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c7",
-    title: { zh: "高噪声复杂度示例（High Noise Complexity）", en: "High Noise Complexity Example" },
+    title: {
+      zh: "高噪声复杂度示例（High Noise Complexity）",
+      en: "High Noise Complexity Example",
+      es: "Ejemplo de Complejidad de Ruido Alta",
+      fr: "Exemple de Complexité de Bruit Élevé",
+      de: "Hohe Rauschkomplexität-Beispiel",
+      ja: "高ノイズ複雑性の例",
+      ko: "높은 노이즈 복잡성 예시",
+    },
     categoryKey: "quality",
     difficultyKey: "advanced",
     description: {
@@ -312,7 +368,15 @@ const cases: CaseStudy[] = [
   },
   {
     id: "c8",
-    title: { zh: "学生学习示例（Student Learning）", en: "Student Learning Example" },
+    title: {
+      zh: "学生学习示例（Student Learning）",
+      en: "Student Learning Example",
+      es: "Ejemplo de Aprendizaje Estudiantil",
+      fr: "Exemple d'Apprentissage Étudiant",
+      de: "Studentisches Lernen-Beispiel",
+      ja: "学生学習の例",
+      ko: "학생 학습 예시",
+    },
     categoryKey: "education",
     difficultyKey: "beginner",
     description: {
@@ -349,7 +413,6 @@ const cases: CaseStudy[] = [
     readTime: "10 分钟",
   },
 ];
-
 const difficultyColor: Record<string, string> = {
   beginner: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800",
   intermediate: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-800",
