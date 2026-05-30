@@ -30,11 +30,27 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+  // Countdown timer for resend cooldown
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
+
   const fetchVerificationCode = async () => {
-    if (!token) return;
+    if (!token || countdown > 0) return;
     setLoadingCode(true);
     setPwError("");
     setPwSuccess("");
@@ -44,9 +60,16 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await resp.json();
-      if (data.success) {
+      if (resp.status === 429) {
+        // Parse remaining seconds from detail message if possible
+        const match = data.detail?.match(/(\d+)/);
+        const seconds = match ? parseInt(match[1], 10) : 60;
+        setCountdown(seconds);
+        setPwError(t("resendAfter")?.replace("{seconds}", String(seconds)) || `${seconds}s后可重发`);
+      } else if (data.success) {
         setApiCode(null); // backend no longer returns code
         setPwSuccess(t("codeSentToEmail") || "Verification code sent to your email, valid for 10 minutes");
+        setCountdown(60);
       } else {
         setPwError(data.error || "Failed to generate code");
       }
@@ -253,10 +276,10 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                           <button
                             type="button"
                             onClick={fetchVerificationCode}
-                            disabled={loadingCode}
+                            disabled={loadingCode || countdown > 0}
                             className="flex-1 py-2 px-3 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-40 transition-colors"
                           >
-                            {loadingCode ? "..." : (t("getCode") || "获取验证码")}
+                            {loadingCode ? "..." : countdown > 0 ? `${countdown}s` : (t("getCode") || "获取验证码")}
                           </button>
                         </div>
 

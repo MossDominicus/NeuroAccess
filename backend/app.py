@@ -341,7 +341,7 @@ NeuroAccess Team
 
 @app.post("/api/auth/verification-code")
 def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Generate a 6-digit verification code for password change."""
+    """Generate a 6-digit verification code for password change. Rate limit: 1 per minute."""
     if not AUTH_AVAILABLE:
         return {"success": False, "error": "Auth module not available"}
     token = credentials.credentials
@@ -352,6 +352,27 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Rate limit: check last unused code created within 60 seconds
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT created_at FROM verification_codes WHERE user_id = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
+            (user_id, "password_change"),
+        ).fetchone()
+        if row and row["created_at"]:
+            from datetime import datetime as _dt
+            last_created = _dt.fromisoformat(row["created_at"])
+            elapsed = (_dt.utcnow() - last_created).total_seconds()
+            if elapsed < 60:
+                remaining = int(60 - elapsed)
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Please wait {remaining} seconds before requesting a new code",
+                )
+    finally:
+        conn.close()
+
     code = generate_verification_code(user_id, purpose="password_change")
     # Send email with verification code
     email_sent = send_verification_email(user["email"], code)
