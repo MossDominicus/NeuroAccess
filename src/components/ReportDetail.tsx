@@ -10,6 +10,10 @@ import {
   Shield, AlertTriangle, CheckCircle, XCircle, Zap,
   Download, Clock, Radio, Eye, User, GraduationCap, Microscope, Loader2,
 } from "lucide-react";
+import {
+  getConfidenceLevelText, getConfidenceBadgeClass, getConfidenceReasons,
+  getLimitations, getCannotTell, normalizeLevel,
+} from "@/lib/report-i18n";
 
 // ── 辅助：小进度条 ──────────────────────────────────────
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -87,8 +91,8 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
   const freqAnalysis = (analysis as any).frequency_analysis || {};
   const literacyScores = (analysis as any).eeg_literacy_scores || (analysis as any).literacy_scores || {};
   const confidence = (analysis as any).confidence || (analysis as any).interpretation_confidence || {};
-  const limitations = (analysis as any).limitations || [];
-  const cannotTell = (analysis as any).what_this_data_cannot_tell || [];
+  const lims = getLimitations(lang as any);
+  const cannotTellList = getCannotTell(lang as any);
   const sq = (signalQuality as any).signal_quality_score || (analysis as any).signal_quality_score || 0;
   const bandpowerPercent = (analysis as any).bandpower_percent || (freqAnalysis as any).bandpower_percent || {};
 
@@ -248,39 +252,46 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           <h2 className="text-base font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</h2>
         </div>
         <div className="space-y-4">
-          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${
-            (confidence as any).level === "High" || (confidence as any).level === "较高"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
-              : (confidence as any).level === "Moderate" || (confidence as any).level === "中等"
-              ? "border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400"
-              : "border-red-200 bg-red-50 text-red-700 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
-          }`}>
-            <TrendingUp className="h-4 w-4" />
-            {(confidence as any).level || t("confidenceLow")}
-          </div>
-          {(confidence as any).reason && (
-            <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-              {(confidence as any).reason}
-            </p>
-          )}
-          {limitations.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-[var(--color-text)]">{t("whatDataCannotTell")}</h4>
-              <ul className="space-y-1">
-                {limitations.map((item: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-text-secondary)]">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {(() => {
+            const levelKey = normalizeLevel((confidence as any).level);
+            const badgeClass = getConfidenceBadgeClass(levelKey);
+            const levelText = getConfidenceLevelText(levelKey, lang as any);
+            const reasons = getConfidenceReasons(analysis as any, lang as any);
+            const lims2 = getLimitations(lang as any);
+            return (
+              <>
+                <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${badgeClass}`}>
+                  <TrendingUp className="h-4 w-4" />
+                  {levelText}
+                </div>
+                {reasons.length > 0 && (
+                  <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                    {reasons.join("\uff1b")}
+                  </p>
+                )}
+                {lims2.length > 0 && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-medium text-[var(--color-text)]">{t("whatDataCannotTell")}</h4>
+                    <ul className="space-y-1">
+                      {lims2.map((item: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-text-secondary)]">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </section>
 
+      {/* \u2580\u2014 Section 7: What This Data Cannot Tell You \u2580\u2014\u2014\u2014\u2014\u2014 */}
+
       {/* ── Section 7: What This Data Cannot Tell You ─ */}
-      {cannotTell.length > 0 && (
+      {cannotTellList.length > 0 && (
         <section className="rounded-2xl border border-red-100 bg-red-50/50 dark:bg-red-950/10 dark:border-red-900/30 p-6">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 dark:bg-red-950/30">
@@ -291,10 +302,10 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             </h2>
           </div>
           <p className="mb-3 text-sm text-red-700/80 dark:text-red-400/80">
-            This platform cannot determine:
+            {t("platformCannotDetermine") || "This platform cannot determine:"}
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
-            {cannotTell.map((item: string, i: number) => (
+            {cannotTellList.map((item: string, i: number) => (
               <li key={i} className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
                 <XCircle className="h-3.5 w-3.5 flex-shrink-0" />
                 <span>{item}</span>
