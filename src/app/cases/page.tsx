@@ -375,8 +375,8 @@ export default function CasesPage() {
       if (selectedTag && !c.tags.includes(selectedTag)) return false;
       const q = search.toLowerCase();
       if (q) {
-        const title = (c.title[lang] || "").toLowerCase();
-        const desc = (c.description[lang] || "").toLowerCase();
+        const title = (c.title[lang] || c.title.en || c.title.zh || "").toLowerCase();
+        const desc = (c.description[lang] || c.description.en || c.description.zh || "").toLowerCase();
         const tags = c.tags.join(" ").toLowerCase();
         if (!title.includes(q) && !desc.includes(q) && !tags.includes(q)) return false;
       }
@@ -494,14 +494,14 @@ export default function CasesPage() {
         <div className="space-y-4">
           {filtered.map((c, i) => {
             const isExpanded = expandedId === c.id;
-            const title = c.title[lang];
-            const description = c.description[lang];
-            const details = c.details[lang];
-            const beginnerExp = c.beginner_explanation[lang] ?? "";
-            const studentExp = c.student_explanation[lang] ?? "";
-            const researchExp = c.research_explanation[lang] ?? "";
-            const limitations = c.limitations[lang] ?? [];
-            const cannotTell = c.what_this_data_cannot_tell[lang] ?? [];
+            const title = c.title[lang] || c.title.en || c.title.zh || "";
+            const description = c.description[lang] || c.description.en || c.description.zh || "";
+            const details = c.details[lang] || c.details.en || c.details.zh || "";
+            const beginnerExp = c.beginner_explanation[lang] || c.beginner_explanation.en || c.beginner_explanation.zh || "";
+            const studentExp = c.student_explanation[lang] || c.student_explanation.en || c.student_explanation.zh || "";
+            const researchExp = c.research_explanation[lang] || c.research_explanation.en || c.research_explanation.zh || "";
+            const limitations = c.limitations[lang] || c.limitations.en || c.limitations.zh || [];
+            const cannotTell = c.what_this_data_cannot_tell[lang] || c.what_this_data_cannot_tell.en || c.what_this_data_cannot_tell.zh || [];
 
             return (
               <motion.div
@@ -528,7 +528,7 @@ export default function CasesPage() {
                         <span className="text-xs text-[var(--color-text-secondary)]">{t(`cat${c.categoryKey}`)}</span>
                         <span className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1">
                           <Eye className="w-3 h-3" />
-                          {c.readTime}
+                          {t("readTime").replace("{min}", c.readTime.replace(/[^0-9]/g, ""))}
                         </span>
                       </div>
                       {/* 标题 */}
@@ -584,7 +584,7 @@ export default function CasesPage() {
 
                         {/* 三层 AI 解释 */}
                         <div>
-                          <h4 className="text-xs font-bold text-[var(--color-text-secondary)] mb-3">{t("aiExplanation")}（{t("beginnerMode").split("（")[0]} / {t("studentMode").split("（")[0]} / {t("researchMode").split("（")[0]}）</h4>
+                          <h4 className="text-xs font-bold text-[var(--color-text-secondary)] mb-3">{t("aiExplanation")}（{t("beginnerMode")} / {t("studentMode")} / {t("researchMode")}）</h4>
                           <div className="space-y-4">
                             {/* Beginner */}
                             <div className="bg-green-50/50 border border-green-200 rounded-xl p-4 dark:bg-green-950/30 dark:border-green-800">

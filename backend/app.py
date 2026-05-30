@@ -177,7 +177,7 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
 def root():
     return {"success": True, "service": "NeuroAccess Backend", "version": "2.5.0", "model": "qwen2.5:7b"}
 
-@app.get("/health")
+@app.get("/api/health")
 def health():
     try:
         from explanations import call_openrouter

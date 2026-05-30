@@ -79,11 +79,26 @@
 .dark {
   --color-primary: #f5f5f7;
   --color-primary-light: #e5e7eb;
-  --color-bg: #000000;
-  --color-surface: #111111;
+  --color-bg: #0f0f0f;
+  --color-surface: #1a1a1a;
   --color-text: #f5f5f7;
   --color-text-secondary: #9ca3af;
   --color-border: #262626;
+}
+
+/* 深色模式：选中文本 */
+.dark ::selection {
+  background: #f5f5f7;
+  color: #0f0f0f;
+}
+
+/* 深色模式：滚动条 */
+.dark ::-webkit-scrollbar-thumb {
+  background: #262626;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
 }
 
 html {

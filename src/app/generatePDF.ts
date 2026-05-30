@@ -2,8 +2,9 @@
  * PDF 报告生成工具（批量版）
  * 使用 jsPDF 将 NeuroAccess 分析结果导出为 PDF
  */
-import jspdf from "jspdf";
+import jsPDF from "jspdf";
 import type { Lang } from "@/lib/translations";
+import { PDF_TRANSLATIONS, type PDFTranslations } from "@/lib/pdf-translations";
 
 export interface BatchPDFData {
   files: {
@@ -49,14 +50,15 @@ const DISCLAIMERS: Record<Lang, string> = {
     "이 플랫폼은 질병、정신 상태、지능、성격、또는 건강 위험을 판단하지 않습니다。",
 };
 
-export function generatePDF(data: BatchPDFData): jspdf {
-  const doc = new jspdf({
+export function generatePDF(data: BatchPDFData): jsPDF {
+  const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
   const lang = data.lang || "zh";
+  const t: PDFTranslations = PDF_TRANSLATIONS[lang] || PDF_TRANSLATIONS["en"];
   const disclaimer = DISCLAIMERS[lang] || DISCLAIMERS["en"];
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -72,7 +74,7 @@ export function generatePDF(data: BatchPDFData): jspdf {
     lines.forEach((line: string) => {
       if (y > 280) { doc.addPage(); y = margin; }
       doc.text(line, margin, y);
-      y += size * 0.5;
+      y += size * 0.3528;
     });
     y += 3;
   };
@@ -86,25 +88,24 @@ export function generatePDF(data: BatchPDFData): jspdf {
   /* ── 标题 ─────────── */
   doc.setFillColor(245, 245, 247);
   doc.rect(0, 0, pageWidth, 40, "F");
-  
+
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(24);
   doc.setFont("helvetica", "bold");
   doc.text("NeuroAccess", margin, 20);
-  
+
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100, 100, 100);
-  const subtitle = lang === "zh" ? "EEG 分析报告 · 批量导出" : "EEG Analysis Report · Batch Export";
-  doc.text(subtitle, margin, 30);
-  
+  doc.text(t.reportTitle, margin, 30);
+
   doc.setTextColor(150, 150, 150);
-  doc.text(`${lang === "zh" ? "生成时间：" : "Generated: "}${new Date().toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}`, margin, 37);
-  
+  doc.text(`${t.generatedAt}${new Date().toLocaleString(t.dateLocale)}`, margin, 37);
+
   y = 50;
 
   /* ── 文件概览 ─────────── */
-  addText(lang === "zh" ? "文件概览" : "File Overview", 14, "bold");
+  addText(t.fileOverview, 14, "bold");
   addSeparator();
 
   data.files.forEach((f, i) => {
@@ -119,14 +120,14 @@ export function generatePDF(data: BatchPDFData): jspdf {
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
-      doc.text(`${lang === "zh" ? "信号质量：" : "Signal quality:"} ${f.analysisResult.signal_quality_score}/100`, margin + 5, y);
+      doc.text(`${t.signalQuality}${f.analysisResult.signal_quality_score}/100`, margin + 5, y);
       y += 5;
-      doc.text(`${lang === "zh" ? "噪声通道：" : "Noisy channels:"} ${(f.analysisResult.noisy_channels || []).join(", ") || (lang === "zh" ? "无" : "none")}`, margin + 5, y);
+      doc.text(`${t.noisyChannels}${(f.analysisResult.noisy_channels || []).join(", ") || t.none}`, margin + 5, y);
       y += 5;
     } else {
       doc.setFontSize(9);
       doc.setTextColor(150, 150, 150);
-      doc.text(lang === "zh" ? "（未分析）" : "(not analyzed)", margin + 5, y);
+      doc.text(t.notAnalyzed, margin + 5, y);
       y += 5;
     }
     y += 3;
@@ -140,7 +141,7 @@ export function generatePDF(data: BatchPDFData): jspdf {
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 30, 30);
-    doc.text(`${lang === "zh" ? "文件" : "File"} ${i + 1}: ${f.filename}`, margin, y);
+    doc.text(`${t.file} ${i + 1}: ${f.filename}`, margin, y);
     y += 10;
 
     addSeparator();
@@ -150,9 +151,9 @@ export function generatePDF(data: BatchPDFData): jspdf {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(50, 50, 50);
     [
-      `${lang === "zh" ? "文件名：" : "File name:"} ${f.filename}`,
-      `${lang === "zh" ? "采样率：" : "Sampling rate:"} ${f.samplingRate} Hz`,
-      `${lang === "zh" ? "记录时长：" : "Duration:"} ${f.duration}`,
+      `${t.fileName}${f.filename}`,
+      `${t.samplingRate}${f.samplingRate} Hz`,
+      `${t.duration}${f.duration}`,
     ].forEach(item => {
       if (y > 280) { doc.addPage(); y = margin; }
       doc.text(`• ${item}`, margin + 5, y);
@@ -162,18 +163,18 @@ export function generatePDF(data: BatchPDFData): jspdf {
 
     /* 分析结果 */
     if (f.analysisResult) {
-      addText(lang === "zh" ? "分析结果" : "Analysis Result", 12, "bold");
+      addText(t.analysisResult, 12, "bold");
       doc.setFontSize(10);
       doc.setTextColor(50, 50, 50);
-      doc.text(`${lang === "zh" ? "信号质量评分：" : "Signal quality score:"} ${f.analysisResult.signal_quality_score}/100`, margin + 5, y);
+      doc.text(`${t.signalQualityScore}${f.analysisResult.signal_quality_score}/100`, margin + 5, y);
       y += 6;
-      doc.text(`${lang === "zh" ? "噪声通道：" : "Noisy channels:"} ${(f.analysisResult.noisy_channels || []).join(", ") || (lang === "zh" ? "无" : "none")}`, margin + 5, y);
+      doc.text(`${t.noisyChannels}${(f.analysisResult.noisy_channels || []).join(", ") || t.none}`, margin + 5, y);
       y += 10;
     }
 
     /* AI 解释 */
     if (f.explainText) {
-      addText(lang === "zh" ? "AI 解释" : "AI Explanation", 12, "bold");
+      addText(t.aiExplanation, 12, "bold");
       addText(f.explainText, 9);
     }
 
@@ -196,8 +197,11 @@ export function generatePDF(data: BatchPDFData): jspdf {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
+    const pageIndicator = t.pageIndicator
+      .replace("{current}", String(i))
+      .replace("{total}", String(totalPages));
     doc.text(
-      `NeuroAccess · ${lang === "zh" ? "批量分析报告" : "Batch Analysis Report"} · ${lang === "zh" ? "第" : "Page"} ${i} ${lang === "zh" ? "页 / 共" : "/"} ${totalPages} ${lang === "zh" ? "页" : ""}`,
+      `NeuroAccess · ${t.reportType} · ${pageIndicator}`,
       pageWidth / 2,
       290,
       { align: "center" }

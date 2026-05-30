@@ -201,7 +201,7 @@ function FileCard({
             href="/reports"
             className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
           >
-            {t("viewInReports") || "查看报告 →"}
+            {t("viewInReports") || "View report →"}
           </a>
         </div>
       )}
@@ -323,7 +323,7 @@ export default function UploadAnalysisCenter() {
                   startAnalysis();
                 }}
                 disabled={running || files.length === 0 || !user}
-                className="rounded-2xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-40"
+                className="rounded-2xl bg-gray-900 dark:bg-white dark:text-gray-900 px-6 py-2.5 text-sm font-semibold text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-40"
               >
                 {!user ? (t("pleaseLogin") || "Please login to analyze") : (running ? t("processing") : t("startAnalysis"))}
               </button>

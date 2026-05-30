@@ -23,7 +23,7 @@ export default function TopNav() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await fetch("/health");
+        const res = await fetch("/api/health");
         const data = await res.json();
         setStatus({
           ollama_running: data.ollama === true,
@@ -40,7 +40,7 @@ export default function TopNav() {
           gpu_available: false,
           openrouter: false,
           model_name: "qwen2.5:7b",
-          error: "Cannot connect to backend",
+          error: t("cannotConnectBackend") || "Cannot connect to backend",
         });
       } finally {
         setLoading(false);

@@ -151,12 +151,13 @@ function ExplanationCards({ analysis }: { analysis: any }) {
 }
 
 function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string, string> | undefined }) {
+  const { t } = useLang();
   if (!bandpowerPercent || Object.keys(bandpowerPercent).length === 0) return null;
   const entries = Object.entries(bandpowerPercent);
   const maxVal = Math.max(...entries.map(([, v]) => parseFloat(v)), 1);
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
-      <div className="mb-3 text-sm font-bold text-[var(--color-text)]">频段能量（百分比）</div>
+      <div className="mb-3 text-sm font-bold text-[var(--color-text)]">{t("bandpowerPercent")}</div>
       <div className="space-y-2">
         {entries.map(([band, val]) => {
           const num = parseFloat(val);
@@ -357,7 +358,7 @@ export default function ReportsPage() {
   // 导出全部
   const handleExportAll = () => {
     if (reports.length === 0) return;
-    alert(t("exportAllHint") || "请逐条查看报告并导出 PDF");
+    alert(t("exportAllHint") || "Please view reports individually and export PDF");
   };
 
   const handleDelete = (report: StoredReport) => {

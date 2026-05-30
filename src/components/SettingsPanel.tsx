@@ -71,10 +71,10 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         setPwSuccess(t("codeSentToEmail") || "Verification code sent to your email, valid for 10 minutes");
         setCountdown(60);
       } else {
-        setPwError(data.error || "Failed to generate code");
+        setPwError(data.error || t("failedToGenerateCode") || "Failed to generate code");
       }
     } catch (e: any) {
-      setPwError(e.message || "Network error");
+      setPwError(e.message || t("networkError") || "Network error");
     } finally {
       setLoadingCode(false);
     }
@@ -93,7 +93,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       return;
     }
     if (!token) {
-      setPwError("Not authenticated");
+      setPwError(t("notAuthenticated") || "未登录");
       return;
     }
     setLoadingSubmit(true);
@@ -118,10 +118,10 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         setConfirmPassword("");
         setShowNewPassword(false);
       } else {
-        setPwError(data.error || "Failed to change password");
+        setPwError(data.error || t("failedToChangePassword") || "Failed to change password");
       }
     } catch (e: any) {
-      setPwError(e.message || "Network error");
+      setPwError(e.message || t("networkError") || "Network error");
     } finally {
       setLoadingSubmit(false);
     }

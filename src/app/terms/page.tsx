@@ -21,7 +21,7 @@ export default function TermsOfService() {
     en: [
       { title: "Service Description", content: "NeuroAccess is an EEG (electroencephalogram) data educational analysis platform. We provide tools to help you understand and analyze EEG data, but our service does not constitute medical advice, diagnosis, or treatment." },
       { title: "User Responsibilities", content: "You are responsible for the data you upload to our platform. Please ensure you have the right to share this data and that it does not contain sensitive or protected health information (PHI). We are not responsible for the legality of the data you upload." },
-      { title: "Prohibited Uses", content: "You may not use our service for any illegal activities, including but not limited to: uploading malware, violating others&apos; privacy, conducting unauthorized medical diagnoses, or violating any applicable laws and regulations." },
+      { title: "Prohibited Uses", content: "You may not use our service for any illegal activities, including but not limited to: uploading malware, violating others' privacy, conducting unauthorized medical diagnoses, or violating any applicable laws and regulations." },
       { title: "Intellectual Property", content: "All content, design, and code of the NeuroAccess platform are protected by copyright and intellectual property laws. Without express written permission, you may not copy, modify, distribute, or create derivative works." },
       { title: "Disclaimer", content: "This service is provided &quot;as is&quot; without any express or implied warranty. We do not guarantee the accuracy, reliability, or suitability of the service. EEG analysis results are for educational purposes only and should not be used as a basis for medical decisions." },
       { title: "Limitation of Liability", content: "In no event shall NeuroAccess and its developers be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to the use or inability to use this service." },
@@ -43,7 +43,7 @@ export default function TermsOfService() {
         {t("termsOfService") || "Terms of Service"}
       </h1>
       <p className="mb-8 text-sm text-[var(--color-text-secondary)]">
-        Last updated: May 29, 2026
+        {t("lastUpdatedDate") || "Last updated: May 29, 2026"}
       </p>
 
       <div className="space-y-8">
@@ -60,7 +60,7 @@ export default function TermsOfService() {
       </div>
 
       <div className="mt-12 border-t border-[var(--color-border)] pt-8 text-center text-sm text-[var(--color-text-secondary)]">
-        <p>NeuroAccess &copy; 2026. All rights reserved.</p>
+        <p>NeuroAccess &copy; 2026. {(t("allRightsReserved") || "All rights reserved.")}</p>
       </div>
     </div>
   );
