@@ -46,9 +46,25 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
       const reportEl = document.getElementById("report-detail-content");
       if (!reportEl) throw new Error("Report element not found");
 
-      const dataUrl = await domtoimage.toPng(reportEl, {
-        scale: 1.5, bgcolor: "#0a0e1a", quality: 1,
+      // 先给元素加一个极淡的文字水印层（CSS），让 OCR 无法识别
+      const watermarkDiv = document.createElement("div");
+      Object.assign(watermarkDiv.style, {
+        position: "absolute", top: "0", left: "0", width: "100%", height: "100%",
+        pointerEvents: "none", zIndex: "9999", opacity: "0.04",
+        backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(0,0,0,0.3) 40px, rgba(0,0,0,0.3) 41px), repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,0,0,0.3) 40px, rgba(0,0,0,0.3) 41px)",
+        backgroundSize: "41px 41px",
       });
+      watermarkDiv.className = "pdf-watermark-overlay";
+      reportEl.style.position = "relative";
+      reportEl.appendChild(watermarkDiv);
+
+      const dataUrl = await domtoimage.toPng(reportEl, {
+        scale: 2, bgcolor: "#0a0e1a", quality: 0.92,
+      });
+
+      // 移除水印层
+      reportEl.removeChild(watermarkDiv);
+      reportEl.style.position = "";
 
       // 获取图片尺寸
       const getSize = (): Promise<{w: number, h: number}> => new Promise((resolve) => {
@@ -59,48 +75,48 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
       const { w, h } = await getSize();
 
       const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - 20;
-      const imgHeight = (h * imgWidth) / w;
+      const pageW = pdf.internal.pageSize.getWidth();   // 210
+      const pageH = pdf.internal.pageSize.getHeight();  // 297
+      const margin = 8;
+      const imgW = pageW - margin * 2; // 194
+      const pxPerMm = w / imgW; // 图片像素密度
+      const sliceH_px = Math.floor((pageH - margin * 2) * pxPerMm); // 每页切多少像素
 
-      // 修复：正确分页，每页显示图片的一部分
-      const contentHeightPerPage = pageHeight - 20; // 每页内容高度（减去上下边距）
-      const totalPages = Math.ceil(imgHeight / contentHeightPerPage);
-
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) pdf.addPage();
-        // jsPDF addImage 不支持直接裁剪，用 canvas 裁剪后每页单独生成图片
+      let remain = h;
+      let srcY = 0;
+      while (remain > 0) {
+        const thisH = Math.min(sliceH_px, remain);
         const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = thisH;
         const ctx = canvas.getContext("2d")!;
         const srcImg = new Image();
         await new Promise<void>((resolve) => {
           srcImg.onload = () => {
-            const sx = 0;
-            const sy = page * contentHeightPerPage * (h / imgHeight); // 源图 Y 偏移
-            const sw = w;
-            const sh = Math.min(contentHeightPerPage * (h / imgHeight), h - sy);
-            canvas.width = w;
-            canvas.height = sh;
-            ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, w, sh);
+            ctx.drawImage(srcImg, 0, srcY, w, thisH, 0, 0, w, thisH);
             resolve();
           };
           srcImg.src = dataUrl;
         });
-        const pageDataUrl = canvas.toDataURL("image/png");
-        // 叠加极淡噪声点阵，防止 OCR/Live Text 识别文字
-        const ctx2 = canvas.getContext("2d")!;
-        const imgData = ctx2.getImageData(0, 0, canvas.width, canvas.height);
-        for (let i = 0; i < imgData.data.length; i += 4 * 8) {
-          const noise = (Math.random() - 0.5) * 6;
-          imgData.data[i]     = Math.min(255, Math.max(0, imgData.data[i] + noise));
-          imgData.data[i + 1] = Math.min(255, Math.max(0, imgData.data[i + 1] + noise));
-          imgData.data[i + 2] = Math.min(255, Math.max(0, imgData.data[i + 2] + noise));
+
+        // 叠加噪声，干扰 OCR（每像素±15，足够干扰但人眼不可见）
+        const imgData = ctx.getImageData(0, 0, w, thisH);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const n = (Math.random() - 0.5) * 30;
+          data[i]     = Math.min(255, Math.max(0, data[i] + n));
+          data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + n));
+          data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + n));
         }
-        ctx2.putImageData(imgData, 0, 0);
-        const pageDataUrl2 = canvas.toDataURL("image/png");
-        const pageImgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(pageDataUrl2, "PNG", 10, 10, imgWidth, pageImgHeight);
+        ctx.putImageData(imgData, 0, 0);
+
+        const sliceDataUrl = canvas.toDataURL("image/png");
+        const sliceH_mm = (thisH / pxPerMm);
+        if (srcY > 0) pdf.addPage();
+        pdf.addImage(sliceDataUrl, "PNG", margin, margin, imgW, sliceH_mm);
+
+        srcY += thisH;
+        remain -= thisH;
       }
 
       // ── 页脚标识（英文，避免字体渲染问题） ───────────
@@ -111,7 +127,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         pdf.setTextColor(150, 150, 150);
         pdf.setFont("helvetica", "normal");
         const footerText = `NeuroAccess · System-Generated Report · For Reference Only · ${new Date().toISOString()} · ID:${report.id}`;
-        pdf.text(footerText, pageWidth / 2, pageHeight - 5, { align: "center" });
+        pdf.text(footerText, pageW / 2, pageH - 5, { align: "center" });
       }
 
       // PDF 元数据
