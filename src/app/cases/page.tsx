@@ -82,8 +82,8 @@ const cases: CaseStudy[] = [
       en: "This EEG looks healthy! You can see clear Alpha waves in the back of the brain, which means the brain is relaxing. All channels have clean signals with no noise.",
     },
     student_explanation: {
-      zh: "该 EEG 记录显示典型的 Alpha rhythm（8-10 Hz），在枕叶区域振幅最高（>50 μV）。前额区域可见低频活动（可能是额头肌肉伪影）。总体信号质量优秀，适合用于学习正常 EEG 模式。",
-      en: "The EEG recording shows typical Alpha rhythm (8-10 Hz) with highest amplitude in occipital areas (>50 μV). Low-frequency activity is visible in frontal areas (possibly forehead muscle artifact). Overall signal quality is excellent, suitable for learning normal EEG patterns.",
+      zh: "该 EEG 记录显示典型的 Alpha rhythm（8-13 Hz），在枕叶区域振幅最高（>50 μV）。前额区域可见低频活动（可能是额头肌肉伪影）。总体信号质量优秀，适合用于学习正常 EEG 模式。",
+      en: "The EEG recording shows typical Alpha rhythm (8-13 Hz) with highest amplitude in occipital areas (>50 μV). Low-frequency activity is visible in frontal areas (possibly forehead muscle artifact). Overall signal quality is excellent, suitable for learning normal EEG patterns.",
     },
     research_explanation: {
       zh: "PSD 分析显示枕叶区域有强烈的 Alpha peak（~10 Hz）。Bandpower 分析：Alpha 42%，Beta 31%，Theta 18%，Delta 9%。采样率 500 Hz，符合标准。无可见伪影或噪声。符合健康成人静息态 EEG 特征。",
@@ -123,8 +123,8 @@ const cases: CaseStudy[] = [
       ko: "이 EEG 데이터는 상당한 노이즈와 아티팩트를 포함합니다. 신호 품질 점수는 겨우 45/100, 여러 채널이 '나쁨' 또는 '최악'으로 표시되어 있습니다."
     },
     details: {
-      zh: "此案例展示了真实世界中常见的脏 EEG 数据。你需要学会识别：\n\n1. 肌电伪影（高频、低振幅，常见于额叶）\n2. 眼电伪影（EOG，大振幅、慢波，常见于前额）\n3. 工频噪声（50/60 Hz 电源线干扰）\n\n学习如何识别这些伪影是 EEG 分析的重要技能。",
-      en: "This case demonstrates common dirty EEG data in real-world settings. You need to learn to identify:\n\n1. Electromyographic (EMG) artifacts (high frequency, low amplitude, common in frontal lobes)\n2. Electrooculographic (EOG) artifacts (large amplitude, slow waves, common in forehead)\n3. Power line noise (50/60 Hz interference)\n\nLearning to identify these artifacts is an important skill in EEG analysis.",
+      zh: "此案例展示了真实世界中常见的脏 EEG 数据。你需要学会识别：\n\n1. 肌电伪影（高频、低振幅，常见于颞肌）\n2. 眼电伪影（EOG，大振幅、慢波，常见于前额）\n3. 工频噪声（50/60 Hz 电源线干扰）\n\n学习如何识别这些伪影是 EEG 分析的重要技能。",
+      en: "This case demonstrates common dirty EEG data in real-world settings. You need to learn to identify:\n\n1. Electromyographic (EMG) artifacts (high frequency, low amplitude, common in temporal muscle)\n2. Electrooculographic (EOG) artifacts (large amplitude, slow waves, common in forehead)\n3. Power line noise (50/60 Hz interference)\n\nLearning to identify these artifacts is an important skill in EEG analysis.",
     },
     signal_quality: 45,
     learning_readability_score: 52,
