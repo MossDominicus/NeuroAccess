@@ -92,31 +92,14 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         pdf.addImage(pageDataUrl, "PNG", 10, 10, imgWidth, pageImgHeight);
       }
 
-      // ── 防篡改水印层 ───────────
-      const watermarkTexts: Record<string, string> = {
-        zh: "系统生成 · 仅供学习参考 · 篡改无效",
-        en: "System Generated · For Reference Only · Tampering Invalid",
-        es: "Generado por Sistema · Solo Referencia · Alteración Inválida",
-        fr: "Généré par Système · Référence Seulement · Falsification Invalide",
-        de: "Systemgeneriert · Nur Referenz · Manipulation Ungültig",
-        ja: "システム生成 · 参考用 · 改ざん無効",
-        ko: "시스템 생성 · 참고용 · 변조 무효",
-      };
-      const watermark = watermarkTexts[lang] || watermarkTexts["en"];
+      // ── 页脚标识（英文，避免字体渲染问题） ───────────
       const pdfPageCount = pdf.getNumberOfPages();
-
       for (let i = 1; i <= pdfPageCount; i++) {
         pdf.setPage(i);
-        // 半透明水印（水平居中，页面中上部）
-        pdf.setTextColor(200, 200, 200);
-        pdf.setFontSize(20);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(watermark, pageWidth / 2, pageHeight / 2 - 20, { align: "center" });
-        // 页脚：时间戳 + 报告ID
         pdf.setFontSize(7);
-        pdf.setTextColor(120, 120, 120);
+        pdf.setTextColor(150, 150, 150);
         pdf.setFont("helvetica", "normal");
-        const footerText = `NeuroAccess · ${new Date().toISOString()} · ID:${report.id}`;
+        const footerText = `NeuroAccess · System-Generated Report · For Reference Only · ${new Date().toISOString()} · ID:${report.id}`;
         pdf.text(footerText, pageWidth / 2, pageHeight - 5, { align: "center" });
       }
 
