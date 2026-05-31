@@ -7,7 +7,7 @@ export default function PublicPreviewFooter() {
 
   const openDisclaimer = (e: React.MouseEvent) => {
     e.preventDefault();
-    window.__openDisclaimerModal?.();
+    (window as any).__openDisclaimerModal?.();
   };
 
   return (

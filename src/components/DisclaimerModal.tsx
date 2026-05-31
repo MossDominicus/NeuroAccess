@@ -1,33 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLang } from "@/lib/language-context";
 import { AlertTriangle, CheckCircle } from "lucide-react";
-
-declare global {
-  interface Window {
-    __openDisclaimerModal?: () => void;
-  }
-}
 
 export default function DisclaimerModal() {
   const { t } = useLang();
   const [visible, setVisible] = useState(false);
+  const hasOpenedRef = useRef(false);
 
   useEffect(() => {
     try {
       const accepted = localStorage.getItem("neuroaccess-disclaimer-accepted");
       if (!accepted) {
         setVisible(true);
+        hasOpenedRef.current = true;
       }
     } catch {
       setVisible(true);
+      hasOpenedRef.current = true;
     }
 
-    // 注册全局回调，供 Footer / SettingsPanel 调用
-    window.__openDisclaimerModal = () => setVisible(true);
+    // 支持两种方式打开：事件 (__openDisclaimer) 或回调 (__openDisclaimerModal)
+    function onOpenEvent() {
+      setVisible(true);
+    }
+    window.addEventListener("__openDisclaimer", onOpenEvent);
+    (window as any).__openDisclaimerModal = () => setVisible(true);
+
     return () => {
-      delete window.__openDisclaimerModal;
+      window.removeEventListener("__openDisclaimer", onOpenEvent);
+      delete (window as any).__openDisclaimerModal;
     };
   }, []);
 
