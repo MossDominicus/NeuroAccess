@@ -437,7 +437,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                       {t("projectPositioning") || "项目定位"}
                     </span>
                     <span className="text-sm text-[var(--color-text)] text-right max-w-[60%]">
-                      {t("projectDescZh") || "EEG 科普教育平台"}
+                      {t("projectDescription") || "EEG 科普教育平台"}
                     </span>
                   </div>
                   <div className="pt-2 border-t border-[var(--color-border)]">
