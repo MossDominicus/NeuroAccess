@@ -487,10 +487,20 @@ const cases: CaseStudy[] = [
     limitations: {
       zh: ["仅静息态记录，无任务条件对比", "未记录同时的行为数据（如 Alpha 阻断测试）", "个体差异未考虑（如 Alpha 优势个体差异）"],
       en: ["Only resting-state recording, no task condition comparison", "No concurrent behavioral data (e.g., Alpha blocking test)", "Individual differences not considered (e.g., individual differences in Alpha dominance)"],
+      es: ["Solo grabación de estado de reposo, sin comparación de condiciones de tarea", "No se registraron datos conductuales simultáneos (p. ej., prueba de bloqueo Alfa)", "Diferencias individuales no consideradas (p. ej., diferencias individuales en dominancia Alfa)"],
+      fr: ["Seulment enregistrement d'état de repos, sans comparaison de conditions de tâche", "Aucune donnée compportementale concurrente enregistrée (p. ex., test de bloquage Alpha)", "Différences individuelles non considérées (p. ex., différences individuelles dans la dominance Alpha)"],
+      de: ["Nur Aufnahme des Ruhezustands, kein Vergleich von Aufgabenbedingungen", "Keine gleichzeitigen Verhaltensdaten aufgezeichnet (z. B. Alpha-Blockade-Test)", "Individuelle Unterschiede nicht berücksichtigt (z. B. individuelle Unterschiede in Alpha-Dominanz)"],
+      ja: ["安静状態の記録のみ、課題条件比較なし", "同時の行動データは記録されていません（例：Alpha遮断テスト）", "個人差は考慮されていません（例：Alpha優勢の個人差）"],
+      ko: ["오직 안정 상태 기록, 과제 조건 비교 없음", "동시 행동 데이터 기록 안 됨(예: Alpha 차단 테스트)", "개인차 고려 안 됨(예: Alpha 우세 개인차)"]
     },
     what_this_data_cannot_tell: {
       zh: ["智商或认知能力", "情绪状态的具体细节", "是否患有神经系统疾病"],
       en: ["IQ or cognitive ability", "Specific details of emotional state", "Whether the person has a neurological disease"],
+      es: ["CI o capacidad cognitiva", "Detalles específicos del estado emocional", "Si la persona tiene una enfermedad neurológica"],
+      fr: ["QI ou capacité cognitive", "Détails spécifiques de l'état émotionnel", "Si la personne a une maladie neurologique"],
+      de: ["IQ oder kognitive Fähigkeit", "Spezifische Details des emotionalen Zustands", "Ob die Person eine neurologische Krankheit hat"],
+      ja: ["IQまたは認知能力", "情緒状態の具体的詳細", "神経系疾患を持っているかどうか"],
+      ko: ["IQ 또는 인지 능력", "감정 상태의 구체적 세부사항", "신경계 질환을 앓고 있는지 여부"]
     },
     tags: ["alpha", "resting", "relax", "rhythm"],
     readTime: "6 分钟",
@@ -511,16 +521,31 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据包含多种复杂噪声（肌电、眼电、工频、电极松动）。信号质量评分仅 30/100，是噪声处理的挑战性案例。",
       en: "This EEG data contains multiple complex noises (EMG, EOG, power line, loose electrodes). Signal quality score is only 30/100, a challenging case for noise processing.",
+      es: "Estos datos EEG contienen múltiples ruidos complejos (EMG, EOG, línea de potencia, electrodes sueltos). La puntuación de calidad de señal es de solo 30/100, un caso desafiante para el procesamiento de ruido.",
+      fr: "Ces données EEG contiennent plusieurs bruits complexes (EMG, EOG, réseau électrique, électrodes lâches). Le score de qualité du signal n'est que de 30/100, un cas diffcile pour le traitement du bruit.",
+      de: "Diese EEG-Daten enthalten mehrere komplexe Rauscharten (EMG, EOG, Stromnetz, lose Elektroden). Die Signalqualitäts-Bewertung beträgt nur 30/100, ein herausfordernder Fall für die Rauschverarbeitung.",
+      ja: "このEEGデータは複数の複雑なノイズ（EMG、EOG、電力線、緩い電極）を含みます。信号品質スコアはわずか30/100で、ノイズ処理の挑戦的な症例です。",
+      ko: "이 EEG 데이터는 여러 복잡한 노이즈(EMG, EOG, 전력선, 헐거운 전극)을 포함합니다. 신호 품질 점수는 겨우 30/100으로, 노이즈 처리의 도젼적인 사례입니다。"
     },
     details: {
       zh: "此案例展示了真实世界中最具挑战性的 EEG 数据：\n\n1. 多种伪影同时出现（肌电 + 眼电 + 工频噪声）\n2. 某些通道完全不可用（信号质量评分 < 20）\n3. 需要高级预处理（ICA、带阻滤波、分段）才能提取有效信息\n\n这是学习 EEG 预处理流程的高级案例。",
       en: "This case demonstrates the most challenging EEG data in real-world settings:\n\n1. Multiple artifacts appear simultaneously (EMG + EOG + power line noise)\n2. Some channels are completely unusable (signal quality score < 20)\n3. Advanced preprocessing (ICA, notch filtering, segmentation) is needed to extract valid information\n\nThis is an advanced case for learning EEG preprocessing workflows.",
+      es: "Este caso demuestra los datos EEG más desafiantes en configuraciones del mundo real:\n\n1. Múltiples artefactos aparecen simultáneamente (EMG + EOG + ruido de línea de potencia)\n2. Algunos canales están completamente inutilizables (puntuación de calidad de señal < 20)\n3. Preprocesamiento avanzado (ICA, filtrado de muesca, segmentación) es necesario para extraer información válida\n\nEste es un caso avanzado para aprender los flujos de trabajo de preprocesamiento de EEG.",
+      fr: "Ce cas démontre les données EEG les plus difficiles dans des paramétrages du monde réel :\n\n1. Plusieurs artefacts apparaissent simultanément (EMG + EOG + bruit de réseau électrique)\n2. Certains canaux sont complètement inutilisables (score de qualité du signal < 20)\n3. Un prétraitement avancé (ICA, filtrage de muesca, segmentation) est nécessaire pour extraire des informations valides\n\nC'est un cas avancé pour apprendre les flux de travail de prétraitement EEG.",
+      de: "Dieser Fall zeigt die herausforderndsten EEG-Daten in Einstellungen der realen Welt:\n\n1. Mehrere Artefakte erscheinen gleichzeitig (EMG + EOG + Netzbrummen)\n2. Einige Kanäle sind vollständig unbrauchbar (Signalqualitäts-Score < 20)\n3. Fortgeschrittene Vorverarbeitung (ICA, Kerbfilterung, Segmentierung) ist erforderlich, um gültige Informationen zu extrahieren\n\nDies ist ein fortgeschrittener Fall zum Erlernen von EEG-Vorverarbeitungs-Workflows.",
+      ja: "この症例は実世界の設定で最も挑戦的なEEGデータを示しています：\n\n1. 複数のアーチファクトが同時に現れます（EMG + EOG + 電力線ノイズ）\n2. 一部のチャンネルは完全に使用不可能です（信号品質スコア < 20）\n3. 有効な情報を抽出するには高度な前処理（ICA、ノッチフィルタリング、セグメンテーション）が必要です\n\nこれはEEG前処理ワークフローを学ぶための高度な症例です。",
+      ko: "이 사례는 실제 세계 설정에서 가장 도젼적인 EEG 데이터를 보여줍니다:\n\n1. 여러 아티팩트가 동시에 나타납니다 (EMG + EOG + 전력선 노이즈)\n2. 일부 채널은 완전히 사용 불가능합니다 (신호 품질 점수 < 20)\n3. 유효한 정보를 추출하려면 고급 전처리 (ICA, 노치 필터링, 세그먼테이션) 이 필요합니다\n\n이는 EEG 전처리 워크플로우를 배우기 위한 고급 사례입니다。"
     },
     signal_quality: 30,
     learning_readability_score: 40,
     beginner_explanation: {
       zh: "这份 EEG 噪声非常多，就像在嘈杂的餐厅里试图听清一个人的说话。很多通道的信号完全不可用，需要专业人士进行大量清理工作。",
       en: "This EEG has a lot of noise, like trying to hear one person speak in a noisy restaurant. Many channels have completely unusable signals, requiring professionals to do a lot of cleaning work.",
+      es: "Este EEG tiene mucho ruido, como tratar de escuchar a una persona hablar en un restaurante ruidoso. Muchos canales tienen señales completamente inutilizables, requiriendo profesionales para hacer mucho trabajo de limpieza.",
+      fr: "Cet EEG a beaucoup de bruit, comme essayer d'entendre une personne parler dans un restaurant bruyant. Beaucoup de canaux ont des signaux complètement inutilisables, nécessitant des professionels pour faire beaucoup de travail de nettoyage.",
+      de: "Dieses EEG hat viel Rauschen, wie zu versuchen, eine Person in einem lauten Restaurant sprechen zu hören. Viele Kanäle haben vollständig unbrauchbare Signale, was professionelle braucht, um viel Reinigungsarbeit zu leisten.",
+      ja: "このEEGはノイズがたくさんあります、うるさいレストランで一人が話すのを聞こうとするようです。多くのチャンネルは完全に使用不能な信号で、専門家がたくさんの清掃作業を行う必要があります。",
+      ko: "이 EEG는 노이즈가 많습니다, 시끄러운 식당에서 한 사람이 말하는 것을 듣으려는 것과 같습니다. 많은 채널은 완전히 사용 불가능한 신호를 가지고 있으며, 전문가가 많은 청소 작업을 수행할 필요가 있습니다。"
     },
     student_explanation: {
       zh: "该 EEG 记录包含多种伪影的叠加：前额区域有眼电伪影（EOG），颞叶和中央区域有肌电伪影（EMG），且存在 50 Hz 工频噪声。多个通道（如 FP1、F7、T3）信号质量 < 20。建议的预处理流程：1) 检查并拒绝坏通道；2) 使用 ICA 去除眼电和肌电伪影；3) 应用 notch filter 去除工频噪声；4) 分段并基线校正。",
