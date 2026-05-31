@@ -10,7 +10,6 @@ import {
   X,
   Calendar,
   Brain,
-  FileDown,
   Eye,
   AlertTriangle,
 } from "lucide-react";
@@ -355,12 +354,6 @@ export default function ReportsPage() {
     }
   };
 
-  // 导出全部 → 浏览器原生打印
-  const handleExportAll = () => {
-    if (reports.length === 0) return;
-    window.print();
-  };
-
   const handleDelete = (report: StoredReport) => {
     setDeleteTarget(report);
   };
@@ -433,16 +426,7 @@ export default function ReportsPage() {
               <Trash2 className="h-4 w-4" />
               {t("batchDeleteCount").replace("{count}", String(selected.length))}
             </button>
-          ) : (
-            <button
-              onClick={handleExportAll}
-              disabled={reports.length === 0}
-              className="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-gray-900/10 transition-all duration-300 hover:bg-gray-800 disabled:opacity-40"
-            >
-              <FileDown className="h-4 w-4" />
-              {t("exportAllPdf")}
-            </button>
-          )}
+          ) : null}
         </div>
 
         {/* 统计卡片 */}
