@@ -355,10 +355,10 @@ export default function ReportsPage() {
     }
   };
 
-  // 导出全部
+  // 导出全部 → 浏览器原生打印
   const handleExportAll = () => {
     if (reports.length === 0) return;
-    alert(t("exportAllHint") || "Please view reports individually and export PDF");
+    window.print();
   };
 
   const handleDelete = (report: StoredReport) => {
