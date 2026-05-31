@@ -125,28 +125,58 @@ const cases: CaseStudy[] = [
     details: {
       zh: "此案例展示了真实世界中常见的脏 EEG 数据。你需要学会识别：\n\n1. 肌电伪影（高频、低振幅，常见于颞肌）\n2. 眼电伪影（EOG，大振幅、慢波，常见于前额）\n3. 工频噪声（50/60 Hz 电源线干扰）\n\n学习如何识别这些伪影是 EEG 分析的重要技能。",
       en: "This case demonstrates common dirty EEG data in real-world settings. You need to learn to identify:\n\n1. Electromyographic (EMG) artifacts (high frequency, low amplitude, common in temporal muscle)\n2. Electrooculographic (EOG) artifacts (large amplitude, slow waves, common in forehead)\n3. Power line noise (50/60 Hz interference)\n\nLearning to identify these artifacts is an important skill in EEG analysis.",
+      es: "Este caso demuestra datos EEG sucios comunes en entornos del mundo real. Necesita aprender a identificar:\n\n1. Artefactos electromiográficos (EMG) (alta frecuencia, baja amplitud, comunes en el músculo temporal)\n2. Artefactos electrooculográficos (EOG) (gran amplitud, ondas lentas, comunes en la frente)\n3. Ruido de línea eléctrica (interferencia de 50/60 Hz)\n\nAprender a identificar estos artefactos es una habilidad importante en el análisis de EEG.",
+      fr: "Ce cas démontre des données EEG sales communes dans des environments du monde réel. Vous devez apprendre à identifier :\n\n1. Artefacts électromyographiques (EMG) (haute fréquence, basse amplitude, communs dans le muscle temporal)\n2. Artefacts électrooculographiques (EOG) (grande amplitude, ondes lentes, communs sur le front)\n3. Bruit de réseau électrique (interférence 50/60 Hz)\n\nApprendre à identifier ces artefacts est une compétence importante dans l'analyse EEG.",
+      de: "Dieser Fall zeigt häufige schmutzige EEG-Daten in Realwelt-Einstellungen. Sie müssen lernen zu identifizieren:\n\n1. Elektromyographische (EMG) Artefakte (hohe Frequenz, niedrige Amplitude, häufig im temporalen Muskel)\n2. Elektrookulographische (EOG) Artefakte (große Amplitude, langsame Wellen, häufig auf der Stirn)\n3. Netzbrummen (50/60 Hz Interferenz)\n\nZu lernen, diese Artefakte zu identifizieren, ist eine wichtige Fähigkeit in der EEG-Analyse.",
+      ja: "この症例は実世界の設定で一般的な汚れたEEGデータを示しています。あなたは識別することを学ぶ必要があります：\n\n1. 筋電図（EMG）アーチファクト（高周波、低振幅、側頭筋に一般的）\n2. 眼電図（EOG）アーチファクト（大振幅、緩波、額に一般的）\n3. 電力線ノイズ（50/60 Hz 干渉）\n\nこれらのアーチファクトを識別することを学ぶことは、EEG分析の重要なスキルです。",
+      ko: "이 사례는 실제 환경에서 흔한 더러운 EEG 데이터를 보여줍니다. 당신은 식별하는 방법을 배워야 합니다:\n\n1. 근전도 (EMG) 아티팩트 (고주파, 저진폭, 측두근에 흔함)\n2. 안구전도 (EOG) 아티팩트 (대진폭, 서파, 이마에 흔함)\n3. 전력선 노이즈 (50/60 Hz 간섭)\n\n이 아티팩트를 식별하는 방법을 배우는 것은 EEG 분석에서 중요한 스킬입니다."
     },
     signal_quality: 45,
     learning_readability_score: 52,
     beginner_explanation: {
       zh: "这份 EEG 有很多杂讯，就像收音机有静电干扰一样。有些通道的信号很乱，可能是因为电极接触不好，或者受试者有眨眼、动弹。",
       en: "This EEG has a lot of noise, like static on a radio. Some channels have messy signals, possibly because the electrodes aren't contacting well, or the subject is blinking or moving.",
+      es: "Este EEG tiene mucho ruido, como estática en la radio. Algunos canales tienen señales desordenadas, posiblemenete porque los electrodos no están contactando bien, o el sujeto está parpadeando o moviéndose.",
+      fr: "Cet EEG a beaucoup de bruit, comme de la statique sur la radio. Certains canaux ont des signaux désordonnés, possiblement parce que les électrodes ne contactent pas bien, ou le sujet est en train de cligner ou de bouger.",
+      de: "Dieses EEG hat viel Rauschen, wie statisches Rauschen im Radio. Einige Kanäle haben ungeordnete Signale, möglicherweise weil die Elektroden nicht gut kontaktieren, oder das Subjekt blinzelt oder sich bewegt.",
+      ja: "このEEGは多くのノイズがあります、ラジオの静電気のようです。一部のチャンネルは信号が乱雑で、おそらく電極がうまく接触していないか、または被験者がまばたきや動きをしているためです。",
+      ko: "이 EEG는 많은 노이즈가 있습니다, 라디오의 정전기처럼. 일부 채널은 신호가 엉망입니다, 가능하게는 전극이 잘 접촉하지 않거나, 또는 피험자가 눈을 깜빡이거나 움직이고 있기 때문에."
     },
     student_explanation: {
       zh: "该 EEG 记录显示多处伪影：前额区域可见眼电伪影（EOG，大振幅慢波），颞叶可见肌电伪影（EMG，高频低振幅）。通道 FP1、FP2 信号质量差。建议在进行分析前先进行伪影去除（如 ICA 或带阻滤波）。",
       en: "The EEG recording shows multiple artifacts: EOG artifacts (large-amplitude slow waves) are visible in frontal areas, and EMG artifacts (high-frequency low-amplitude) are visible in temporal areas. Channels FP1, FP2 have poor signal quality. Artifact removal (e.g., ICA or notch filtering) is recommended before analysis.",
+      es: "La grabación de EEG muestra múltiples artefactos: los artefactos EOG (ondas lentas de gran amplitud) son visibles en áreas frontales, y los artefactos EMG (baja amplitud de alta frecuencia) son visibles en áreas temporales. Los canales FP1, FP2 tienen mala calidad de señal. Se recomienda la eliminación de artefactos (por ejemplo, ICA o filtrado de muesca) antes del análisis.",
+      fr: "L'enregistrement EEG montre plusieurs artefacts : les artefacts EOG (ondes lentes de grande amplitude) sont visibles dans les zones frontales, et les artefacts EMG (basse amplitude haute fréquence) sont visibles dans les zones temporales. Les canaux FP1, FP2 ont une mauvaise qualité de signal. L'élimination des artefacts (par exemple, ICA ou filtrage de muesca) est recommandée avant l'analyse.",
+      de: "Die EEG-Aufzeichnung zeigt mehrere Artefakte: EOG-Artefakte (langsame Wellen großer Amplitude) sind in frontalen Bereichen sichtbar, und EMG-Artefakte (niedrige Amplitude hoher Frequenz) sind in temporalen Bereichen sichtbar. Die Kanäle FP1, FP2 haben schlechte Signalqualität. Artefaktentfernung (z. B. ICA oder Kerbfilterung) wird vor der Analyse empfohlen.",
+      ja: "EEG記録は複数のアーチファクトを示しています：EOGアーチファクト（大振幅緩波）は前頭領域で可視であり、EMGアーチファクト（高周波低振幅）は側頭領域で可視です。チャンネルFP1、FP2は信号品質が悪いです。分析の前にアーチファクト除去（例：ICAまたはノッチフィルタリング）が推奨されます。",
+      ko: "EEG 기록은 여러 아티팩트를 보여줍니다: EOG 아티팩트 (대진폭 서파) 는 전두 영역에서 가시적이며, EMG 아티팩트 (고주파 저진폭) 는 측두 영역에서 가시적입니다. 채널 FP1, FP2 는 신호 품질이 나쁩입니다. 분석 전에 아티팩트 제거 (예: ICA 또는 노치 필터링) 가 권장됩니다."
     },
     research_explanation: {
       zh: "PSD 显示 50 Hz 工频噪声（电源干扰）。多个通道 SNR < 2 dB。建议：1) 检查电极阻抗（应 < 5 kΩ）；2) 使用 notch filter 去除 50 Hz 噪声；3) 考虑使用 ICA 去除眼电和肌电伪影。当前数据不适合用于认知或临床研究。",
       en: "PSD shows 50 Hz power line noise (mains interference). Multiple channels have SNR < 2 dB. Recommendations: 1) Check electrode impedance (should be < 5 kΩ); 2) Use notch filter to remove 50 Hz noise; 3) Consider using ICA to remove EOG and EMG artifacts. Current data is not suitable for cognitive or clinical research.",
+      es: "PSD muestra ruido de línea eléctrica de 50 Hz (interferencia de red). Múltiples canales tienen SNR < 2 dB. Recomendaciones: 1) Verificar impedancia de electrodos (debería ser < 5 kΩ); 2) Usar filtro de muesca para eliminar ruido de 50 Hz; 3) Considerar el uso de ICA para eliminar artefactos EOG y EMG. Los datos actuales no son adecuados para investigación cognitiva o clínica.",
+      fr: "PSD montre du bruit de réseau électrique 50 Hz (interférence de secteur). Plusieurs canaux ont un SNR < 2 dB. Recommandations: 1) Vérifier l'impédance des électrodes (devrait être < 5 kΩ); 2) Utiliser un filtre de muesca pour éliminer le bruit de 50 Hz; 3) Envisager l'utilisation d'ICA pour éliminer les artefacts EOG et EMG. Les données actuelles ne sont pas adaptées à la recherche cognitive ou clinique.",
+      de: "PSD zeigt 50 Hz Netzbrummen (Netzinterferenz). Mehrere Kanäle haben SNR < 2 dB. Empfehlungen: 1) Elektrodenimpedanz prüfen (sollte < 5 kΩ sein); 2) Kerbfilter verwenden, um 50 Hz Rauschen zu entfernen; 3) Erwägen Sie die Verwendung von ICA, um EOG- und EMG-Artefakte zu entfernen. Aktuelle Daten eignen sich nicht für kognitive oder klinische Forschung.",
+      ja: "PSDは50Hz電力線ノイズ（電源干渉）を示しています。複数のチャンネルはSNR < 2 dBです。推奨：1）電極インピーダンスを確認（< 5 kΩであるべき）；2）ノッチフィルタを使用して50Hzノイズを除去；3）EOGとEMGアーチファクトを除去するためにICAの使用を考慮。現在のデータは認知または臨床研究に適していません。",
+      ko: "PSD는 50Hz 전력선 노이즈 (전원 간섭) 를 보여줍니다. 여러 채널은 SNR < 2 dB입니다. 권장사항: 1) 전극 임피던스 확인 ( < 5 kΩ이어야 함); 2) 50Hz 노이즈를 제거하기 위해 노치 필터 사용; 3) EOG 및 EMG 아티팩트를 제거하기 위해 ICA 사용 고려. 현재 데이터는 인지 또는 임상 연구에 적합하지 않습니다."
     },
     limitations: {
       zh: ["高噪声水平严重限制了数据解读", "无法可靠地测量频段功率", "伪影去除算法可能引入额外误差"],
       en: ["High noise level severely limits data interpretation", "Cannot reliably measure band power", "Artifact removal algorithms may introduce additional errors"],
+      es: ["El nivel alto de ruido limit seriamente la interpretación de datos", "No se puede medir confiablemente la potencia de banda", "Los algoritmos de eliminación de artefactos pueden introducir errores adicionales"],
+      fr: ["Le niveau élevé de bruit limite sévèrement l'interprétation des données", "Impossible de mesurer fiablement la puissance de la bande", "Les algorithmes d'élimination d'artefacts peuvent introduire des erreurs supplémentaires"],
+      de: ["Hohes Rauschniveau eingeschränkt die Datenerpretation stark", "Kann Bandleistung nicht zuverlässig messen", "Artefaktentfernungsalgorithmen können zusätzliche Fehler einführen"],
+      ja: ["高ノイズレベルはデータ解釈を深刻に制限します", "信頼できる帯域電力測定は不可能です", "アーチファクト除去アルゴリズムは追加の誤差を導入する可能性があります"],
+      ko: ["높은 노이즈 수준은 데이터 해석을 심각하게 제한합니다", "신뢰할 수 있게 밴드 전력을 측정할 수 없습니다", "아티팩트 제거 알고리즘은 추가 오차를 도입할 수 있습니다"]
     },
     what_this_data_cannot_tell: {
       zh: ["真实的脑活动模式", "准确的频段能量分布", "任何与认知相关的信息"],
       en: ["True brain activity patterns", "Accurate band power distribution", "Any cognition-related information"],
+      es: ["Patrones reales de actividad cerebral", "Distribución precisa de potencia de banda", "Cualquier información relacionada con la cognición"],
+      fr: ["Vrais patrons d'activité cérébrale", "Distribution précise de puissance de bande", "Toute information liée à la cognition"],
+      de: ["Echte Hirnaktivitätsmuster", "Präzise Bandleistungsverteilung", "Jeglische kognitionsbezogene Information"],
+      ja: ["真の脳活動パターン", "正確な帯域電力分布", "認知関連の情報"],
+      ko: ["진정한 뇌 활동 패턴", "정확한 밴드 전력 분포", "인지 관련 정보"]
     },
     tags: ["noise", "artifact", "eog", "emg", "qualityCtrl"],
     readTime: "8 分钟",
@@ -167,32 +197,67 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据只记录了 30 秒。虽然信号质量尚可（评分 68/100），但记录时间太短，无法可靠地评估脑电活动。",
       en: "This EEG data was recorded for only 30 seconds. Although signal quality is acceptable (score 68/100), the recording time is too short to reliably assess brain activity.",
+      es: "Estos datos EEG fueron grabados solo durante 30 segundos. Aunque la calidad de señal es aceptable (puntuación 68/100), el tiempo de grabación es demasiado corto para evaluar confiablemente la actividad cerebral.",
+      fr: "Ces données EEG n'ont été enregistrées que pendant 30 secondes. Bien que la qualité du signal soit acceptable (score 68/100), la durée d'enregistrement est trop courte pour évaluer fiablement l'activité cérébrale.",
+      de: "Diese EEG-Daten wurden nur 30 Sekunden lang aufgezeichnet. Obwohl die Signalqualität akzeptabel ist (Score 68/100), ist die Aufnahmedauer zu kurz, um die Hirnaktivität zuverlässig zu bewerten.",
+      ja: "このEEGデータはわずか30秒間記録されました。信号品質は許容範囲ですが（スコア68/100）、記録時間が短すぎて脳活動を可靠に評価できません。",
+      ko: "이 EEG 데이터는 겨우 30초 동안 기록되었습니다. 신호 품질은 허용 가능합니다 (점수 68/100), 하지만 기록 시간이 너무 짧아서 뇌 활동을 신뢰할 수 있게 평가할 수 없습니다."
     },
     details: {
       zh: "此案例展示了记录时长不足的问题：\n\n1. 30 秒不足以评估 Alpha 阻断等事件相关反应\n2. 频段功率估算可能不准确（需要至少 2-3 分钟）\n3. 可能无法捕捉到 intermittent 的异常活动\n\n学习 EEG 时，理解记录时长的重要性非常关键。",
       en: "This case demonstrates the problem of insufficient recording duration:\n\n1. 30 seconds is not enough to assess event-related responses like Alpha blocking\n2. Band power estimation may be inaccurate (at least 2-3 minutes needed)\n3. May not capture intermittent abnormal activities\n\nWhen learning EEG, understanding the importance of recording duration is crucial.",
+      es: "Este caso demuestra el problema de la durción de grabación insuficiente:\n\n1. 30 segundos no son suficientes para evaluar respuestas relacionadas con eventos como el bloqueo Alfa\n2. La estimación de potencia de banda puede ser imprecisa (se necesitan al menos 2-3 minutos)\n3. Puede que no se capturen actividades anormales intermitentes\n\nAl aprender EEG, comprender la importancia de la durción de la grabación es crucial.",
+      fr: "Ce cas démontre le problème de la durée d'enregistrement insuffisante :\n\n1. 30 secondes ne suffisent pas pour évaluer les réponses liées aux événements comme le bloquage Alfa\n2. L'estimation de la puissance de la bande peut être imprécise (au moins 2-3 minutes nécessaires)\n3. Peut-être que les activités anormales intermittentes ne sont pas capturées\n\nEn apprenant l'EEG, comprendre l'importance de la durée d'enregistrement est crucial.",
+      de: "Dieser Fall zeigt das Problem der unzureichenden Aufnahmedauer:\n\n1. 30 Sekunden reichen nicht aus, um ereignisbezogene Reaktionen wie Alpha-Blockade zu bewerten\n2. Die Schätzung der Bandleistung kann ungenau sein (mindestens 2-3 Minuten erforderlich)\n3. Intermittierende anormale Aktivitäten werden möglicherweise nicht erfasst\n\nBeim Erlernen von EEG ist das Verständnis der Bedeutung der Aufnahmedauer von entscheidender Bedeutung.",
+      ja: "この症例は記録時間の不足の問題を示しています：\n\n1. 30秒ではAlpha遮断などの事象関連反応を評価するには不十分です\n2. 帯域電力推定は不正確かもしれません（少なくとも2-3分必要）\n3. 間歇的な異常活動を捕捉できないかもしれません\n\nEEGを学ぶ際、記録時間の重要性を理解することは決定的に重要です。",
+      ko: "이 사례는 기록 지속 시간 부족의 문제를 보여줍니다:\n\n1. 30초는 Alpha 차단과 같은 사건 관련 반응을 평가하기에 부족합니다\n2. 밴드 전력 추정은 부정확할 수 있습니다 (적어도 2-3분 필요)\n3. 간헐적인 비정상 활동을 포착하지 못할 수 있습니다\n\nEEG를 배울 때, 기록 지속 시간의 중요성을 이해하는 것은 결정적으로 중요합니다."
     },
     signal_quality: 68,
     learning_readability_score: 75,
     beginner_explanation: {
       zh: "这份 EEG 只记录了 30 秒，就像只看了书的最后一页。大脑活动是会变化的，30 秒太短了，不能代表你的整体脑电活动。",
       en: "This EEG was recorded for only 30 seconds, like reading only the last page of a book. Brain activity changes over time; 30 seconds is too short to represent your overall brain activity.",
+      es: "Este EEG fue grabado solo durante 30 segundos, como leer solo la última página de un libro. La actividad cerebral cambia con el tiempo; 30 segundos son demasiado cortos para representar tu actividad cerebral general.",
+      fr: "Cet EEG n'a été enregistré que pendant 30 secondes, comme si on ne lisait que la dernière page d'un livre. L'activité cérébrale change avec le temps ; 30 secondes sont trop courtes pour représenter votre activité cérébrale globale.",
+      de: "Dieses EEG wurde nur 30 Sekunden lang aufgezeichnet, wie wenn man nur die letzte Seite eines Buches liest. Die Hirnaktivität ändert sich mit der Zeit; 30 Sekunden sind zu kurz, um Ihre gesamte Hirnaktivität zu repräsentieren.",
+      ja: "このEEGはわずか30秒間記録されました、本の最後のページだけを読むようなものです。脳活動は時間とともに変化します；30秒では全体の脳活動を代表するには短すぎます。",
+      ko: "이 EEG는 겨우 30초 동안 기록되었습니다, 책의 마지막 페이지만 읽는 것과 같습니다. 뇌 활동은 시간에 따라 변화합니다; 30초는 전체 뇌 활동을 대표하기에는 너무 짧습니다."
     },
     student_explanation: {
       zh: "该记录时长仅 30 秒，不符合最低记录时长建议（静息态 EEG 至少 2 分钟）。短时程导致频段功率估算不准确（Welch 方法需要足够多的数据段）。若需评估 Alpha 阻断等事件相关反应，建议记录 3-5 分钟。",
       en: "The recording duration is only 30 seconds, which does not meet the minimum recommended recording time (at least 2 minutes for resting-state EEG). Short duration leads to inaccurate band power estimation (Welch's method requires sufficient data segments). If assessing event-related responses like Alpha blocking, 3-5 minutes of recording is recommended.",
+      es: "La durción de la grabación es solo de 30 segundos, lo cual no cumple con el tiempo mínimo recomendado de grabación (al menos 2 minutos para EEG de estado de reposo). La corta durción conduce a una estimación inaccurata de la potencia de banda (el método de Welch requiere segmentos de datos suficientes). Si se evalúan respuestas relacionadas con eventos como el bloqueo Alfa, se recomiendan 3-5 minutos de grabación.",
+      fr: "La durée d'enregistrement n'est que de 30 secondes, ce qui ne respecte pas le temps d'enregistrement minimum recommandé (au moins 2 minutes pour l'EEG de l'état de repos). La courte durée conduit à une estimation inexacte de la puissance de la bande (la méthode de Welch nécessite des segments de données suffisants). Si l'on évalue les réponses liées aux événements comme le bloquage Alfa, 3-5 minutes d'enregistrement sont recommandées.",
+      de: "Die Aufnahmedauer beträgt nur 30 Sekunden, was der minimal empfohlenen Aufnahmedauer nicht entspricht (mindestens 2 Minuten für ruhezustands-EEG). Kurze Dauer führt zu ungenauer Bandleistungsschätzung (Welch-Methode erfordert ausreichende Datensegmente). Bei Bewertung ereignisbezogener Reaktionen wie Alpha-Blockade werden 3-5 Minuten Aufnahme empfohlen.",
+      ja: "記録時間はわずか30秒で、推奨される最小記録時間（安静状態EEGでは少なくとも2分）を満たしていません。短時間では帯域電力推定が不正確になります（Welch法には十分なデータセグメントが必要です）。Alpha遮断などの事象関連反応を評価する場合は、3-5分の記録が推奨されます。",
+      ko: "기록 지속 시간은 겨우 30초입니다. 이는 권장되는 최소 기록 시간(안정 상태 EEG의 경우 적어도 2분)을 충족하지 않습니다. 짧은 지속 시간은 부정확한 밴드 전력 추정으로 이어집니다(Welch 방법에는 충분한 데이터 세그먼트가 필요합니다). Alpha 차단과 같은 사건 관련 반응을 평가하는 경우 3-5분 기록이 권장됩니다."
     },
     research_explanation: {
       zh: "30 秒记录仅包含 15 个 2-second epochs（无重叠）。根据 Welch 方法，频率分辨率 ≈ 0.5 Hz，但功率谱估计的方差很大。建议至少记录 2 分钟（120 秒 = 60 epochs），以获得稳定的 PSD 估计。此数据仅适合作为教学示例，不应用于研究。",
       en: "30-second recording contains only 15 2-second epochs (non-overlapping). According to Welch's method, frequency resolution ≈ 0.5 Hz, but the variance of power spectrum estimation is large. At least 2 minutes of recording (120 seconds = 60 epochs) is recommended for stable PSD estimation. This data is only suitable as a teaching example, not for research.",
+      es: "La grabación de 30 segundos contiene solo 15 épocas de 2 segundos (sin solapamiento). Según el método de Welch, la resolución de frecuencia ≈ 0.5 Hz, pero la varianza de la estimación del espectro de potencia es grande. Se recomienda al menos 2 minutos de grabación (120 segundos = 60 épocas) para una estimación estable de PSD. Estos datos solo son adecuados como ejemplo de enseñanza, no para investigación.",
+      fr: "L'enregistrement de 30 secondes ne contient que 15 époches de 2 secondes (non chevauchantes). Selon la méthode de Welch, la résolution fréquentielle ≈ 0.5 Hz, mais la variance de l'estimation du spectre de puissance est grande. Au moins 2 minutes d'enregistrement (120 secondes = 60 époches) sont recommandées pour une estimation stable de PSD. Ces données ne sont adaptées que comme exemple d'enseignement, pas pour la recherche.",
+      de: "30-Sekunden-Aufnahme enthält nur 15 2-Sekunden-Epochen (nicht überlappend). Nach Welch-Methode beträgt die Frequenzauflösung ≈ 0,5 Hz, aber die Varianz der Leistungsspektrumschätzung ist groß. Mindestens 2 Minuten Aufnahme (120 Sekunden = 60 Epochen) werden für stable PSD-Schätzung empfohlen. Diese Daten eignen sich nur als Lehrbeispiel, nicht für Forschung.",
+      ja: "30秒記録はわずか15個の2秒エポック（非重複）を含みます。Welch法によると、周波数分解能≈0.5Hzですが、電力スペクトル推定の分散は大きいです。安定したPSD推定には少なくとも2分（120秒=60エポック）の記録が推奨されます。このデータは教授例としてのみ適しており、研究には適していません。",
+      ko: "30초 기록은 겨우 15개의 2초 에포크(비겹침)만 포함합니다. Welch 방법에 따르면, 주파수 해상도 ≈ 0.5Hz이지만, 전력 스펙트럼 추정의 분산은 큽니다. 안정적인 PSD 추정을 위해서는 적어도 2분(120초 = 60 에포크)의 기록이 권장됩니다. 이 데이터는 교수 예시로만 적합하며, 연구에는 적합하지 않습니다."
     },
     limitations: {
       zh: ["记录时长严重不足", "频段功率估计不可靠", "无法评估稳态特征"],
       en: ["Severely insufficient recording duration", "Band power estimation is unreliable", "Cannot assess steady-state characteristics"],
+      es: ["Durción de grabación severamente insuficiente", "La estimación de potencia de banda es poco fiable", "No se pueden evaluar características de estado estacionario"],
+      fr: ["Durée d'enregistrement sévèrement insuffisante", "L'estimation de la puissance de la bande est peu fiable", "Impossible d'évaluer les caractéristiques d'état stationnaire"],
+      de: ["Schwerwiegend unzureichende Aufnahmedauer", "Bandleistungsschätzung ist unzuverlässig", "Kann stationäre Merkmale nicht bewerten"],
+      ja: ["記録時間が深刻に不十分です", "帯域電力推定は信頼できません", "定常状態の特徴を評価できません"],
+      ko: ["기록 지속 시간이 심각하게 불충분합니다", "밴드 전력 추정은 신뢰할 수 없습니다", "정상 상태 특성을 평가할 수 없습니다"]
     },
     what_this_data_cannot_tell: {
       zh: ["可靠的频段能量分布", "Alpha 阻断反应", "任何时序相关的变化"],
       en: ["Reliable band power distribution", "Alpha blocking response", "Any time-series related changes"],
+      es: ["Distribución de potencia de banda confiable", "Respuesta de bloqueo Alfa", "Cualquier cambio relacionado con la serie temporal"],
+      fr: ["Distribution de puissance de bande fiable", "Réponse de bloquage Alfa", "Tout changement lié à la série temporelle"],
+      de: ["Zuverlässige Bandleistungsverteilung", "Alpha-Blockade-Reaktion", "Jeglische zeitreihenbezogene Änderungen"],
+      ja: ["信頼できる帯域電力分布", "Alpha遮断反応", "時間系列関連の変化"],
+      ko: ["신뢰할 수 있는 밴드 전력 분포", "Alpha 차단 반응", "시계열 관련 변화"]
     },
     tags: ["shortRec", "teachingEx", "psd"],
     readTime: "4 分钟",
@@ -213,32 +278,67 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据采样率仅为 128 Hz，低于标准推荐的 500 Hz。信号质量评分 55/100，可能丢失高频信息。",
       en: "This EEG data has a sampling rate of only 128 Hz, below the standard recommendation of 500 Hz. Signal quality score 55/100, may lose high-frequency information.",
+      es: "Estos datos EEG tienen una tasa de muestreo de solo 128 Hz, por debajo de la recomendación estándar de 500 Hz. Puntuación de calidad de señal 55/100, puede perder información de alta frecuencia.",
+      fr: "Ces données EEG ont un taux d'échantillonnage de seulement 128 Hz, inférieur à la recommandation standard de 500 Hz. Score de qualité du signal 55/100, peut perdre des informations haute fréquence.",
+      de: "Diese EEG-Daten haben eine Abtastrate von nur 128 Hz, unterhalb der Standardempfehlung von 500 Hz. Signalqualitäts-Score 55/100, kann hochfrequente Informationen verlieren.",
+      ja: "このEEGデータはサンプリングレートがわずか128Hzで、標準推奨の500Hzを下回っています。信号品質スコア55/100、高周波情報を失う可能性があります。",
+      ko: "이 EEG 데이터는 샘플링 레이트가 겨우 128Hz로, 표준 권장 사항인 500Hz보다 낮습니다. 신호 품질 점수 55/100, 고주파 정보를 잃을 수 있습니다."
     },
     details: {
       zh: "此案例展示了低采样率的问题：\n\n1. 根据奈奎斯特定理，128 Hz 采样率只能可靠地记录 ≤ 64 Hz 的信号\n2. Beta 波（13-30 Hz）和 Gamma 波（30-100 Hz）的高频部分可能混叠\n3. 对于需要高频分析的 ERP 研究，此采样率不足\n\n学习 EEG 时，理解采样率对数据质量的影响非常重要。",
       en: "This case demonstrates the problem of low sampling rate:\n\n1. According to Nyquist theorem, 128 Hz sampling rate can only reliably record signals ≤ 64 Hz\n2. High-frequency parts of Beta waves (13-30 Hz) and Gamma waves (30-100 Hz) may be aliased\n3. For ERP research requiring high-frequency analysis, this sampling rate is insufficient\n\nWhen learning EEG, understanding the impact of sampling rate on data quality is very important.",
+      es: "Este caso demuestra el problema de la baja tasa de muestreo:\n\n1. Según el teorema de Nyquist, la tasa de muestreo de 128 Hz solo puede registrar señales ≤ 64 Hz de forma fiable\n2. Las partes de alta frecuencia de las ondas Beta (13-30 Hz) y Gamma (30-100 Hz) pueden estar aliased\n3. Para la investigación de ERP que requiere análisis de alta frecuencia, esta tasa de muestreo es insuficiente\n\nAl aprender EEG, comprender el impacto de la tasa de muestreo en la calidad de los datos es muy importante.",
+      fr: "Ce cas démontre le problème du faible taux d'échantillonnage :\n\n1. Selon le théorème de Nyquist, un taux d'échantillonnage de 128 Hz ne peut enregistrer de manière fiable que des signaux ≤ 64 Hz\n2. Les parties haute fréquence des ondes Beta (13-30 Hz) et Gamma (30-100 Hz) peuvent être aliasées\n3. Pour la recherche ERP nécessitant une analyse haute fréquence, ce taux d'échantillonnage est insuffisant\n\nEn apprenant l'EEG, comprendre l'impact du taux d'échantillonnage sur la qualité des données est très important.",
+      de: "Dieser Fall zeigt das Problem der niedrigen Abtastrate:\n\n1. Nach dem Nyquist-Theorem kann eine Abtastrate von 128 Hz nur Signale ≤ 64 Hz zuverlässig aufzeichnen\n2. Hochfrequente Teile der Beta-Wellen (13-30 Hz) und Gamma-Wellen (30-100 Hz) können aliasiert sein\n3. Für ERP-Forschung, die hochfrequente Analyse erfordert, ist diese Abtastrate unzureichend\n\nBeim Erlernen von EEG ist das Verständnis der Auswirkungen der Abtastrate auf die Datenqualität sehr wichtig.",
+      ja: "この症例は低サンプリングレートの問題を示しています：\n\n1. ナイキストの定理によると、128Hzサンプリングレートでは≤64Hzの信号のみを可靠に記録できます\n2. Beta波（13-30Hz）とGamma波（30-100Hz）の高周波部分はエイリアシングの可能性があります\n3. 高周波解析を必要とするERP研究では、このサンプリングレートは不十分です\n\nEEGを学ぶ際、サンプリングレートがデータ品質に与える影響を理解することは非常に重要です。",
+      ko: "이 사례는 낮은 샘플링 레이트의 문제를 보여줍니다:\n\n1. 나이퀴스트 정리에 따르면, 128Hz 샘플링 레이트는 ≤64Hz 신호만을 신뢰할 수 있게 기록할 수 있습니다\n2. Beta 파(13-30Hz)와 Gamma 파(30-100Hz)의 고주파 부분은 앨리어싱될 수 있습니다\n3. 고주파 분석을 필요로 하는 ERP 연구의 경우, 이 샘플링 레이트는 불충분합니다\n\nEEG를 배울 때, 샘플링 레이트가 데이터 품질에 미치는 영향을 이해하는 것은 매우 중요합니다。"
     },
     signal_quality: 55,
     learning_readability_score: 60,
     beginner_explanation: {
       zh: "这份 EEG 的'拍照速度'比较慢（128 Hz），就像用慢速摄像机拍快速运动。可能会丢失一些快速的脑电活动信息。",
       en: "This EEG has a 'slow camera speed' (128 Hz), like using a slow-motion camera to film fast movement. It may miss some fast brain activity information.",
+      es: "Este EEG tiene una 'velocidad de cámara lenta' (128 Hz), como usar una cámara lenticular para filmar movimiento rápido. Puede que se pierda algo de información rápida de actividad cerebral.",
+      fr: "Cet EEG a une 'vitesse de caméra lente' (128 Hz), comme utiliser une caméra au ralenti pour filmer un mouvement rapide. Il peut manquer certaines informations rapides d'activité cérébrale.",
+      de: "Dieses EEG hat eine 'langsame Kamerasgeschwindigkeit' (128 Hz), wie eine Zeitlupenkamera für schnelle Bewegung. Es kann einige schnelle Hirnaktivitätsinformationen verpassen.",
+      ja: "このEEGは「カメラのスピードが遅い」（128Hz）で、高速動画を撮るのにスローモーションビデオを使うようなものです。高速な脳活動情報の一部を見逃す可能性があります。",
+      ko: "이 EEG는 '느린 카메라 속도'(128Hz)를 가지고 있으며, 마치 빠른 움직임을 찍기 위해 슬로 모션 카메라를 사용하는 것과 같습니다. 빠른 뇌 활동 정보의 일부를 놓칠 수 있습니다。"
     },
     student_explanation: {
       zh: "采样率 128 Hz 意味着每秒记录 128 个数据点。根据奈奎斯特定理，最高可可靠记录频率为 64 Hz。对于在意 Beta（13-30 Hz）和 Gamma（30+ Hz）的研究，建议采样率 ≥ 500 Hz。此数据适合初步学习，但不适合高频分析。",
       en: "Sampling rate of 128 Hz means 128 data points are recorded per second. According to Nyquist theorem, the highest reliably recordable frequency is 64 Hz. For research interested in Beta (13-30 Hz) and Gamma (30+ Hz), sampling rate ≥ 500 Hz is recommended. This data is suitable for preliminary learning but not for high-frequency analysis.",
+      es: "La tasa de muestreo de 128 Hz significa que se registran 128 puntos de datos por segundo. Según el teorema de Nyquist, la frecuencia máxima que se puede registrar de forma fiable es 64 Hz. Para la investigación interesada en Beta (13-30 Hz) y Gamma (30+ Hz), se recomienda una tasa de muestreo ≥ 500 Hz. Estos datos son adecuados para el aprendizaje preliminar pero no para el análisis de alta frecuencia.",
+      fr: "Une taux d'échantillonnage de 128 Hz signifie que 128 points de données sont enregistrés par seconde. Selon le théorème de Nyquist, la fréquence maximale pouvant être enregistrée de manière fiable est de 64 Hz. Pour la recherche intéressée par Beta (13-30 Hz) et Gamma (30+ Hz), un taux d'échantillonnage ≥ 500 Hz est recommandé. Ces données sont adaptées à l'apprentissage préliminaire mais pas à l'analyse haute fréquence.",
+      de: "Eine Abtastrate von 128 Hz bedeutet, dass 128 Datenpunkte pro Sekunde aufgezeichnet werden. Nach dem Nyquist-Theorem ist die höchste zuverlässig aufzeichnenbare Frequenz 64 Hz. Für Forschung, die an Beta (13-30 Hz) und Gamma (30+ Hz) interessiert ist, wird eine Abtastrate von ≥ 500 Hz empfohlen. Diese Daten eignen sich für das vorläufige Lernen, aber nicht für hochfrequente Analyse.",
+      ja: "サンプリングレート128Hzは1秒間に128個のデータポイントが記録されることを意味します。ナイキストの定理によると、確実に記録可能な最高周波数は64Hzです。Beta（13-30Hz）とGamma（30+Hz）に興味がある研究の場合、サンプリングレート≥500Hzが推奨されます。このデータは初步学習に適していますが、高周波解析には適していません。",
+      ko: "128Hz 샘플링 레이트는 초당 128개의 데이터 포인트가 기록됨을 의미합니다. 나이퀴스트 정리에 따르면, 가장 신뢰할 수 있게 기록 가능한 주파수는 64Hz입니다. Beta(13-30Hz)와 Gamma(30+Hz)에 관심이 있는 연구의 경우, 샘플링 레이트 ≥ 500Hz가 권장됩니다. 이 데이터는 예비 학습에는 적합하지만 고주파 분석에는 적합하지 않습니다。"
     },
     research_explanation: {
       zh: "128 Hz 采样率违反了对于高频神经活动（如 Gamma 振荡 30-100 Hz）的采样要求。FFT 频率分辨率受采样率限制，高频混叠可能发生。若研究涉及 ERP（事件相关电位）或高频振荡，此数据不适用。建议重新以 ≥ 500 Hz 采样率记录。",
       en: "128 Hz sampling rate violates sampling requirements for high-frequency neural activity (e.g., Gamma oscillations 30-100 Hz). FFT frequency resolution is limited by sampling rate, and high-frequency aliasing may occur. If the research involves ERPs (event-related potentials) or high-frequency oscillations, this data is not suitable. Re-recording at ≥ 500 Hz sampling rate is recommended.",
+      es: "La tasa de muestreo de 128 Hz viola los requisitos de muestreo para la actividad neural de alta frecuencia (p. ej., oscilaciones Gamma 30-100 Hz). La resolución de frecuencia FFT está limitada por la tasa de muestreo, y el alias de alta frecuencia puede ocurrir. Si la investigación involucra ERPs (potenciales relacionados con eventos) u oscilaciones de alta frecuencia, estos datos no son adecuados. Se recomienda regrabar con una tasa de muestreo ≥ 500 Hz.",
+      fr: "Le taux d'échantillonnage de 128 Hz viole les exigences d'échantillonnage pour l'activité neuronale haute fréquence (p. ex., oscillations Gamma 30-100 Hz). La résolution fréquentielle FFT est limitée par le taux d'échantillonnage, et l'aliasage haute fréquence peut se produire. Si la recherche implique des ERPs (potentials liés aux événements) ou des oscilations haute fréquence, ces données ne sont pas adaptées. Un nouvel enregistrement avec un taux d'échantillonnage ≥ 500 Hz est recommandé.",
+      de: "Die Abtastrate von 128 Hz verstößt gegen die Abtastanforderungen für hochfrequente neuronale Aktivität (z. B. Gamma-Oszillationen 30-100 Hz). Die FFT-Frequenzauflösung ist durch die Abtastrate begrenzt, und hochfrequentes Aliasing kann auftreten. Wenn die Forschung ERPs (ereignisbezogene Potentiale) oder hochfrequente Oszillationen beinhaltet, sind diese Daten nicht geeignet. Eine Neuaufzeichnung mit einer Abtastrate von ≥ 500 Hz wird empfohlen.",
+      ja: "128Hzサンプリングレートは高周波神経活動（例：Gamma振動30-100Hz）のサンプリング要件に違反します。FFT周波数分解能はサンプリングレートによって制限され、高周波エイリアシングが発生する可能性があります。研究がERP（事象関連電位）または高周波振動を含む場合、このデータは適していません。≥500Hzサンプリングレートでの再記録が推奨されます。",
+      ko: "128Hz 샘플링 레이트는 고주파 신경 활동(예: Gamma 진동 30-100Hz)에 대한 샘플링 요구 사항을 위반합니다. FFT 주파수 해상도는 샘플링 레이트에 의해 제한되며, 고주파 앨리어싱이 발생할 수 있습니다. 연구가 ERP(사건 관련 전위) 또는 고주파 진동을 포함하는 경우, 이 데이터는 적합하지 않습니다. ≥500Hz 샘플링 레이트로 재기록이 권장됩니다。"
     },
     limitations: {
       zh: ["高频信息丢失", "不符合标准 EEG 研究采样率要求", "不适合 ERP 或高频分析"],
       en: ["High-frequency information loss", "Does not meet standard EEG research sampling rate requirements", "Not suitable for ERP or high-frequency analysis"],
+      es: ["Pérdida de información de alta frecuencia", "No cumple con los requisitos de tasa de muestreo de investigación EEG estándar", "No es adecuado para ERP o análisis de alta frecuencia"],
+      fr: ["Perte d'informations haute fréquence", "Ne respecte pas les exigences de taux d'échantillonnage de recherche EEG standard", "Pas adapté pour ERP ou analyse haute fréquence"],
+      de: ["Verlust hochfrequenter Informationen", "Entspricht nicht den standard EEG-Forschungs-Abtastratenanforderungen", "Nicht geeignet für ERP oder hochfrequente Analyse"],
+      ja: ["高周波情報の損失", "標準EEG研究サンプリングレート要件を満たしていません", "ERPまたは高周波解析に適していません"],
+      ko: ["고주파 정보 손실", "표준 EEG 연구 샘플링 레이트 요구 사항을 충족하지 않습니다", "ERP 또는 고주파 분석에 적합하지 않습니다"]
     },
     what_this_data_cannot_tell: {
       zh: ["高频脑活动（Gamma 振荡）", "精确的 ERP 成分", "超过 64 Hz 的任何信号"],
       en: ["High-frequency brain activity (Gamma oscillations)", "Precise ERP components", "Any signal above 64 Hz"],
+      es: ["Actividad cerebral de alta frecuencia (oscilaciones Gamma)", "Componentes precisos de ERP", "Cualquier señal por encima de 64 Hz"],
+      fr: ["Activité cérébrale haute fréquence (oscilations Gamma)", "Composants précis d'ERP", "Tout signal au-dessus de 64 Hz"],
+      de: ["Hochfrequente Hirnaktivität (Gamma-Oszillationen)", "Präzise ERP-Komponenten", "Jeglisches Signal über 64 Hz"],
+      ja: ["高周波脳活動（Gamma振動）", "正確なERP成分", "64Hzを超える信号"],
+      ko: ["고주파 뇌 활동(Gamma 진동)", "정확한 ERP 성분", "64Hz 이상의 신호"]
     },
     tags: ["lowSR", "nyquist", "aliasing", "techLimit"],
     readTime: "6 分钟",
@@ -259,20 +359,40 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据缺失多个通道（仅记录了 8 个通道，标准是 19-32 个）。信号质量评分 50/100，空间覆盖不足。",
       en: "This EEG data is missing multiple channels (only 8 channels recorded, standard is 19-32). Signal quality score 50/100, insufficient spatial coverage.",
+      es: "Estos datos EEG faltan multiples canales (solo 8 canales grabados, el estándar es 19-32). Puntuación de calidad de señal 50/100, cobertura espacial insuficiente.",
+      fr: "Ces données EEG manquent de multiples canaux (seulement 8 canaux enregistrés, le standard est 19-32). Score de qualité du signal 50/100, couverture spatiale insuffisante.",
+      de: "Diese EEG-Daten fehlen mehrere Kanäle (nur 8 Kanäle aufgezeichnet, Standard ist 19-32). Signalqualitäts-Score 50/100, unzureichende räumliche Abdeckung.",
+      ja: "このEEGデータは複数のチャンネルが欠損しています（わずか8チャンネルのみ記録、標準は19-32）。信号品質スコア50/100、空間的カバレッジが不十分です。",
+      ko: "이 EEG 데이터는 여러 채널이 누락되었습니다(기록된 채널은 8개뿐, 표준은 19-32개입니다). 신호 품질 점수 50/100, 공간 적용 범위가 불충분합니다。"
     },
     details: {
       zh: "此案例展示了通道缺失的问题：\n\n1. 标准 10-20 系统有 19 个通道，此数据仅 8 个\n2. 无法进行全面的空间分析（如源定位）\n3. 某些脑区（如颞叶）完全没有覆盖\n\n学习 EEG 时，理解电极放置和通道数量对解释的影响非常重要。",
       en: "This case demonstrates the problem of missing channels:\n\n1. Standard 10-20 system has 19 channels, this data has only 8\n2. Cannot perform comprehensive spatial analysis (e.g., source localization)\n3. Some brain regions (e.g., temporal lobes) are completely uncovered\n\nWhen learning EEG, understanding the impact of electrode placement and channel count on interpretation is very important.",
+      es: "Este caso demuestra el problema de canales faltantes:\n\n1. El sistema estándar 10-20 tiene 19 canales, estos datos tienen solo 8\n2. No se puede realizar un análisis espacial comprensivo (p. ej., localización de fuente)\n3. Algunas regiones cerebrales (p. ej., lóbulos temporales) están completamente descubiertas\n\nAl aprender EEG, comprender el impacto de la colocación de electrodos y el recuento de canales en la interpretación es muy importante.",
+      fr: "Ce cas démontre le problème des canaux manquants :\n\n1. Le système standard 10-20 a 19 canaux, ces données n'en ont que 8\n2. Impossible de réaliser une analyse spatiale complète (p. ex., localisation des sources)\n3. Certaines régions cérébrales (p. ex., lobes temporaux) sont complètement non couvertes\n\nEn apprenant l'EEG, comprendre l'impact du placement des électrodes et du nombre de canaux sur l'interprétation est très important.",
+      de: "Dieser Fall zeigt das Problem fehlender Kanäle:\n\n1. Das Standard-10-20-System hat 19 Kanäle, diese Daten haben nur 8\n2. Kann keine umfassende räumliche Analyse durchführen (z. B. Quellenlokalisation)\n3. Einige Hirnregionen (z. B. Temporallappen) sind vollständig unbedeckt\n\nBeim Erlernen von EEG ist das Verständnis der Auswirkungen der Elektrodenplatzierung und der Kanalanzahl auf die Interpretation sehr wichtig.",
+      ja: "この症例は欠損チャンネルの問題を示しています：\n\n1. 標準10-20システムは19チャンネルありますが、このデータはわずか8つです\n2. 包括的な空間解析（例：ソースローカリゼーション）を実行できません\n3. 一部の脳領域（例：側頭葉）は完全にカバーされていません\n\nEEGを学ぶ際、解釈に対する電極配置とチャンネル数の影響を理解することは非常に重要です。",
+      ko: "이 사례는 누락된 채널의 문제를 보여줍니다:\n\n1. 표준 10-20 시스템은 19개 채널이 있지만, 이 데이터는 8개뿐입니다\n2. 포괄적인 공간 분석(예: 소스 로케lization)을 수행할 수 없습니다\n3. 일부 뇌 영역(예: 측두엽)은 완전히 커버되지 않았습니다\n\nEEG를 배울 때, 해석에 대한 전극 배치 및 채널 수의 영향을 이해하는 것은 매우 중요합니다。"
     },
     signal_quality: 50,
     learning_readability_score: 65,
     beginner_explanation: {
       zh: "这份 EEG 只记录了很少的通道（像只用几个麦克风录音乐会），很多脑区没有被记录到。就像拼图少了很多块，看不完整。",
       en: "This EEG only recorded a few channels (like using only a few microphones to record a concert), many brain areas are not recorded. It's like a jigsaw puzzle with many missing pieces, the picture is incomplete.",
+      es: "Este EEG solo grabó unos pocos canales (como usar solo unos pocos micrófonos para grabar un concierto), muchas áreas cerebrales no están grabadas. Es como un puzle de rompecabezas con muchas piezas faltantes, la imagen está incompleta.",
+      fr: "Cet EEG n'a enregistré que quelques canaux (comme utiliser seulement quelques micros pour enregistrer un concert), beaucoup de zones cérébrales ne sont pas enregistrées. C'est comme un puzle avec beaucoup de pièces manquantes, l'image est incomplète.",
+      de: "Dieses EEG hat nur einige wenige Kanäle aufgezeichnet (wie nur einige wenige Mikrofone zu verwenden, um ein Konzert aufzunehmen), viele Hirnbereiche sind nicht aufgezeichnet. Es ist wie ein Puzle mit vielen fehlenden Teilen, das Bild ist unvollständig.",
+      ja: "このEEGはわずか数チャンネルしか記録しませんでした（コンサートを録音するのに数個のマイクのみを使用するようなものです）、多くの脳領域は記録されていません。これは多くの欠片があるジグソーパズルをしたようなもので、絵は不完全です。",
+      ko: "이 EEG는 몇 개의 채널만 기록했습니다 (콘서트를 녹음하는 데 몇 개의 마이크만 사용하는 것과 같습니다), 많은 뇌 영역이 기록되지 않았습니다. 이것은 많은 조각이 누락된 직소 퍼즐과 같으며, 그림은 불완전합니다。"
     },
     student_explanation: {
       zh: "标准 10-20 系统包含 19 个通道（扩展版可达 32 或更多）。此数据仅记录 8 个通道（可能是 Fp1、Fp2、F3、F4、C3、C4、O1、O2）。空间采样不足限制了拓扑分析和源定位的准确性。建议至少使用 19 通道记录。",
       en: "Standard 10-20 system includes 19 channels (extended versions can have 32 or more). This data only records 8 channels (possibly Fp1, Fp2, F3, F4, C3, C4, O1, O2). Insufficient spatial sampling limits the accuracy of topographic analysis and source localization. At least 19-channel recording is recommended.",
+      es: "El sistema estándar 10-20 incluye 19 canales (versiones extendidas pueden tener 32 o más). Estos datos solo registran 8 canales (posiblemenete Fp1, Fp2, F3, F4, C3, C4, O1, O2). El muestreo espacial insuficiente limita la precisión del análisis topográfico y la localización de fuente. Se recomienda al menos una grabación de 19 canales.",
+      fr: "Le système standard 10-20 inclut 19 canaux (des versions étendues peuvent avoir 32 ou plus). Ces données n'enregistrent que 8 canaux (possiblement Fp1, Fp2, F3, F4, C3, C4, O1, O2). L'échantillonnage spatial insuffisant limitte la précision de l'analyse topographique et de la localisation des sources. Au moins un enregistrement de 19 canaux est recommandé.",
+      de: "Das Standard-10-20-System umfasst 19 Kanäle (erweiterte Versionen können 32 oder mehr haben). Diese Daten zeichnen nur 8 Kanäle auf (möglicherweise Fp1, Fp2, F3, F4, C3, C4, O1, O2). Unzureichende räumliche Abtastung begrenzt die Genauigkeit der topographischen Analyse und der Quellenlokalisation. Eine Aufzeichnung mit mindestens 19 Kanälen wird empfohlen.",
+      ja: "標準10-20システムは19チャンネルを含みます（拡張版は32以上になる可能性があります）。このデータはわずか8チャンネルを記録します（おそらくFp1、Fp2、F3、F4、C3、C4、O1、O2）。不十分な空間サンプリングはトポグラフィック解析とソースローカリゼーションの精度を制限します。少なくとも19チャンネルの記録が推奨されます。",
+      ko: "표준 10-20 시스템은 19개 채널을 포함합니다(확장 버전은 32개 이상일 수 있습니다). 이 데이터는 겨우 8개 채널만 기록합니다(아마도 Fp1, Fp2, F3, F4, C3, C4, O1, O2). 불충분한 공간 샘플링은 지형 분석 및 소스 현지화의 정확도를 제한합니다. 적어도 19채널 기록이 권장됩니다."
     },
     research_explanation: {
       zh: "8 通道记录不符合 10-20 标准，空间欠采样导致无法进行可靠的皮层源定位。缺少颞叶（T3、T4、T5、T6）和中央-顶叶通道限制了全脑分析。若研究需要空间信息（如 connectivity 分析），此数据不适用。建议使用高密度 EEG（64+ 通道）或至少标准 19 通道。",
