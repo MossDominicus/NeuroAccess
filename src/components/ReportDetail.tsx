@@ -60,20 +60,36 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
 
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth - 20;
       const imgHeight = (h * imgWidth) / w;
 
-      let heightLeft = imgHeight;
-      let position = 10;
+      // 修复：正确分页，每页显示图片的一部分
+      const contentHeightPerPage = pageHeight - 20; // 每页内容高度（减去上下边距）
+      const totalPages = Math.ceil(imgHeight / contentHeightPerPage);
 
-      pdf.addImage(dataUrl, "PNG", 10, position, imgWidth, imgHeight);
-      heightLeft -= pdf.internal.pageSize.getHeight() - 20;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight + 10;
-        pdf.addPage();
-        pdf.addImage(dataUrl, "PNG", 10, position, imgWidth, imgHeight);
-        heightLeft -= pdf.internal.pageSize.getHeight() - 20;
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage();
+        // jsPDF addImage 不支持直接裁剪，用 canvas 裁剪后每页单独生成图片
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d")!;
+        const srcImg = new Image();
+        await new Promise<void>((resolve) => {
+          srcImg.onload = () => {
+            const sx = 0;
+            const sy = page * contentHeightPerPage * (h / imgHeight); // 源图 Y 偏移
+            const sw = w;
+            const sh = Math.min(contentHeightPerPage * (h / imgHeight), h - sy);
+            canvas.width = w;
+            canvas.height = sh;
+            ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, w, sh);
+            resolve();
+          };
+          srcImg.src = dataUrl;
+        });
+        const pageDataUrl = canvas.toDataURL("image/png");
+        const pageImgHeight = (sh * imgWidth) / w;
+        pdf.addImage(pageDataUrl, "PNG", 10, 10, imgWidth, pageImgHeight);
       }
 
       pdf.save(`${report.fileName.replace(/\.[^.]+$/, "")}_NeuroAccess_Report.pdf`);
