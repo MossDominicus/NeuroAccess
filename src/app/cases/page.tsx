@@ -397,14 +397,29 @@ const cases: CaseStudy[] = [
     research_explanation: {
       zh: "8 通道记录不符合 10-20 标准，空间欠采样导致无法进行可靠的皮层源定位。缺少颞叶（T3、T4、T5、T6）和中央-顶叶通道限制了全脑分析。若研究需要空间信息（如 connectivity 分析），此数据不适用。建议使用高密度 EEG（64+ 通道）或至少标准 19 通道。",
       en: "8-channel recording does not meet 10-20 standards, and spatial undersampling makes reliable cortical source localization impossible. Missing temporal (T3, T4, T5, T6) and central-parietal channels limits whole-brain analysis. If the research requires spatial information (e.g., connectivity analysis), this data is not suitable. High-density EEG (64+ channels) or at least standard 19 channels is recommended.",
+      es: "La grabación de 8 canales no cumple con los estándares 10-20, y el submuestreo espacial hace imposible la localización de fuente cortical confiable. La falta de canales temporales (T3, T4, T5, T6) y centrales-parietales limita el análisis de todo el cerebro. Si la investigación requiere información espacial (p. ej., análisis de conectividad), estos datos no son adecuados. Se recomienda EEG de alta densidad (64+ canales) o al menos 19 canales estándar.",
+      fr: "L'enregistrement de 8 canaux ne respecte pas les standards 10-20, et la sous-échantillonnage spatial rend impossible une localisation de source corticale fiable. L'absence de canaux temporaux (T3, T4, T5, T6) et centraux-pariétaux limitte l'analyse de tout le cerveau. Si la recherche nécessite des informations spatiales (p. ex., analyse de connectivité), ces données ne sont pas adaptées. Un EEG de haute densité (64+ canaux) ou au moins 19 canaux standards est recommandé.",
+      de: "Die 8-Kanal-Aufnahme entspricht nicht den 10-20-Standards, und räumliche Unterabtastung macht eine zuverlässige kortikale Quellenlokalisation unmöglich. Fehlende temporale (T3, T4, T5, T6) und zentral-parietale Kanäle begrenzen die Ganzhirn-Analyse. Wenn die Forschung räumliche Informationen erfordert (z. B. Konnektivitätsanalyse), sind diese Daten nicht geeignet. Hochdichte-EEG (64+ Kanäle) oder mindestens 19 Standardkanäle werden empfohlen.",
+      ja: "8チャンネル記録は10-20標準を満たしておらず、空間的アンダーサンプリングにより信頼できる皮質ソースローカリゼーションが不可能です。側頭（T3、T4、T5、T6）と中心-頭頂チャンネルの欠損は全脳分析を制限します。研究が空間情報を必要とする場合（例：コネクティビティ解析）、このデータは適していません。高密度EEG（64+チャンネル）または少なくとも標準19チャンネルが推奨されます。",
+      ko: "8채널 기록은 10-20 표준을 충족하지 않으며, 공간적 언더샘플링으로 인해 신뢰할 수 있는 피질 소스 로케라이ゼ이션이 불가능합니다. 측두(T3, T4, T5, T6) 및 중심-두정 채널 부재는 전체 뇌 분석을 제한합니다. 연구가 공간 정보를 필요로 하는 경우(예: 연결성 분석), 이 데이터는 적합하지 않습니다. 고밀도 EEG(64+ 채널) 또는 적어도 표준 19 채널이 권장됩니다。"
     },
     limitations: {
       zh: ["空间覆盖严重不足", "无法进行源定位或 connectivity 分析", "不符合 10-20 标准"],
       en: ["Severely insufficient spatial coverage", "Cannot perform source localization or connectivity analysis", "Does not meet 10-20 standards"],
+      es: ["Cobertura espacial severamente insuficiente", "No se puede realizar localización de fuente o análisis de conectividad", "No cumple con los estándares 10-20"],
+      fr: ["Couverture spatiale sévèrement insuffisante", "Impossible de réaliser une localisation de source ou une analyse de connectivité", "Ne respecte pas les standards 10-20"],
+      de: ["Schwerwiegend unzureichende räumliche Abdeckung", "Kann keine Quellenlokalisation oder Konnektivitätsanalyse durchführen", "Entspricht nicht den 10-20-Standards"],
+      ja: ["空間的カバレッジが深刻に不十分です", "ソースローカリゼーションまたはコネクティビティ解析を実行できません", "10-20標準を満たしていません"],
+      ko: ["공간 적용 범위가 심각하게 불충분합니다", "소스 로케라이제이션 또는 연결성 분석을 수행할 수 없습니다", "10-20 표준을 충족하지 않습니다"]
     },
     what_this_data_cannot_tell: {
       zh: ["全脑活动模式", "精确的皮层源位置", "通道间的功能连接"],
       en: ["Whole-brain activity patterns", "Precise cortical source locations", "Functional connectivity between channels"],
+      es: ["Patrones de actividad de todo el cerebro", "Ubicaciones precisas de fuente cortical", "Conectividad funcional entre canales"],
+      fr: ["Modèles d'activité de tout le cerveau", "Emplacements précis de source corticale", "Connectivité fonctionnelle entre canaux"],
+      de: ["Ganzhirn-Aktivitätsmuster", "Präzise kortikale Quellenorte", "Funktionelle Konnektivität zwischen Kanälen"],
+      ja: ["全脳活動パターン", "正確な皮質ソース位置", "チャンネル間の機能的接続性"],
+      ko: ["전체 뇌 활동 패턴", "정확한 피질 소스 위치", "채널 간의 기능적 연결성"]
     },
     tags: ["missingCh", "sys1020", "spatSamp", "srcLoc"],
     readTime: "7 分钟",
@@ -425,24 +440,49 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据显示非常强的 Alpha 波活动（枕叶区域振幅 > 80 μV）。信号质量评分 85/100，是典型的放松状态 EEG。",
       en: "This EEG data shows very strong Alpha wave activity (occipital area amplitude > 80 μV). Signal quality score 85/100, typical of relaxed-state EEG.",
+      es: "Estos datos EEG muestran actividad de ondas Alfa muy fuerte (área occipital amplitud > 80 μV). Puntuación de calidad de señal 85/100, típico de EEG de estado relajado.",
+      fr: "Ces données EEG montrent une activité d'ondes Alpha très forte (zone occipitale amplitude > 80 μV). Score de qualité du signal 85/100, typique d'un EEG d'état relaxé.",
+      de: "Diese EEG-Daten zeigen sehr starke Alpha-Wellen-Aktivität (okzipitaler Bereich Amplitude > 80 μV). Signalqualitäts-Score 85/100, typisch für entspannten Zustands-EEG.",
+      ja: "このEEGデータは非常に強いアルファ波活動（後頭葉領域振幅 > 80μV）を示しています。信号品質スコア85/100、典型的なリラックス状態EEGです。",
+      ko: "이 EEG 데이터는 매우 강한 알파 파 활동(후두엽 영역 진폭 > 80μV)을 보여줍니다. 신호 품질 점수 85/100, 전형적인 이완 상태 EEG입니다。"
     },
     details: {
       zh: "此案例展示了典型的 Alpha 节律：\n\n1. Alpha 波（8-13 Hz）在闭眼放松状态下最为明显\n2. 一旦睁眼或注意外部刺激，Alpha 波会减弱（Alpha 阻断）\n3. Alpha 振幅和分布可以反映放松程度和注意力状态\n\n这是学习 EEG 基础节律的最佳案例之一。",
       en: "This case demonstrates typical Alpha rhythm:\n\n1. Alpha waves (8-13 Hz) are most prominent during eyes-closed relaxed state\n2. Upon opening eyes or attending to external stimuli, Alpha waves diminish (Alpha blocking)\n3. Alpha amplitude and distribution can reflect relaxation level and attention state\n\nThis is one of the best cases for learning basic EEG rhythms.",
+      es: "Este caso demuestra el ritmo Alfa típico:\n\n1. Las ondas Alfa (8-13 Hz) son más promimentes durante el estado relajado de ojos cerrados\n2. Al abrir los ojos o prestar atención a estímulos externos, las ondas Alfa disminuyen (bloqueo Alfa)\n3. La amplitud y distribución Alfa pueden reflejar el nivel de relajación y el estado de atención\n\nEste es uno de los mejores casos para aprender los ritmos básicos de EEG.",
+      fr: "Ce cas démontre le rythme Alpha typique :\n\n1. Les ondes Alpha (8-13 Hz) sont les plus promientes pendant l'état relaxé les yeux fermés\n2. En ouvrant les yeux ou en préstant attention à des stimulis externes, les ondes Alpha diminuent (bloquage Alpha)\n3. L'amplitude et la distribution Alpha peuvent réfléchir le nivel de relaxation et l'état d'attention\n\nC'est l'un des meilleurs cas pour apprendre les rythmes EEG de base.",
+      de: "Dieser Fall zeigt den typischen Alpha-Rhythmus:\n\n1. Alpha-Wellen (8-13 Hz) sind am promientesten während des entspannten Zustands mit geschlossenen Augen\n2. Beim Öffnen der Augen oder bei Aufmerksamkeit auf externe Stimuli verringern sich die Alpha-Wellen (Alpha-Blockade)\n3. Alpha-Amplitude und -Verteilung können das Entspannungsniveau und den Aufmerksamkeitszustand reflektieren\n\nDies ist einer der besten Fälle zum Erlernen der grundlegenen EEG-Rhythmen.",
+      ja: "この症例は典型的なアルファリズムを示しています：\n\n1. アルファ波（8-13Hz）は閉眼リラックス状態で最も顕著です\n2. 開眼または外部刺激に注意を向けると、アルファ波は減少します（アルファ遮断）\n3. アルファ振幅と分布はリラックスレベルと注意力状態を反映できます\n\nこれはEEGの基礎リズムを学ぶための最良の症例の一つです。",
+      ko: "이 사례는 전형적인 알파 리듬을 보여줍니다:\n\n1. 알파 파(8-13Hz)는 안검 폐쇄 이완 상태에서 가장 두드러집니다\n2. 눈을 뜨거나 외부 자극에 주의를 기울이면 알파 파는 감소합니다(알파 차단)\n3. 알파 진폭과 분포는 이완 수준과 주의력 상태를 반영할 수 있습니다\n\n이것은 기본 EEG 리듬을 배우기 위한 최고의 사례 중 하나입니다。"
     },
     signal_quality: 85,
     learning_readability_score: 90,
     beginner_explanation: {
       zh: "这份 EEG 显示很强的 Alpha 波，就像大脑在'休息模式'。当你闭眼放松时，后脑会发出这种规律的波。如果睁眼或开始思考，这种波就会消失。",
       en: "This EEG shows strong Alpha waves, like the brain is in 'rest mode.' When you close your eyes and relax, the back of the brain emits this regular wave. If you open your eyes or start thinking, this wave disappears.",
+      es: "Este EEG muestra ondas Alfa fuertes, como si el cerebro estuviera en 'modo de descanso'. Cuando cierras los ojos y te relajas, la parte posterior del cerebro emite esta onda regu lar. Si abres los ojos o comienzas a pensar, esta onda desaparece.",
+      fr: "Cet EEG montre des ondes Alpha fortes, comme si le cerveau était en 'mode repos'. Quand vous fermez les yeux et vous détendez, l'arrière du cerveau émet cette onde régulière. Si vous ouvrez les yeux ou commencez à penser, cette onde disparaît.",
+      de: "Dieses EEG zeigt starke Alpha-Wellen, wie wenn das Gehirn im 'Ruhemodus' wäre. Wenn Sie die Augen schließen und sich entspannen, sendet der hintere Teil des Gehirns diese regelmäßige Wel e. Wenn Sie die Augen öffnen oder anfangen zu denken, verschwindet diese Wel e.",
+      ja: "このEEGは強いアルファ波を示しており、まるで脳が「休息モード」にあるようです。目を閉じてリラックスすると、脳の後部がこの規則的な波を発します。目を開けたり思考を始めたりすると、この波は消えます。",
+      ko: "이 EEG는 강한 알파 파를 보여주며, 마치 뇌가 '휴식 모드'에 있는 것 같습니다. 눈을 감고 이완하면, 뇌의 후부가 이 규칙적인 파를 방출합니다. 눈을 뜨거나 사고를 시작하면, 이 파는 사라집니다。"
     },
     student_explanation: {
       zh: "Alpha 节律（8-13 Hz）是成人静息态 EEG 最突出的特征。枕叶区域（O1、O2）振幅通常 50-100 μV。Alpha 阻断是指视觉输入或认知任务导致 Alpha 功率下降。此案例适合学习基本的 EEG 节律和状态变化。",
       en: "Alpha rhythm (8-13 Hz) is the most prominent feature of adult resting-state EEG. Occipital areas (O1, O2) typically have amplitude 50-100 μV. Alpha blocking refers to the reduction of Alpha power due to visual input or cognitive tasks. This case is suitable for learning basic EEG rhythms and state changes.",
+      es: "El ritmo Alfa (8-13 Hz) es la característica más prominente del EEG de estado de reposo en adultos. Las áreas occipitales (O1, O2) tienen típicamente una amplitud de 50-100 μV. El bloqueo Alfa se refiere a la reducción de la potencia Alfa debido a la entrada visual o tareas cognitivas. Este caso es adecuado para aprender los ritmos básicos de EEG y los cambios de estado.",
+      fr: "Le rythme Alpha (8-13 Hz) est la caractéristique la plus prominente de l'EEG d'état de repos chez l'adulte. Les zones occipitales (O1, O2) ont typiquement une amplitude de 50-100 μV. Le bloquage Alpha se réfère à la réduction de la puissance Alpha due à l'entrée visuelle ou aux tâches cognitives. Ce cas est adapté pour apprendre les rythmes EEG de base et les changements d'état.",
+      de: "Der Alpha-Rhythmus (8-13 Hz) ist das prominenteste Merkmal des ruhenden EEG bei Erwachsenen. Okzipitale Bereiche (O1, O2) haben typischerweise eine Amplitude von 50-100 μV. Alpha-Blockade bezieht sich auf die Reduktion der Alpha-Leistung aufgrund visueller Eingabe oder kognitiver Aufgaben. Dieser Fall ist geeignet zum Erlernen grundlegeneder EEG-Rhythmen und Zustandsänderungen.",
+      ja: "アルファ・リズム（8-13Hz）は成人安静状態EEGの最も顕著な特徴です。後頭葉領域（O1、O2）は典型的に50-100μVの振幅を持ちます。アルファ遮断は、視覚入力または認知課題によるアルファパワーの減少を指します。この症例は、基本的なEEGリズムと状態変化を学ぶのに適しています。",
+      ko: "알파 리듬(8-13Hz)은 성인 안정 상태 EEG의 가장 두드러진 특징입니다. 후두엽 영역(O1, O2)은 일반적으로 50-100μV의 진폭을 가집니다. 알파 차단은 시각 입력 또는 인지 과제로 인한 알파 전력 감소를 의미합니다. 이 사례는 기본 EEG 리듬과 상태 변화를 배우는 데 적합합니다。"
     },
     research_explanation: {
       zh: "PSD 分析显示枕叶区域 Alpha peak 在 10 Hz，功率谱密度 ~15 μV²/Hz。Alpha/Theta 比值约为 2.5。根据文献，强 Alpha 活动与放松状态、降低的焦虑水平、以及良好的认知储备相关。此数据适合用于研究个体差异和状态依赖性变化。",
       en: "PSD analysis shows Alpha peak at 10 Hz in occipital areas, power spectral density ~15 μV²/Hz. Alpha/Theta ratio is approximately 2.5. According to literature, strong Alpha activity is associated with relaxed state, reduced anxiety levels, and good cognitive reserve. This data is suitable for studying individual differences and state-dependent changes.",
+      es: "El análisis PSD muestra el pico Alfa a 10 Hz en áreas occipitales, densidad espectral de potencia ~15 μV²/Hz. La relación Alfa/Theta es aproximadamente 2,5. Según la literatura, la fuerte actividad Alfa está asociada con el estado relajado, niveles reducidos de ansiedad y buena reserva cognitiva. Estos datos son adecuados para estudiar diferencias individuales y cambios dependientes del estado.",
+      fr: "L'analyse PSD montre le pic Alpha à 10 Hz dans les zones occipitales, densité spectrale de puissance ~15 μV²/Hz. Le rapport Alpha/Theta est approximativement de 2,5. Selon la littérature, la forte activité Alpha est associée à l'état relaxé, aux niveaux réduits d'anxiété et à une bonne réserve cognitive. Ces données sont adaptées pour étudier les différences individuelles et les changements dépendants de l'état.",
+      de: "Die PSD-Analyse zeigt den Alpha-Peak bei 10 Hz in okzipitalen Bereichen, Leistungsdichte ~15 μV²/Hz. Das Alpha/Theta-Verhältnis beträgt ungefähr 2,5. Laut Literatur ist starke Alpha-Aktivität mit entspanntem Zustand, reduzierten Angstniveaus und guter kognitiver Reserve assoziiert. Diese Daten eignen sich zum Studium von individuellen Unterschieden und zustandsabhängigen Änderungen.",
+      ja: "PSD分析は後頭葉領域でAlphaピークが10Hz、電力スペクトル密度〜15μV²/Hzであることを示しています。Alpha/Theta比は約2.5です。文献によると、強いAlpha活動はリラックス状態、低下した不安レベル、および良好な認知予備と関連しています。このデータは個人の差異と状態依存性変化を研究するのに適しています。",
+      ko: "PSD 분석은 후두엽 영역에서 Alpha 피크가 10Hz, 전력 스펙트럼 밀도 ~15μV²/Hz임을 보여줍니다. Alpha/Theta 비율은 약 2.5입니다. 문헌에 따르면, 강한 Alpha 활동은 이완 상태, 낮아진 불안 수준,以及良好的认知储备相关。此数据适合用于研究个体差异和状态依赖性变化。"
     },
     limitations: {
       zh: ["仅静息态记录，无任务条件对比", "未记录同时的行为数据（如 Alpha 阻断测试）", "个体差异未考虑（如 Alpha 优势个体差异）"],
