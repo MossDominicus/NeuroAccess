@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Moon, Sun, Monitor, User, X, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare, Camera } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, User, X, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import FeedbackPanel from "@/components/FeedbackPanel";
 
 type SettingsPanelProps = {
@@ -39,54 +39,12 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
-  const [avatarPreview, setAvatarPreview] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-  const compressImage = (file: File, maxWidth = 256, quality = 0.8): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          let w = img.width,
-            h = img.height;
-          if (w > maxWidth) {
-            h = Math.round((h * maxWidth) / w);
-            w = maxWidth;
-          }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d")!;
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL("image/jpeg", quality));
-        };
-        img.onerror = () => reject(new Error("Image load failed"));
-        img.src = reader.result as string;
-      };
-      reader.onerror = () => reject(new Error("FileReader failed"));
-      reader.readAsDataURL(file);
-    });
-  };
 
-  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setEditError(t("fileTooLarge") || "File too large");
-      return;
-    }
-    try {
-      const base64 = await compressImage(file);
-      setEditAvatarUrl(base64);
-      setAvatarPreview(base64);
-      setEditError("");
-    } catch (err: any) {
-      setEditError(t("imageProcessingError") || "Image processing failed");
-    }
-  };
+
+
 
   // Countdown timer for resend cooldown
   useEffect(() => {
@@ -348,21 +306,16 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         setPwSuccess("");
                         if (next) {
                           setEditUsername(user?.username || "");
-                          // Only reset avatar if user hasn't uploaded a new one
-                          if (!editAvatarUrl || editAvatarUrl === user?.avatar_url) {
-                            setEditAvatarUrl(user?.avatar_url || "");
-                            setAvatarPreview(user?.avatar_url || "");
-                          }
+                          setEditAvatarUrl(user?.avatar_url || "");
                         }
                       }}
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--color-border)] transition-colors text-left"
                     >
-                      <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center overflow-hidden shrink-0">
-                        {user?.avatar_url ? (
-                          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-4 h-4 text-blue-500" />
-                        )}
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                        style={{ backgroundColor: user?.avatar_url || "#3B82F6" }}
+                      >
+                        {(user?.username || "?")[0].toUpperCase()}
                       </div>
                       <div className="text-left flex-1 min-w-0">
                         <p className="text-sm font-medium text-[var(--color-text)] truncate">{user.username}</p>
@@ -378,30 +331,26 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     {/* Edit Panel — avatar, username, password */}
                     {showEditProfile && (
                       <div className="space-y-4 pt-1">
-                        {/* Avatar upload */}
+                        {/* Avatar color picker */}
                         <div className="flex flex-col items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="relative w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-400 transition-all"
+                          <div
+                            className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white"
+                            style={{ backgroundColor: editAvatarUrl || "#3B82F6" }}
                           >
-                            {avatarPreview || user?.avatar_url ? (
-                              <img src={avatarPreview || user?.avatar_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <Camera className="w-6 h-6 text-blue-500" />
-                            )}
-                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                              <Camera className="w-5 h-5 text-white" />
-                            </div>
-                          </button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAvatarFileChange}
-                            className="hidden"
-                          />
-                          <p className="text-xs text-[var(--color-text-secondary)]">{t("clickToUploadAvatar") || "点击更换头像"}</p>
+                            {(editUsername || user?.username || "?")[0].toUpperCase()}
+                          </div>
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {["#3B82F6", "#10B981", "#8B5CF6", "#EF4444", "#F59E0B", "#06B6D4", "#EC4899", "#84CC16"].map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setEditAvatarUrl(c)}
+                                className={`w-6 h-6 rounded-full transition-all ${editAvatarUrl === c ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : "hover:scale-110"}`}
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-xs text-[var(--color-text-secondary)]">{t("chooseAvatarColor") || "选择头像颜色"}</p>
                         </div>
 
                         {/* Username */}
