@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useRef, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
@@ -38,8 +38,26 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setEditError(t("fileTooLarge") || "图片超过 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setEditAvatarUrl(base64);
+      setAvatarPreview(base64);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Countdown timer for resend cooldown
   useEffect(() => {
@@ -134,8 +152,8 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     }
   };
 
-  const submitProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitProfileUpdate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setEditError("");
     setEditSuccess("");
     if (!token) {
@@ -283,106 +301,105 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 </h3>
                 {user ? (
                   <div className="w-full p-3 rounded-xl bg-[var(--color-bg)] space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                        <User className="w-4 h-4 text-blue-500" />
+                    {/* Clickable user card — opens edit panel */}
+                    <button
+                      onClick={() => {
+                        const next = !showEditProfile;
+                        setShowEditProfile(next);
+                        setEditError("");
+                        setEditSuccess("");
+                        setPwError("");
+                        setPwSuccess("");
+                        if (next) {
+                          setEditUsername(user?.username || "");
+                          setEditAvatarUrl(user?.avatar_url || "");
+                          setAvatarPreview(user?.avatar_url || "");
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--color-border)] transition-colors text-left"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center overflow-hidden shrink-0">
+                        {user?.avatar_url ? (
+                          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-blue-500" />
+                        )}
                       </div>
                       <div className="text-left flex-1 min-w-0">
                         <p className="text-sm font-medium text-[var(--color-text)] truncate">{user.username}</p>
                         <p className="text-xs text-[var(--color-text-secondary)] truncate">{user.email}</p>
                       </div>
-                    </div>
-
-                    {/* Edit Profile toggle */}
-                    <button
-                      onClick={() => {
-                        setShowEditProfile(!showEditProfile);
-                        setEditError("");
-                        setEditSuccess("");
-                        setEditUsername(user?.username || "");
-                        setEditAvatarUrl(user?.avatar_url || "");
-                      }}
-                      className="w-full flex items-center justify-between py-2 px-3 rounded-lg text-sm text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Camera className="w-3.5 h-3.5" />
-                        {t("editProfile") || "编辑资料"}
-                      </span>
-                      {showEditProfile ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      {showEditProfile ? (
+                        <ChevronUp className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0" />
+                      )}
                     </button>
 
+                    {/* Edit Panel — avatar, username, password */}
                     {showEditProfile && (
-                      <form onSubmit={submitProfileUpdate} className="space-y-3 pt-1">
+                      <div className="space-y-4 pt-1">
+                        {/* Avatar upload */}
+                        <div className="flex flex-col items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="relative w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-400 transition-all"
+                          >
+                            {avatarPreview || user?.avatar_url ? (
+                              <img src={avatarPreview || user?.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Camera className="w-6 h-6 text-blue-500" />
+                            )}
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                              <Camera className="w-5 h-5 text-white" />
+                            </div>
+                          </button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarFileChange}
+                            className="hidden"
+                          />
+                          <p className="text-xs text-[var(--color-text-secondary)]">{t("clickToUploadAvatar") || "点击更换头像"}</p>
+                        </div>
+
+                        {/* Username */}
                         <input
                           type="text"
                           value={editUsername}
                           onChange={(e) => setEditUsername(e.target.value)}
                           placeholder={t("username") || "用户名"}
                           className="w-full px-3 py-2 rounded-lg border bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] text-sm focus:outline-none focus:border-gray-400"
-                          required
                         />
-                        <input
-                          type="text"
-                          value={editAvatarUrl}
-                          onChange={(e) => setEditAvatarUrl(e.target.value)}
-                          placeholder={t("avatarUrl") || "头像 URL"}
-                          className="w-full px-3 py-2 rounded-lg border bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] text-sm focus:outline-none focus:border-gray-400"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="submit"
-                            disabled={editLoading}
-                            className="flex-1 py-2 px-3 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-40 transition-colors"
-                          >
-                            {editLoading ? "..." : (t("save") || "保存")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowEditProfile(false)}
-                            className="flex-1 py-2 px-3 rounded-lg border border-[var(--color-border)] text-sm hover:bg-[var(--color-bg)] transition-colors"
-                          >
-                            {t("cancel") || "取消"}
-                          </button>
-                        </div>
-                        {editError && (
-                          <p className="text-xs text-red-500">{editError}</p>
-                        )}
-                        {editSuccess && (
-                          <p className="text-xs text-green-500">{editSuccess}</p>
-                        )}
-                      </form>
-                    )}
 
-                    {/* Change Password toggle */}
-                    <button
-                      onClick={() => {
-                        setShowChangePassword(!showChangePassword);
-                        setPwError("");
-                        setPwSuccess("");
-                      }}
-                      className="w-full flex items-center justify-between py-2 px-3 rounded-lg text-sm text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Key className="w-3.5 h-3.5" />
-                        {t("changePassword") || "修改密码"}
-                      </span>
-                      {showChangePassword ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
+                        {/* Save profile */}
+                        <button
+                          onClick={submitProfileUpdate}
+                          disabled={editLoading}
+                          className="w-full py-2 px-3 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                        >
+                          {editLoading ? "..." : (t("save") || "保存资料")}
+                        </button>
 
-                    {showChangePassword && (
-                      <form onSubmit={submitPasswordChange} className="space-y-3 pt-1">
-                        {/* Get code */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={fetchVerificationCode}
-                            disabled={loadingCode || countdown > 0}
-                            className="flex-1 py-2 px-3 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-40 transition-colors"
-                          >
-                            {loadingCode ? "..." : countdown > 0 ? `${countdown}s` : (t("getCode") || "获取验证码")}
-                          </button>
-                        </div>
+                        {/* Divider */}
+                        <div className="border-t border-[var(--color-border)] pt-3">
+                          <p className="text-xs font-medium text-[var(--color-text-secondary)] mb-2">{t("changePassword") || "修改密码"}</p>
 
+                          {/* Get code */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <button
+                              type="button"
+                              onClick={fetchVerificationCode}
+                              disabled={loadingCode || countdown > 0}
+                              className="flex-1 py-2 px-3 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                            >
+                              {loadingCode ? "..." : countdown > 0 ? `${countdown}s` : (t("getCode") || "获取验证码")}
+                            </button>
+                          </div>
+
+                          <form onSubmit={submitPasswordChange} className="space-y-2">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -440,14 +457,16 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                           {loadingSubmit ? "..." : (t("confirmChange") || "确认修改")}
                         </button>
                       </form>
-                    )}
+                    </div>
+                  </div>
+                )}
 
-                    <button
-                      onClick={() => { logout(); window.location.href = "/"; }}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>{t("logout") || "退出登录"}</span>
+                <button
+                  onClick={() => { logout(); window.location.href = "/"; }}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{t("logout") || "退出登录"}</span>
                     </button>
                   </div>
                 ) : (
