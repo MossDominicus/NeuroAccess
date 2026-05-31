@@ -60,10 +60,20 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据来自一名健康成人，闭眼放松状态记录 5 分钟。信号质量评分 92/100，几乎所有通道质量都为 Excellent。",
       en: "This EEG data is from a healthy adult, eyes-closed relaxed state for 5 minutes. Signal quality score 92/100, almost all channels are Excellent.",
+      es: "Estos datos EEG son de un adulto sano, estado relajado con ojos cerrados durante 5 minutos. Puntuación de calidad de señal 92/100, casi todos los canales son Excelentes.",
+      fr: "Ces données EEG proviennent d'un adulte sain, état de repos yeux fermés pendant 5 minutes. Score de qualité du signal 92/100, presque tous les canaux sont Excellents.",
+      de: "Diese EEG-Daten stammen von einem gesunden Erwachsenen, entspannter Zustand mit geschlossenen Augen für 5 Minuten. Signalqualitätsscore 92/100, fast alle Kanäle sind exzellent.",
+      ja: "このEEGデータは健康な成人のもので、閉眼リラックス状態で5分間記録されました。信号品質スコア92/100、ほぼすべてのチャンネルが優秀です。",
+      ko: "이 EEG 데이터는 건강한 성인의 것으로, 눈을 감고 휴식한 상태에서 5분간 기록되었습니다. 신호 품질 점수 92/100, 거의 모든 채널이 우수합니다."
     },
     details: {
       zh: "此案例展示了一份干净（无噪声）的 EEG 数据应该是什么样的。\n\n1. Alpha 波（8-13 Hz）在枕叶区域（O1、O2）非常明显\n2. 没有可见的噪声或伪影\n3. 所有通道的信号质量都很好\n\n这是学习正常 EEG 模式的理想参考案例。",
       en: "This case shows what clean (noise-free) EEG data should look like.\n\n1. Alpha waves (8-13 Hz) are very prominent in occipital areas (O1, O2)\n2. No visible noise or artifacts\n3. All channels have good signal quality\n\nThis is an ideal reference case for learning normal EEG patterns.",
+      es: "Este caso muestra cómo deberían verse los datos EEG limpios (sin ruido).\n\n1. Las ondas Alfa (8-13 Hz) son muy prominentes en áreas occipitales (O1, O2)\n2. No hay ruido ni artefactos visibles\n3. Todos los canales tienen buena calidad de señal\n\nEste es un caso de referencia ideal para aprender los patrones normales de EEG.",
+      fr: "Ce cas montre à quoi devraient ressembler des données EEG propres (sans bruit).\n\n1. Les ondes Alpha (8-13 Hz) sont très prominentes dans les zones occipitales (O1, O2)\n2. Pas de bruit ni d'artefacts visibles\n3. Tous les canaux ont une bonne qualité de signal\n\nC'est un cas de référence idéal pour apprendre les motifs EEG normaux.",
+      de: "Dieser Fall zeigt, wie saubere (rauschfreie) EEG-Daten aussehen sollten.\n\n1. Alpha-Wellen (8-13 Hz) sind in okzipitalen Bereichen (O1, O2) sehr prominent\n2. Kein sichtbares Rauschen oder Artefakte\n3. Alle Kanäle haben gute Signalqualität\n\nDies ist ein ideales Referenzbeispiel zum Erlernen normaler EEG-Muster.",
+      ja: "この症例は、きれいな（ノイズのない）EEGデータがどのように見えるべきかを示しています。\n\n1. アルファ波（8-13Hz）は後頭部領域（O1、O2）で非常に顕著です\n2. 可視的なノイズやアーチファクトはありません\n3. すべてのチャンネルで信号品質が良好です\n\nこれは正常なEEGパターンを学ぶための理想的な参照症例です。",
+      ko: "이 사례는 깨끗한(노이즈 없는) EEG 데이터가 어떻게 보여야 하는지 보여줍니다.\n\n1. 알파파(8-13Hz)는 후두부 영역(O1, O2)에서 매우 두드러집니다\n2. 가시적인 노이즈나 아티팩트가 없습니다\n3. 모든 채널의 신호 품질이 좋습니다\n\n이는 정상적인 EEG 패턴을 배우기 위한 이상적인 참조 사례입니다."
     },
     signal_quality: 92,
     learning_readability_score: 88,
