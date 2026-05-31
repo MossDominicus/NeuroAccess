@@ -159,15 +159,6 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             <Activity className="h-3.5 w-3.5" />
             {t("signalQuality")}: {sq}
           </span>
-          <button
-            id="export-pdf-btn"
-            onClick={handleExportHTML}
-            disabled={exporting}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 dark:bg-white px-4 py-2 text-xs font-semibold text-white dark:text-gray-900 transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            {exporting ? "Exporting..." : t("exportPdf")}
-          </button>
         </div>
       </div>
 
@@ -356,19 +347,6 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           </ul>
         </section>
       )}
-
-      {/* ── Section 8: Export PDF ───────────────────── */}
-      <div className="flex justify-center pt-4">
-        <button
-          id="export-pdf-bottom"
-          onClick={handleExportHTML}
-          disabled={exporting}
-          className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 dark:bg-white px-8 py-3 text-sm font-semibold text-white dark:text-gray-900 shadow-lg transition-all hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:scale-100"
-        >
-          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          {exporting ? "Exporting..." : `${t("exportPdf")} — ${report.fileName}`}
-        </button>
-      </div>
 
       {/* ── Section 9: Understanding Feedback ─────────── */}
     </div>
