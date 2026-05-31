@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Moon, Sun, Monitor, User, X, AlertTriangle, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, User, X, AlertTriangle, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare, Camera } from "lucide-react";
 import FeedbackPanel from "@/components/FeedbackPanel";
 
 type SettingsPanelProps = {
@@ -16,7 +16,7 @@ type SettingsPanelProps = {
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { lang, setLang, t } = useLang();
   const { theme, setTheme } = useTheme();
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, updateUser } = useAuth();
 
   // Password change state
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -31,6 +31,13 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [pwSuccess, setPwSuccess] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  // Edit profile state
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editUsername, setEditUsername] = useState("");
+  const [editAvatarUrl, setEditAvatarUrl] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -124,6 +131,39 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       setPwError(e.message || t("networkError") || "Network error");
     } finally {
       setLoadingSubmit(false);
+    }
+  };
+
+  const submitProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError("");
+    setEditSuccess("");
+    if (!token) {
+      setEditError(t("notAuthenticated") || "未登录");
+      return;
+    }
+    setEditLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username: editUsername, avatar_url: editAvatarUrl }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setEditSuccess(t("profileUpdated") || "资料更新成功");
+        setShowEditProfile(false);
+        if (updateUser && data.user) updateUser(data.user);
+      } else {
+        setEditError(data.error || t("failedToUpdateProfile") || "Failed to update profile");
+      }
+    } catch (e: any) {
+      setEditError(e.message || t("networkError") || "Network error");
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -252,6 +292,66 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         <p className="text-xs text-[var(--color-text-secondary)] truncate">{user.email}</p>
                       </div>
                     </div>
+
+                    {/* Edit Profile toggle */}
+                    <button
+                      onClick={() => {
+                        setShowEditProfile(!showEditProfile);
+                        setEditError("");
+                        setEditSuccess("");
+                        setEditUsername(user?.username || "");
+                        setEditAvatarUrl(user?.avatar_url || "");
+                      }}
+                      className="w-full flex items-center justify-between py-2 px-3 rounded-lg text-sm text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Camera className="w-3.5 h-3.5" />
+                        {t("editProfile") || "编辑资料"}
+                      </span>
+                      {showEditProfile ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {showEditProfile && (
+                      <form onSubmit={submitProfileUpdate} className="space-y-3 pt-1">
+                        <input
+                          type="text"
+                          value={editUsername}
+                          onChange={(e) => setEditUsername(e.target.value)}
+                          placeholder={t("username") || "用户名"}
+                          className="w-full px-3 py-2 rounded-lg border bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] text-sm focus:outline-none focus:border-gray-400"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={editAvatarUrl}
+                          onChange={(e) => setEditAvatarUrl(e.target.value)}
+                          placeholder={t("avatarUrl") || "头像 URL"}
+                          className="w-full px-3 py-2 rounded-lg border bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] text-sm focus:outline-none focus:border-gray-400"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={editLoading}
+                            className="flex-1 py-2 px-3 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                          >
+                            {editLoading ? "..." : (t("save") || "保存")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowEditProfile(false)}
+                            className="flex-1 py-2 px-3 rounded-lg border border-[var(--color-border)] text-sm hover:bg-[var(--color-bg)] transition-colors"
+                          >
+                            {t("cancel") || "取消"}
+                          </button>
+                        </div>
+                        {editError && (
+                          <p className="text-xs text-red-500">{editError}</p>
+                        )}
+                        {editSuccess && (
+                          <p className="text-xs text-green-500">{editSuccess}</p>
+                        )}
+                      </form>
+                    )}
 
                     {/* Change Password toggle */}
                     <button
