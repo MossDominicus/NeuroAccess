@@ -88,8 +88,19 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           srcImg.src = dataUrl;
         });
         const pageDataUrl = canvas.toDataURL("image/png");
+        // 叠加极淡噪声点阵，防止 OCR/Live Text 识别文字
+        const ctx2 = canvas.getContext("2d")!;
+        const imgData = ctx2.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < imgData.data.length; i += 4 * 8) {
+          const noise = (Math.random() - 0.5) * 6;
+          imgData.data[i]     = Math.min(255, Math.max(0, imgData.data[i] + noise));
+          imgData.data[i + 1] = Math.min(255, Math.max(0, imgData.data[i + 1] + noise));
+          imgData.data[i + 2] = Math.min(255, Math.max(0, imgData.data[i + 2] + noise));
+        }
+        ctx2.putImageData(imgData, 0, 0);
+        const pageDataUrl2 = canvas.toDataURL("image/png");
         const pageImgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(pageDataUrl, "PNG", 10, 10, imgWidth, pageImgHeight);
+        pdf.addImage(pageDataUrl2, "PNG", 10, 10, imgWidth, pageImgHeight);
       }
 
       // ── 页脚标识（英文，避免字体渲染问题） ───────────
