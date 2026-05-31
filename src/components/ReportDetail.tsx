@@ -88,7 +88,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           srcImg.src = dataUrl;
         });
         const pageDataUrl = canvas.toDataURL("image/png");
-        const pageImgHeight = (sh * imgWidth) / w;
+        const pageImgHeight = (canvas.height * imgWidth) / canvas.width;
         pdf.addImage(pageDataUrl, "PNG", 10, 10, imgWidth, pageImgHeight);
       }
 
