@@ -116,6 +116,11 @@ const cases: CaseStudy[] = [
     description: {
       zh: "这份 EEG 数据包含明显的噪声和伪影。信号质量评分仅 45/100，多个通道被标记为 Poor 或 Bad。",
       en: "This EEG data contains significant noise and artifacts. Signal quality score is only 45/100, multiple channels are marked as Poor or Bad.",
+      es: "Estos datos EEG contienen ruido y artefactos significativos. La puntuación de calidad de señal es solo 45/100, múltiples canales están marcados como Pobres o Malos.",
+      fr: "Ces données EEG contiennent un bruit et des artefacts significatifs. Le score de qualité du signal n'est que de 45/100, plusieurs canaux sont marqués comme Pauvres ou Mauvais.",
+      de: "Diese EEG-Daten enthalten signifikantes Rauschen und Artefakte. Der Signalqualitätsscore beträgt nur 45/100, mehrere Kanäle sind als Schlecht oder Schlechtest markiert.",
+      ja: "このEEGデータは著しいノイズとアーチャクトを含みます。信号品質スコアはわずか45/100、複数のチャンネルが「不良」または「悪い」とマークされています。",
+      ko: "이 EEG 데이터는 상당한 노이즈와 아티팩트를 포함합니다. 신호 품질 점수는 겨우 45/100, 여러 채널이 '나쁨' 또는 '최악'으로 표시되어 있습니다."
     },
     details: {
       zh: "此案例展示了真实世界中常见的脏 EEG 数据。你需要学会识别：\n\n1. 肌电伪影（高频、低振幅，常见于额叶）\n2. 眼电伪影（EOG，大振幅、慢波，常见于前额）\n3. 工频噪声（50/60 Hz 电源线干扰）\n\n学习如何识别这些伪影是 EEG 分析的重要技能。",
