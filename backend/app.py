@@ -440,8 +440,8 @@ async def auth_update_profile(
                 conn.close()
                 return {"success": False, "error": "Username already taken"}
             conn.execute("UPDATE users SET username = ? WHERE id = ?", (username, user_id))
-        if avatar_url:
-            conn.execute("UPDATE users SET avatar_url = ? WHERE id = ?", (avatar_url, user_id))
+        # Always update avatar_url (even if empty string = remove avatar)
+        conn.execute("UPDATE users SET avatar_url = ? WHERE id = ?", (avatar_url, user_id))
         conn.commit()
     except Exception as e:
         conn.close()

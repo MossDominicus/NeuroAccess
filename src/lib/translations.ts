@@ -79,6 +79,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "清空",
     reupload: "重新上传",
     fileTooLarge: "文件过大",
+    imageProcessingError: "图片处理失败",
     removeFile: "移除",
 
     // 结果区标题
@@ -248,6 +249,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "技术",
     catpatterns: "波形",
     cateducation: "教育",
+    catclinical: "临床",
+    catsleep: "睡眠",
 
     // 案例库难度
     diffbeginner: "入门",
@@ -338,6 +341,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "资料更新失败",
     clickToUploadAvatar: "点击更换头像",
     confirmChange: "确认修改",
+    save: "保存",
+    notAuthenticated: "未登录",
     codeGenerated: "验证码已生成，10分钟内有效",
     passwordChanged: "密码修改成功",
     passwordTooShort: "密码至少6位",
@@ -516,6 +521,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "Clear All",
     reupload: "Re-upload",
     fileTooLarge: "File too large",
+    imageProcessingError: "Image processing failed",
     removeFile: "Remove",
 
     // Result section titles
@@ -685,6 +691,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "Technical",
     catpatterns: "Patterns",
     cateducation: "Education",
+    catclinical: "Clinical",
+    catsleep: "Sleep",
 
     // Case difficulty
     diffbeginner: "Beginner",
@@ -775,6 +783,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "Failed to update profile",
     clickToUploadAvatar: "Click to change avatar",
     confirmChange: "Confirm",
+    save: "Save",
+    notAuthenticated: "Not logged in",
     codeGenerated: "Code generated, valid for 10 minutes",
     passwordChanged: "Password changed successfully",
     passwordTooShort: "Password must be at least 6 characters",
@@ -951,6 +961,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "Limpiar Todo",
     reupload: "Volver a Subir",
     fileTooLarge: "Archivo demasiado grande",
+    imageProcessingError: "Error al procesar la imagen",
     removeFile: "Eliminar",
 
     eegOverview: "Resumen EEG",
@@ -1105,6 +1116,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "Técnico",
     catpatterns: "Patrones",
     cateducation: "Educación",
+    catclinical: "Clínico",
+    catsleep: "Sueño",
 
     diffbeginner: "Principiante",
     diffintermediate: "Intermedio",
@@ -1192,6 +1205,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "Error al actualizar el perfil",
     clickToUploadAvatar: "Haz clic para cambiar el avatar",
     confirmChange: "Confirmar",
+    save: "Guardar",
+    notAuthenticated: "No autenticado",
     codeGenerated: "Código generado, válido por 10 minutos",
     passwordChanged: "Contraseña cambiada con éxito",
     passwordTooShort: "La contraseña debe tener al menos 6 caracteres",
@@ -1368,6 +1383,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "Tout Effacer",
     reupload: "Retélécharger",
     fileTooLarge: "Fichier trop volumineux",
+    imageProcessingError: "Échec du traitement de l'image",
     removeFile: "Supprimer",
 
     eegOverview: "Aperçu EEG",
@@ -1522,6 +1538,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "Technique",
     catpatterns: "Motifs",
     cateducation: "Éducation",
+    catclinical: "Clinique",
+    catsleep: "Sommeil",
 
     diffbeginner: "Débutant",
     diffintermediate: "Intermédiaire",
@@ -1609,6 +1627,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "Échec de la mise à jour du profil",
     clickToUploadAvatar: "Cliquez pour changer l'avatar",
     confirmChange: "Confirmer",
+    save: "Enregistrer",
+    notAuthenticated: "Non connecté",
     codeGenerated: "Code généré, valide pendant 10 minutes",
     passwordChanged: "Mot de passe changé avec succès",
     passwordTooShort: "Le mot de passe doit contenir au moins 6 caractères",
@@ -1785,6 +1805,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "Alles Löschen",
     reupload: "Erneut Hochladen",
     fileTooLarge: "Datei zu groß",
+    imageProcessingError: "Bildverarbeitung fehlgeschlagen",
     removeFile: "Entfernen",
 
     eegOverview: "EEG-Überblick",
@@ -1939,6 +1960,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "Technisch",
     catpatterns: "Muster",
     cateducation: "Bildung",
+    catclinical: "Klinisch",
+    catsleep: "Schlaf",
 
     diffbeginner: "Anfänger",
     diffintermediate: "Mittelstufe",
@@ -2026,6 +2049,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "Fehler beim Aktualisieren des Profils",
     clickToUploadAvatar: "Klicken, um Avatar zu ändern",
     confirmChange: "Bestätigen",
+    save: "Speichern",
+    notAuthenticated: "Nicht angemeldet",
     codeGenerated: "Code generiert, 10 Minuten gültig",
     passwordChanged: "Passwort erfolgreich geändert",
     passwordTooShort: "Passwort muss mindestens 6 Zeichen haben",
@@ -2202,6 +2227,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "すべてクリア",
     reupload: "再アップロード",
     fileTooLarge: "ファイルが大きすぎます",
+    imageProcessingError: "画像の処理に失敗しました",
     removeFile: "削除",
 
     eegOverview: "EEG概要",
@@ -2356,6 +2382,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "技術",
     catpatterns: "パターン",
     cateducation: "教育",
+    catclinical: "臨床",
+    catsleep: "睡眠",
 
     diffbeginner: "初心者",
     diffintermediate: "中級",
@@ -2443,6 +2471,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "プロフィール更新失敗",
     clickToUploadAvatar: "アバターを変更するにはクリック",
     confirmChange: "確認",
+    save: "保存",
+    notAuthenticated: "未ログイン",
     codeGenerated: "認証コードを生成しました（10分間有効）",
     passwordChanged: "パスワードを変更しました",
     passwordTooShort: "パスワードは6文字以上必要です",
@@ -2619,6 +2649,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     clearAll: "모두 지우기",
     reupload: "다시 업로드",
     fileTooLarge: "파일이 너무 큽니다",
+    imageProcessingError: "이미지 처리 실패",
     removeFile: "제거",
 
     eegOverview: "EEG 개요",
@@ -2773,6 +2804,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     cattechnical: "기술",
     catpatterns: "패턴",
     cateducation: "교육",
+    catclinical: "임상",
+    catsleep: "수면",
 
     diffbeginner: "초보자",
     diffintermediate: "중급",
@@ -2860,6 +2893,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failedToUpdateProfile: "프로필 업데이트 실패",
     clickToUploadAvatar: "아바타 변경을 클릭하세요",
     confirmChange: "확인",
+    save: "저장",
+    notAuthenticated: "로그인되지 않음",
     codeGenerated: "인증 코드가 생성되었습니다 (10분간 유효)",
     passwordChanged: "비밀번호가 변경되었습니다",
     passwordTooShort: "비밀번호는 6자 이상이어야 합니다",

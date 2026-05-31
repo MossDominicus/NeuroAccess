@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Moon, Sun, Monitor, User, X, AlertTriangle, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare, Camera } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, User, X, LogOut, Eye, EyeOff, Key, ChevronDown, ChevronUp, MessageSquare, Camera } from "lucide-react";
 import FeedbackPanel from "@/components/FeedbackPanel";
 
 type SettingsPanelProps = {
@@ -43,20 +44,48 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = (file: File, maxWidth = 256, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let w = img.width,
+            h = img.height;
+          if (w > maxWidth) {
+            h = Math.round((h * maxWidth) / w);
+            w = maxWidth;
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = () => reject(new Error("Image load failed"));
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error("FileReader failed"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setEditError(t("fileTooLarge") || "图片超过 2MB");
+    if (file.size > 5 * 1024 * 1024) {
+      setEditError(t("fileTooLarge") || "File too large");
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
+    try {
+      const base64 = await compressImage(file);
       setEditAvatarUrl(base64);
       setAvatarPreview(base64);
-    };
-    reader.readAsDataURL(file);
+      setEditError("");
+    } catch (err: any) {
+      setEditError(t("imageProcessingError") || "Image processing failed");
+    }
   };
 
   // Countdown timer for resend cooldown
@@ -170,6 +199,12 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         },
         body: JSON.stringify({ username: editUsername, avatar_url: editAvatarUrl }),
       });
+      if (!resp.ok) {
+        const text = await resp.text();
+        setEditError(`Server error ${resp.status}: ${text.substring(0, 200)}`);
+        setEditLoading(false);
+        return;
+      }
       const data = await resp.json();
       if (data.success) {
         setEditSuccess(t("profileUpdated") || "资料更新成功");
@@ -201,16 +236,17 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   }, [open, onClose]);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex"
-          onClick={handleOverlay}
-        >
+    <>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex"
+            onClick={handleOverlay}
+          >
           {/* 遮罩 */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
@@ -312,8 +348,11 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         setPwSuccess("");
                         if (next) {
                           setEditUsername(user?.username || "");
-                          setEditAvatarUrl(user?.avatar_url || "");
-                          setAvatarPreview(user?.avatar_url || "");
+                          // Only reset avatar if user hasn't uploaded a new one
+                          if (!editAvatarUrl || editAvatarUrl === user?.avatar_url) {
+                            setEditAvatarUrl(user?.avatar_url || "");
+                            setAvatarPreview(user?.avatar_url || "");
+                          }
                         }
                       }}
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--color-border)] transition-colors text-left"
@@ -489,22 +528,6 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 )}
               </section>
 
-              {/* 免责声明 */}
-              <section>
-                <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
-                  {t("disclaimer") || "免责声明"}
-                </h3>
-                <button
-                  onClick={() => {
-                    window.dispatchEvent(new Event("__openDisclaimer"));
-                  }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)] transition-colors text-sm text-[var(--color-text)]"
-                >
-                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                  <span>{t("viewDisclaimer") || "查看免责声明"}</span>
-                </button>
-              </section>
-
               {/* 反馈 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
@@ -512,20 +535,15 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 </h3>
                 <div className="rounded-xl bg-[var(--color-bg)]">
                   <button
-                    onClick={() => setShowFeedback(!showFeedback)}
+                    onClick={() => setShowFeedback(true)}
                     className="w-full flex items-center justify-between p-3 text-sm text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors rounded-xl"
                   >
                     <span className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-[var(--color-text-secondary)]" />
                       {t("helpImprove") || "帮助改进 NeuroAccess"}
                     </span>
-                    {showFeedback ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    <span className="text-xs text-[var(--color-text-secondary)]">{t("clickToOpen") || "点击打开"}</span>
                   </button>
-                  {showFeedback && (
-                    <div className="px-3 pb-3">
-                      <FeedbackPanel />
-                    </div>
-                  )}
                 </div>
               </section>
 
@@ -571,8 +589,29 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         </motion.div>
       )}
     </AnimatePresence>
-  );
+
+    {/* Feedback Modal — portal to document.body */}
+    {showFeedback && typeof document !== 'undefined' && createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowFeedback(false)} />
+        <div className="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto bg-[var(--color-surface)] rounded-2xl shadow-2xl border border-[var(--color-border)]">
+          <div className="sticky top-0 z-10 flex items-center justify-between px-5 h-14 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+            <h2 className="text-sm font-semibold">{t("feedback") || "反馈"}</h2>
+            <button onClick={() => setShowFeedback(false)} className="p-1.5 rounded-lg hover:bg-[var(--color-bg)] transition-colors">
+              <X className="w-4 h-4 text-[var(--color-text-secondary)]" />
+            </button>
+          </div>
+          <div className="p-5">
+            <FeedbackPanel />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+  </>)
 }
+
+
 
 function ThemeOption({
   icon,

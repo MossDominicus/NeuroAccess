@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import { useLang } from "@/lib/language-context";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 
+declare global {
+  interface Window {
+    __openDisclaimerModal?: () => void;
+  }
+}
+
 export default function DisclaimerModal() {
   const { t } = useLang();
   const [visible, setVisible] = useState(false);
@@ -18,12 +24,11 @@ export default function DisclaimerModal() {
       setVisible(true);
     }
 
-    // 监听设置页「查看免责声明」按钮
-    function onOpen() {
-      setVisible(true);
-    }
-    window.addEventListener("__openDisclaimer", onOpen);
-    return () => window.removeEventListener("__openDisclaimer", onOpen);
+    // 注册全局回调，供 Footer / SettingsPanel 调用
+    window.__openDisclaimerModal = () => setVisible(true);
+    return () => {
+      delete window.__openDisclaimerModal;
+    };
   }, []);
 
   const handleAccept = () => {
