@@ -235,7 +235,7 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
 try:
     from auth import (
         create_user, authenticate_user, create_access_token, verify_token, get_user_by_id,
-        generate_verification_code, verify_verification_code, update_password,
+        generate_verification_code, verify_verification_code, update_password, get_db,
     )
     AUTH_AVAILABLE = True
 except Exception as _auth_e:
