@@ -304,7 +304,7 @@ def send_verification_email(to_email: str, code: str) -> bool:
     import json, urllib.request, urllib.error
     url = "https://api.resend.com/emails"
     payload = json.dumps({
-        "from": "NeuroAccess <noreply@neuroaccess.cloud>",
+        "from": "NeuroAccess <onboarding@resend.dev>",
         "to": [to_email],
         "subject": "NeuroAccess - Password Change Verification Code",
         "text": f"""Hello,
@@ -407,6 +407,49 @@ def auth_change_password(
         return {"success": False, "error": "Failed to update password"}
     except ValueError as e:
         return {"success": False, "error": str(e)}
+
+@app.put("/api/auth/profile")
+async def auth_update_profile(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Update user profile (username, avatar_url)."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "Auth module not available"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    try:
+        body = await request.json()
+    except:
+        body = {}
+    username = body.get("username", "").strip()
+    avatar_url = body.get("avatar_url", "").strip()
+    
+    conn = get_db()
+    try:
+        if username and username != user["username"]:
+            existing = conn.execute("SELECT id FROM users WHERE username = ? AND id != ?", (username, user_id)).fetchone()
+            if existing:
+                conn.close()
+                return {"success": False, "error": "Username already taken"}
+            conn.execute("UPDATE users SET username = ? WHERE id = ?", (username, user_id))
+        if avatar_url:
+            conn.execute("UPDATE users SET avatar_url = ? WHERE id = ?", (avatar_url, user_id))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return {"success": False, "error": str(e)}
+    conn.close()
+    
+    updated_user = get_user_by_id(user_id)
+    return {"success": True, "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "avatar_url": updated_user.get("avatar_url", "")}}
 
 # =================================================================
 # Feedback API

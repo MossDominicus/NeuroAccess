@@ -60,6 +60,11 @@ def init_db():
         )
         """
     )
+    # Add avatar_url column if not exists
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''")
+    except Exception:
+        pass  # column already exists
     conn.commit()
     conn.close()
 
