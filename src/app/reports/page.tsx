@@ -12,6 +12,7 @@ import {
   Brain,
   Eye,
   AlertTriangle,
+  Waves,
 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
@@ -315,11 +316,14 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
 
 /* ── Reports Page ─────────────────────────────────────────────── */
 
+type ReportFilter = "all" | "analysis" | "eeg";
+
 export default function ReportsPage() {
   const [reports, setReports] = useState<StoredReport[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<StoredReport | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [filter, setFilter] = useState<ReportFilter>("all");
   const { lang, t } = useLang();
   const { user, loading } = useAuth();
 
@@ -336,9 +340,16 @@ export default function ReportsPage() {
     );
   };
 
-  const allSelected = reports.length > 0 && selected.length === reports.length;
+  const filteredReports = reports.filter((r) => {
+    if (filter === "all") return true;
+    if (filter === "analysis") return true;
+    if (filter === "eeg") return !!r.eegData;
+    return true;
+  });
+
+  const allSelected = filteredReports.length > 0 && selected.length === filteredReports.length;
   const toggleSelectAll = () => {
-    setSelected(allSelected ? [] : reports.map((r) => r.id));
+    setSelected(allSelected ? [] : filteredReports.map((r) => r.id));
   };
 
   const handleExport = (report: StoredReport) => {
@@ -374,7 +385,7 @@ export default function ReportsPage() {
   };
 
   const statCards = [
-    { labelKey: "totalReports", value: reports.length, icon: FileText },
+    { labelKey: "totalReports", value: filteredReports.length, icon: FileText },
   ];
 
   if (loading) {
@@ -418,15 +429,17 @@ export default function ReportsPage() {
             <h1 className="text-2xl font-bold tracking-tight">{t("reportsTitle")}</h1>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{t("reportsSubtitle")}</p>
           </div>
-          {selected.length > 0 ? (
-            <button
-              onClick={() => setBatchDeleteOpen(true)}
-              className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-red-600/10 transition-all duration-300 hover:bg-red-700"
-            >
-              <Trash2 className="h-4 w-4" />
-              {t("batchDeleteCount").replace("{count}", String(selected.length))}
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {selected.length > 0 ? (
+              <button
+                onClick={() => setBatchDeleteOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-red-600/10 transition-all duration-300 hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                {t("batchDeleteCount").replace("{count}", String(selected.length))}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {/* 统计卡片 */}
@@ -452,7 +465,7 @@ export default function ReportsPage() {
         </div>
 
         {/* 报告列表 */}
-        {reports.length === 0 ? (
+        {filteredReports.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -482,7 +495,7 @@ export default function ReportsPage() {
 
             {/* 行 */}
             <AnimatePresence>
-              {reports.map((report, i) => (
+              {filteredReports.map((report, i) => (
                 <motion.div
                   key={report.id}
                   initial={{ opacity: 0, x: -10 }}

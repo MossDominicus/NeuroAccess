@@ -181,8 +181,14 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
     payload      = json.dumps(to_jsonable(a), ensure_ascii=False, indent=2)
     output_lang  = LANG_NAME_MAP.get(lang, "English")
     boundary     = (
-        "Never provide medical diagnosis, disease labels, treatment advice, or normal/abnormal judgment. "
-        "This is for EEG literacy, education, and accessibility only."
+        "CRITICAL BOUNDARIES - You MUST follow these rules:\n"
+        "1. NEVER provide medical diagnosis, disease labels, treatment advice, or normal/abnormal judgment.\n"
+        "2. NEVER interpret bandpower values as indicators of mental states (e.g., do NOT say 'high alpha means relaxation' or 'low beta means poor attention').\n"
+        "3. NEVER suggest what the user should do based on EEG data (no lifestyle, medication, or therapy advice).\n"
+        "4. NEVER claim to detect emotions, attention levels, cognitive states, personality traits, or intelligence.\n"
+        "5. ALWAYS emphasize the limitations of EEG analysis and that single-session data cannot characterize brain function.\n"
+        "6. ALWAYS use cautious language (e.g., 'may be associated with', 'could reflect', 'might indicate') when describing patterns.\n"
+        "7. This is for EEG literacy, education, and accessibility ONLY."
     )
     sq = safe_float(a.get("signal_quality_score", 100), 100)
     uncertainty = ""

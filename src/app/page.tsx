@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { useAnalysis } from "@/lib/analysis-context";
+import { useAnalysis } from "@//lib/analysis-context";
 import IntroAnimation from "@/components/IntroAnimation";
 import {
   UploadCloud,
@@ -17,6 +17,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  Cpu, Pause,
 } from "lucide-react";
 
 type Status = "pending" | "analyzing" | "completed" | "failed";
@@ -62,7 +63,7 @@ function OverviewCard({ analysis }: { analysis: any }) {
   );
 }
 
-// ── ScoreBar ────────────────────────────────────────────────────────
+// ── ScoreBar ──────────────────────────────────────────────────────────
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div>
@@ -132,7 +133,7 @@ function ExplanationCards({ analysis }: { analysis: any }) {
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <div className="text-sm font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</div>
           <div className="mt-2 text-sm text-[var(--color-text-secondary)]">{analysis.confidence?.level || "-"}</div>
-          <div className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{analysis.confidence?.reason || ""}</div>
+          <div className="mt-1 text-xs leading-6 text-[var(--color-text-secondary)]">{analysis.confidence?.reason || ""}</div>
         </div>
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 lg:col-span-2">
           <div className="text-sm font-bold text-[var(--color-text)]">{t("whatDataCannotTell")}</div>
@@ -155,14 +156,111 @@ function ExplanationCards({ analysis }: { analysis: any }) {
   );
 }
 
+// ── EEG Waveform (inline) ────────────────────────────────────────────
+function EEGWaveform({ eegData }: { eegData: any }) {
+  const { t } = useLang();
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(
+    new Set(eegData.channel_names || [])
+  );
+
+  const toggleChannel = (ch: string) => {
+    setSelectedChannels(prev => {
+      const next = new Set(prev);
+      if (next.has(ch)) next.delete(ch); else next.add(ch);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!eegData || !eegData.times || !eegData.channels || !plotRef.current) return;
+    // @ts-expect-error no types for plotly.js-dist
+    import("plotly.js-dist").then((Plotly: any) => {
+      if (!plotRef.current) return;
+      const { times, channels, channel_names } = eegData;
+      const plotData: any[] = [];
+
+      channel_names.forEach((chName: string, idx: number) => {
+        if (!selectedChannels.has(chName)) return;
+        const chData = channels[chName];
+        if (!chData) return;
+        const offset = -idx * 100;
+        const yData = chData.map((v: number) => v + offset);
+        plotData.push({
+          x: times,
+          y: yData,
+          type: "scatter",
+          mode: "lines",
+          name: chName,
+          line: { width: 1 },
+          hovertemplate: `%{fullData.name}<br>${t("hoverTime")}: %{x:.2f}s<br>${t("hoverAmplitude")}: %{y:.2f}${t("hoverUnit")}<extra></extra>`,
+        });
+      });
+
+      const yTicks: number[] = [];
+      const yTickLabels: string[] = [];
+      channel_names.forEach((chName: string, idx: number) => {
+        if (selectedChannels.has(chName)) { yTicks.push(-idx * 100); yTickLabels.push(chName); }
+      });
+
+      const isDark = document.documentElement.classList.contains("dark");
+      const layout = {
+        title: { text: `${t("eegWaveformTitle")} - ${eegData.file_name}`, font: { size: 16, color: isDark ? "#e5e7eb" : "#111827" } },
+        xaxis: {
+          title: { text: t("timeSec"), font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
+          showgrid: true, gridcolor: isDark ? "#374151" : "#e5e7eb",
+          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
+        },
+        yaxis: {
+          title: { text: t("channelAxis"), font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
+          tickmode: "array" as const, tickvals: yTicks, ticktext: yTickLabels,
+          showgrid: true, gridcolor: isDark ? "#374151" : "#e5e7eb",
+          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
+        },
+        plot_bgcolor: isDark ? "transparent" : "#fafafa",
+        paper_bgcolor: "transparent",
+        margin: { t: 50, r: 30, l: 80, b: 50 },
+        showlegend: false, hovermode: "closest" as const,
+        font: { color: isDark ? "#e5e7eb" : "#111827" },
+      };
+
+      Plotly.newPlot(plotRef.current, plotData, layout, { responsive: true, displayModeBar: true, modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d"] });
+    });
+  }, [eegData, selectedChannels]);
+
+  if (!eegData) return null;
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
+        <h4 className="text-sm font-semibold text-[var(--color-text)] mb-3">{t("channelSelect")}</h4>
+        <div className="flex flex-wrap gap-2">
+          {eegData.channel_names?.map((ch: string) => (
+            <button key={ch} onClick={() => toggleChannel(ch)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                selectedChannels.has(ch) ? "bg-blue-600 text-white" : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
+              }`}
+            >{ch}</button>
+          ))}
+        </div>
+      </div>
+      <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
+        <div ref={plotRef} style={{ width: "100%", height: "400px" }} />
+      </div>
+    </div>
+  );
+}
+
 // ── FileCard ────────────────────────────────────────────────────────
 function FileCard({
-  item, expanded, onToggle, onRemove,
+  item, expanded, onToggle, onRemove, running, paused,
 }: {
   item: any;
   expanded: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  running: boolean;
+  paused: boolean;
 }) {
   const { t } = useLang();
 
@@ -180,12 +278,11 @@ function FileCard({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={item.status} />
-          <button onClick={onToggle} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-border)] hover:text-[var(--color-text)]">
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-          <button onClick={onRemove} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-red-950/30 hover:text-red-400">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {(!running || paused) && (
+            <button onClick={onRemove} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-red-950/30 hover:text-red-400">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,13 +293,17 @@ function FileCard({
       )}
 
       {expanded && item.status === "completed" && !item.error && (
-        <div className="border-t border-[var(--color-border)] px-5 py-4 text-center">
-          <a
-            href="/reports"
-            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-          >
-            {t("viewInReports") || "View report →"}
-          </a>
+        <div className="border-t border-[var(--color-border)] px-5 py-4">
+          <div className="text-center mb-4">
+            <a
+              href="/reports"
+              className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+            >
+              {t("viewInReports") || "View report →"}
+            </a>
+          </div>
+          {/* EEG Waveform */}
+          {item.eegData && <EEGWaveform eegData={item.eegData} />}
         </div>
       )}
     </div>
@@ -218,22 +319,21 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
   );
 }
 
-// ── Main Page ───────────────────────────────────────────────────────
-export default function UploadAnalysisCenter() {
+// ═══════════════════════════════════════════════════════════════
+//  MAIN DASHBOARD PAGE
+// ═══════════════════════════════════════════════════════════════
+
+export default function DashboardPage() {
   const { t } = useLang();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { user } = useAuth();
   const {
-    files, running, expandId, setExpandId,
-    handleFileSelect, removeFile, clearAll, startAnalysis,
+    files, running, paused, expandId, setExpandId,
+    handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis,
   } = useAnalysis();
 
   // ── 启动动画状态 ─────────────────────────────────────
-  // showIntro: false = 显示主界面（SSR 默认，避免空白）
-  // showIntro: true  = 显示动画
   const [showIntro, setShowIntro] = useState(false);
-
-  // 客户端挂载后检查 localStorage 或 URL 参数
   useEffect(() => {
     const forced = new URLSearchParams(window.location.search).get("intro");
     if (forced === "1") {
@@ -241,29 +341,40 @@ export default function UploadAnalysisCenter() {
       setShowIntro(true);
     } else {
       const played = window.sessionStorage.getItem("neuroaccess-intro-played");
-      if (played !== "true") {
-        setShowIntro(true);
-      }
+      if (played !== "true") setShowIntro(true);
     }
   }, []);
-
-  // 动画播放完毕
   const handleIntroComplete = useCallback(() => {
     window.sessionStorage.setItem("neuroaccess-intro-played", "true");
     setShowIntro(false);
   }, []);
-
-  // Settings 手动重播
   const replayIntro = useCallback(() => {
     window.sessionStorage.removeItem("neuroaccess-intro-played");
     setShowIntro(true);
   }, []);
-  useEffect(() => {
-    (window as any).__replayIntro = replayIntro;
-    return () => { delete (window as any).__replayIntro; };
-  }, [replayIntro]);
+  useEffect(() => { (window as any).__replayIntro = replayIntro; return () => { delete (window as any).__replayIntro; }; }, [replayIntro]);
 
-  // 显示动画
+  // ── AI 状态 ─────────────────────────────────────────
+  const [aiStatus, setAiStatus] = useState<{ online: boolean; model: string; mode: string } | null>(null);
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        setAiStatus({
+          online: data.openrouter === true,
+          model: data.openrouter ? "qwen-2.5-7b" : (data.model || "qwen2.5:7b"),
+          mode: data.openrouter ? t("apiMode") : t("cpuMode"),
+        });
+      } catch {
+        setAiStatus({ online: false, model: "-", mode: t("cpuMode") });
+      }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
+  }, [t]);
+
   if (showIntro) return <IntroAnimation onComplete={handleIntroComplete} />;
 
   const stats = {
@@ -280,79 +391,120 @@ export default function UploadAnalysisCenter() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
     >
-      {/* Upload area */}
-      <div
-        className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)]"
-        onDragOver={(e) => { e.preventDefault(); }}
-        onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
-      >
-        <UploadCloud className="mx-auto mb-4 h-10 w-10 text-[var(--color-text-secondary)]" />
-        <p className="text-sm font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
-        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".edf,.bdf,.gdf,.csv"
-          multiple
-          className="hidden"
-          onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
-        />
-        <button
+      {/* EEG Analysis Panel */}
+      <div className="space-y-6">
+        {/* Upload area */}
+        <div
+          className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] cursor-pointer"
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
           onClick={() => inputRef.current?.click()}
-          className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-2.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
         >
-          {t("chooseFiles")}
-        </button>
+          <UploadCloud className="mx-auto mb-4 h-10 w-10 text-[var(--color-text-secondary)]" />
+          <p className="text-sm font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".edf,.bdf,.gdf,.csv"
+            multiple
+            className="hidden"
+            onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
+          />
+        </div>
+
+        {/* File list */}
+        {files.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                <StatBadge label={t("totalFiles")}  value={stats.total}     color="bg-[var(--color-border)] text-[var(--color-text-secondary)]" />
+                <StatBadge label={t("completed")}   value={stats.completed} color="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" />
+                <StatBadge label={t("failed")}      value={stats.failed}    color="bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400" />
+                <StatBadge label={t("processing")}  value={stats.processing} color="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" />
+              </div>
+              <div className="flex gap-2">
+                {/* Primary button: Start / Processing (disabled) / Resume */}
+                <button
+                  onClick={() => {
+                    if (!user) { window.location.href = "/login"; return; }
+                    if (paused) {
+                      resumeAnalysis();
+                    } else {
+                      startAnalysis();
+                    }
+                  }}
+                  disabled={!user || files.length === 0 || (running && !paused)}
+                  className="rounded-2xl bg-[var(--color-primary)] dark:bg-[var(--color-primary)] dark:text-[var(--color-bg)] px-6 py-2.5 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:opacity-90 disabled:opacity-40"
+                >
+                  {!user ? (t("pleaseLogin") || "Please login to analyze") : (
+                    paused ? (t("resumeAnalysis") || "Resume") : (
+                      running ? t("processing") : (t("startAnalysis") || "Start Analysis")
+                    )
+                  )}
+                </button>
+
+                {/* Secondary button: Pause (when running, not paused) / Clear (when paused or idle) */}
+                {running && !paused ? (
+                  <button
+                    onClick={pauseAnalysis}
+                    className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-border)]"
+                  >
+                    <Pause className="inline h-4 w-4" /> {t("pauseAnalysis") || "Pause"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={clearAll}
+                    className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-border)]"
+                  >
+                    <Trash2 className="inline h-4 w-4" /> {t("clearAll")}
+                  </button>
+                )}
+              </div>
+            </div>
+            {files.map((item: any) => (
+                <FileCard
+                  key={item.id}
+                  item={item}
+                  expanded={expandId === item.id}
+                  onToggle={() => setExpandId(expandId === item.id ? null : item.id)}
+                  onRemove={() => removeFile(item.id)}
+                  running={running}
+                  paused={paused}
+                />
+            ))}
+            {paused && files.length > 1 && (
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center text-sm text-[var(--color-text-secondary)]">
+                {t("batchSummary")}：{stats.completed} / {stats.total} {t("completed").toLowerCase()}，{stats.failed} {t("failed").toLowerCase()}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* File list */}
-      {files.length > 0 && (
-        <div className="space-y-4">
-          {/* Stats + action buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              <StatBadge label={t("totalFiles")}  value={stats.total}     color="bg-[var(--color-border)] text-[var(--color-text-secondary)]" />
-              <StatBadge label={t("completed")}   value={stats.completed} color="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" />
-              <StatBadge label={t("failed")}      value={stats.failed}    color="bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400" />
-              <StatBadge label={t("processing")}  value={stats.processing} color="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (!user) { window.location.href = "/login"; return; }
-                  startAnalysis();
-                }}
-                disabled={running || files.length === 0 || !user}
-                className="rounded-2xl bg-gray-900 dark:bg-white dark:text-gray-900 px-6 py-2.5 text-sm font-semibold text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-40"
-              >
-                {!user ? (t("pleaseLogin") || "Please login to analyze") : (running ? t("processing") : t("startAnalysis"))}
-              </button>
-              <button
-                onClick={clearAll}
-                className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-border)]"
-              >
-                <Trash2 className="inline h-4 w-4" /> {t("clearAll")}
-              </button>
-            </div>
+      {/* AI Status Bar */}
+      {aiStatus && (
+        <div className="flex items-center justify-center gap-4 py-2 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] mt-4">
+          <div className="flex items-center gap-1.5">
+            {aiStatus.online ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+            )}
+            <span className={aiStatus.online ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+              {aiStatus.online ? t("aiOnline") : t("aiOffline")}
+            </span>
           </div>
-
-          {/* File cards */}
-          {files.map((item: any) => (
-            <FileCard
-              key={item.id}
-              item={item}
-              expanded={expandId === item.id}
-              onToggle={() => setExpandId(expandId === item.id ? null : item.id)}
-              onRemove={() => removeFile(item.id)}
-            />
-          ))}
-
-          {/* Batch summary */}
-          {files.length > 1 && (
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center text-sm text-[var(--color-text-secondary)]">
-                {t("batchSummary")}：{stats.completed} / {stats.total} {t("completed").toLowerCase()}，{stats.failed} {t("failed").toLowerCase()}
+          {aiStatus.online && (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+              <span>{aiStatus.model}</span>
             </div>
           )}
+          <div className="flex items-center gap-1.5">
+            <Cpu className="w-3.5 h-3.5" />
+            <span>{aiStatus.mode}</span>
+          </div>
         </div>
       )}
     </motion.div>

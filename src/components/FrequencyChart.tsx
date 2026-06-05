@@ -43,7 +43,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300">
+      <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300">
         <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] mb-4">{t("avgBandpowerTitle")}</h4>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={bandpowerData}>
@@ -58,7 +58,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
       </div>
 
       {distributionData.length > 0 && (
-        <div className="bg-white dark:bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300">
+        <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300">
           <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] mb-4">{t("frequencyDistributionTitle")}</h4>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={distributionData.slice(0, 50)}>

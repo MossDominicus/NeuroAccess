@@ -37,7 +37,7 @@ class SignalQuality:
 @dataclass
 class FrequencyAnalysis:
     """频段分析"""
-    bandpower: Dict[str, List[float]]   # delta, theta, alpha, beta（每通道）
+    bandpower: Dict[str, List[float]]   # delta, theta, alpha, beta, gamma（每通道）
     dominant_frequency: float
     frequency_distribution: List[Dict[str, float]]  # 用于图表
     average_bandpower: Dict[str, float]      # 跨通道平均
@@ -129,9 +129,9 @@ class EEGAnalyzer:
         # 检测伪影（简单启发式）
         possible_artifacts = []
         lang = self.lang
-        if len(noisy_channels) > len(ch_names) * 0.2:
+        if len(noisy_channels) > len(ch_names) * 0.1:
             possible_artifacts.append(i18n.get_artifact_text(lang, "many_noisy_channels"))
-        if np.any(np.abs(data) > 1e-4):  # 异常大值
+        if np.any(np.abs(data) > 1e-3):  # 异常大值 (> 1000 μV)
             possible_artifacts.append(i18n.get_artifact_text(lang, "large_values"))
 
         # 检测缺失数据
@@ -185,12 +185,13 @@ class EEGAnalyzer:
         data = self.raw.get_data()
         sfreq = self.raw.info['sfreq']
 
-        # 定义频段 (Hz)
+        # 定义频段 (Hz) — 标准 EEG 频段
         bands = {
             'delta': (0.5, 4),
             'theta': (4, 8),
             'alpha': (8, 13),
-            'beta':  (13, 30)
+            'beta':  (13, 30),
+            'gamma': (30, 100)
         }
 
         bandpower = {}
@@ -206,10 +207,11 @@ class EEGAnalyzer:
                 nperseg = min(1024, len(ch_data))
                 freqs, psd = welch(ch_data, fs=sfreq, nperseg=nperseg)
 
-                # 提取频段范围内的功率
+                # 提取频段范围内的功率 — 使用积分（曲线下面积）而非平均值
                 band_mask = (freqs >= fmin) & (freqs <= fmax)
-                band_power = np.mean(psd[band_mask])
-                band_power_per_channel.append(float(band_power))
+                df = freqs[1] - freqs[0] if len(freqs) > 1 else 1.0
+                band_power = float(np.sum(psd[band_mask]) * df)
+                band_power_per_channel.append(band_power)
 
             bandpower[band_name] = band_power_per_channel
             average_bandpower[band_name] = float(np.mean(band_power_per_channel))

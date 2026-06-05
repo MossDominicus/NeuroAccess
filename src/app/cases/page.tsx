@@ -1153,7 +1153,7 @@ export default function CasesPage() {
                           <ul className="space-y-1">
                             {cannotTell.map((item, j) => (
                               <li key={j} className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)]">
-                                <span className="text-gray-300">•</span>
+                                <span className="text-[var(--color-text-secondary)]">•</span>
                                 {item}
                               </li>
                             ))}

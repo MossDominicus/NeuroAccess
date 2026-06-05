@@ -170,3 +170,30 @@ button, a, input, textarea {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
+
+/* Plotly modebar 按钮放大更明显 */
+.modebar {
+  padding: 4px !important;
+  background: rgba(255,255,255,0.92) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+}
+.dark .modebar {
+  background: rgba(26,26,26,0.92) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.40) !important;
+}
+.modebar-btn {
+  padding: 4px !important;
+  margin: 2px !important;
+}
+.modebar-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+.modebar-btn:hover {
+  background: rgba(0,0,0,0.08) !important;
+  border-radius: 4px !important;
+}
+.dark .modebar-btn:hover {
+  background: rgba(255,255,255,0.12) !important;
+}

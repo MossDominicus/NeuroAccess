@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import PublicPreviewFooter from "@/components/PublicPreviewFooter";
 import DisclaimerModal from "@/components/DisclaimerModal";
+import PostLoginModals from "@/components/PostLoginModals";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AnalysisProvider } from "@/lib/analysis-context";
@@ -25,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -52,6 +53,7 @@ export default function RootLayout({
             <LanguageProvider>
               <AnalysisProvider>
                 <DisclaimerModal />
+                <PostLoginModals />
                 <div className="flex h-screen overflow-hidden">
                   <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">

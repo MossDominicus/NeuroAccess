@@ -48,7 +48,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       key: "beginner" as const,
       label: t("beginnerMode"),
       icon: User,
-      card: "border-green-200 bg-white dark:bg-[var(--color-surface)] dark:border-green-900/50",
+      card: "border-green-200 bg-[var(--color-surface)] dark:border-green-900/50",
       iconBox: "bg-green-50 dark:bg-green-950/30",
       iconColor: "text-green-600 dark:text-green-400",
     },
@@ -56,7 +56,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       key: "student" as const,
       label: t("studentMode"),
       icon: GraduationCap,
-      card: "border-blue-200 bg-white dark:bg-[var(--color-surface)] dark:border-blue-900/50",
+      card: "border-blue-200 bg-[var(--color-surface)] dark:border-blue-900/50",
       iconBox: "bg-blue-50 dark:bg-blue-950/30",
       iconColor: "text-blue-600 dark:text-blue-400",
     },
@@ -64,7 +64,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       key: "research" as const,
       label: t("researchMode"),
       icon: Microscope,
-      card: "border-purple-200 bg-white dark:bg-[var(--color-surface)] dark:border-purple-900/50",
+      card: "border-purple-200 bg-[var(--color-surface)] dark:border-purple-900/50",
       iconBox: "bg-purple-50 dark:bg-purple-950/30",
       iconColor: "text-purple-600 dark:text-purple-400",
     },
@@ -109,7 +109,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       </div>
 
       {data?.confidence && (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-white dark:bg-[var(--color-surface)] p-6 shadow-sm">
+        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
           <h4 className="mb-3 text-sm font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</h4>
           <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${levelClass[data.confidence.level || "Low"] || levelClass.Low}`}>
             <Shield className="h-3.5 w-3.5" />
@@ -120,7 +120,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       )}
 
       {data?.limitations && data.limitations.length > 0 && (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-white dark:bg-[var(--color-surface)] p-6 shadow-sm">
+        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
           <h4 className="mb-3 text-sm font-bold text-[var(--color-text)]">{t("whatDataCannotTell")}</h4>
           <ul className="space-y-2">
             {data.limitations.map((item, index) => (

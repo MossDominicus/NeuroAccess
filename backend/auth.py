@@ -50,11 +50,13 @@ def init_db():
         """
         CREATE TABLE IF NOT EXISTS verification_codes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id INTEGER,
+            email TEXT,
             code TEXT NOT NULL,
             purpose TEXT NOT NULL DEFAULT 'password_change',
             expires_at TIMESTAMP NOT NULL,
             used INTEGER NOT NULL DEFAULT 0,
+            attempts INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
@@ -65,6 +67,27 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''")
     except Exception:
         pass  # column already exists
+    # Add terms_accepted column if not exists
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists
+    # Add email column if not exists (for registration codes)
+    try:
+        conn.execute("ALTER TABLE verification_codes ADD COLUMN email TEXT")
+    except Exception:
+        pass  # column already exists
+    # Add attempts column if not exists
+    try:
+        conn.execute("ALTER TABLE verification_codes ADD COLUMN attempts INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists
+    # Create index for faster lookup
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email, purpose, used)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_codes_user ON verification_codes(user_id, purpose, used)")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -113,6 +136,7 @@ def create_user(username: str, email: str, password: str) -> Dict[str, Any]:
             "id": user_id,
             "username": username,
             "email": email,
+            "avatar_url": "",
             "created_at": datetime.utcnow().isoformat(),
         }
     except sqlite3.IntegrityError as e:
@@ -129,14 +153,14 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
     try:
         # Try username first
         row = conn.execute(
-            "SELECT id, username, email, password_hash, created_at FROM users WHERE username = ?",
+            "SELECT id, username, email, avatar_url, password_hash, created_at FROM users WHERE username = ?",
             (username_or_email,),
         ).fetchone()
 
         # If not found, try email
         if row is None:
             row = conn.execute(
-                "SELECT id, username, email, password_hash, created_at FROM users WHERE email = ?",
+                "SELECT id, username, email, avatar_url, password_hash, created_at FROM users WHERE email = ?",
                 (username_or_email,),
             ).fetchone()
 
@@ -150,6 +174,7 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
             "id": row["id"],
             "username": row["username"],
             "email": row["email"],
+            "avatar_url": row["avatar_url"] or "",
             "created_at": row["created_at"],
         }
     finally:
@@ -161,7 +186,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, created_at FROM users WHERE id = ?",
+            "SELECT id, username, email, avatar_url, created_at FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
         if row:
@@ -171,20 +196,28 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
 
 
-def generate_verification_code(user_id: int, purpose: str = "password_change") -> str:
-    """Generate a 6-digit verification code for the user. Returns the code."""
+def generate_verification_code(user_id: Optional[int] = None, email: Optional[str] = None, purpose: str = "password_change") -> str:
+    """Generate a 6-digit verification code. Returns the code.
+    For registration codes, pass email instead of user_id.
+    """
     code = f"{random.randint(100000, 999999)}"
     expires_at = datetime.utcnow() + timedelta(minutes=10)
     conn = get_db()
     try:
-        # Invalidate any existing unused codes for this user + purpose
+        # Invalidate any existing unused codes for this user/email + purpose
+        if user_id:
+            conn.execute(
+                "UPDATE verification_codes SET used = 1 WHERE user_id = ? AND purpose = ? AND used = 0",
+                (user_id, purpose),
+            )
+        elif email:
+            conn.execute(
+                "UPDATE verification_codes SET used = 1 WHERE email = ? AND purpose = ? AND used = 0",
+                (email, purpose),
+            )
         conn.execute(
-            "UPDATE verification_codes SET used = 1 WHERE user_id = ? AND purpose = ? AND used = 0",
-            (user_id, purpose),
-        )
-        conn.execute(
-            "INSERT INTO verification_codes (user_id, code, purpose, expires_at) VALUES (?, ?, ?, ?)",
-            (user_id, code, purpose, expires_at.isoformat()),
+            "INSERT INTO verification_codes (user_id, email, code, purpose, expires_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, email, code, purpose, expires_at.isoformat()),
         )
         conn.commit()
         return code
@@ -192,20 +225,51 @@ def generate_verification_code(user_id: int, purpose: str = "password_change") -
         conn.close()
 
 
-def verify_verification_code(user_id: int, code: str, purpose: str = "password_change") -> bool:
-    """Verify a 6-digit code for the user. Marks it as used if valid."""
+def verify_verification_code(user_id: Optional[int] = None, email: Optional[str] = None, code: str = "", purpose: str = "password_change") -> bool:
+    """Verify a 6-digit code. Marks it as used if valid. Max 3 attempts.
+    For registration codes, pass email instead of user_id.
+    """
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT id, expires_at FROM verification_codes WHERE user_id = ? AND code = ? AND purpose = ? AND used = 0",
-            (user_id, code, purpose),
-        ).fetchone()
-        if not row:
+        if user_id:
+            row = conn.execute(
+                "SELECT id, expires_at, attempts FROM verification_codes WHERE user_id = ? AND code = ? AND purpose = ? AND used = 0",
+                (user_id, code, purpose),
+            ).fetchone()
+        elif email:
+            row = conn.execute(
+                "SELECT id, expires_at, attempts FROM verification_codes WHERE email = ? AND code = ? AND purpose = ? AND used = 0",
+                (email, code, purpose),
+            ).fetchone()
+        else:
             return False
+        
+        if not row:
+            # Code not found - increment attempts for existing codes with same purpose
+            if user_id:
+                conn.execute(
+                    "UPDATE verification_codes SET attempts = attempts + 1 WHERE user_id = ? AND purpose = ? AND used = 0",
+                    (user_id, purpose)
+                )
+            elif email:
+                conn.execute(
+                    "UPDATE verification_codes SET attempts = attempts + 1 WHERE email = ? AND purpose = ? AND used = 0",
+                    (email, purpose)
+                )
+            conn.commit()
+            return False
+        
+        # Check attempts
+        if row["attempts"] >= 3:
+            conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
+            conn.commit()
+            return False
+        
         # Check expiry
         expires = datetime.fromisoformat(row["expires_at"])
         if datetime.utcnow() > expires:
             return False
+        
         # Mark as used
         conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
         conn.commit()
@@ -226,6 +290,69 @@ def update_password(user_id: int, new_password: str) -> bool:
         )
         conn.commit()
         return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def update_email(user_id: int, new_email: str) -> bool:
+    """Update user email. Returns True on success."""
+    conn = get_db()
+    try:
+        # Check if new_email is already taken
+        existing = conn.execute("SELECT id FROM users WHERE email = ? AND id != ?", (new_email, user_id)).fetchone()
+        if existing:
+            return False
+        cursor = conn.execute(
+            "UPDATE users SET email = ? WHERE id = ?",
+            (new_email, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_user(user_id: int) -> bool:
+    """Delete user and all related data. Returns True on success."""
+    conn = get_db()
+    try:
+        # Delete related data first (reports, verification_codes, etc.)
+        conn.execute("DELETE FROM reports WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM verification_codes WHERE user_id = ?", (user_id,))
+        # Delete user
+        cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def accept_terms(user_id: int) -> bool:
+    """Mark user as having accepted terms. Returns True on success."""
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            "UPDATE users SET terms_accepted = 1 WHERE id = ?",
+            (user_id,),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def check_username_setup(user_id: int) -> bool:
+    """Check if user needs to set up username (default 'User' or empty). Returns True if setup needed."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT username FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return False
+        username = row["username"]
+        return username == "User" or username.strip() == ""
     finally:
         conn.close()
 

@@ -125,7 +125,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
                 onClick={() => setQ1(v)}
                 className={`flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-all ${
                   q1 === v
-                    ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-bg)] dark:border-[var(--color-primary)] dark:bg-[var(--color-primary)] dark:text-[var(--color-bg)]"
                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]"
                 }`}
               >
@@ -148,7 +148,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
                 onClick={() => setQ2(v)}
                 className={`flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-all ${
                   q2 === v
-                    ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-bg)] dark:border-[var(--color-primary)] dark:bg-[var(--color-primary)] dark:text-[var(--color-bg)]"
                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]"
                 }`}
               >
@@ -171,7 +171,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
                 onClick={() => setQ3(q3 === v ? "" : v)}
                 className={`rounded-lg border px-4 py-2 text-xs font-medium transition-all ${
                   q3 === v
-                    ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-bg)] dark:border-[var(--color-primary)] dark:bg-[var(--color-primary)] dark:text-[var(--color-bg)]"
                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]"
                 }`}
               >
@@ -196,7 +196,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="inline-flex items-center gap-2 rounded-xl bg-gray-900 dark:bg-white px-6 py-2.5 text-sm font-medium text-white dark:text-gray-900 transition-opacity disabled:opacity-40 hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] dark:bg-[var(--color-primary)] px-6 py-2.5 text-sm font-medium text-[var(--color-bg)] dark:text-[var(--color-bg)] transition-opacity disabled:opacity-40 hover:opacity-90"
         >
           <Send className="h-4 w-4" />
           {t("feedbackSubmit")}

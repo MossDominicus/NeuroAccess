@@ -3,6 +3,7 @@
 import { useLang } from "@/lib/language-context";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { privacySections } from "@/lib/legal-content";
 
 export default function PrivacyPolicy() {
   const { t, lang } = useLang();
@@ -28,9 +29,59 @@ export default function PrivacyPolicy() {
       { title: "Policy Updates", content: "We may update this privacy policy from time to time. Any changes will be posted on this page and, where necessary, notified to registered users via email." },
       { title: "Contact Us", content: "If you have any questions about this privacy policy, please contact us through the website feedback feature." },
     ],
+    ja: [
+      { title: "情報収集", content: "NeuroAccessはブラウザベースのアプリケーションです。EEGデータの前処理（フィルタリング、時間/周波数領域解析）はブラウザ内でローカルに実行されます。生データはNeuroAccessサーバーにアップロードされません。AI分析機能を使用する場合、処理されたサマリーデータがOpenRouter APIに送信されて処理されますが、あなたのID情報とは関連付けられません。" },
+      { title: "データ保存", content: "あなたのEEGデータファイル（.edfなど）は分析中のみ一時的に使用され、NeuroAccessサーバーに永久保存されることはありません。分析レポートはブラウザのローカルストレージ（localStorage）に保存され、いつでも消去できます。" },
+      { title: "Cookieの使用", content: "アニメーション再生状態を保存するためにsessionStorageを使用し、言語設定と分析レポートを保存するためにlocalStorageを使用します。トラッキングCookieやサードパーティの分析ツールは使用しません。" },
+      { title: "サードパーティサービス", content: "AI分析機能を使用する場合、処理されたEEGデータのサマリーがOpenRouter APIのサーバーに送信されて処理されます。応答はAIモデルによって生成されます。Google Analyticsやその他のトラッキングサービスは使用しません。OpenRouterのデータ処理はそのプライバシーポリシーに準拠します。" },
+      { title: "データセキュリティ", content: "あなたの情報を保護するために合理的なセキュリティ対策を講じています。ただし、インターネット通信の性質上、100%の安全性を保証することはできません。AI分析にはサードパーティのサーバーへのデータ送信が含まれます。機密データをアップロードする前に、リスクを自己評価してください。" },
+      { title: "子供のプライバシー", content: "NeuroAccessは教育プラットフォームであり、あらゆる年齢のユーザーに適しています。13歳未満の子供から個人情報を故意に収集することはありません。教育目的で子供のデータを使用する場合は、適切な同意が得られていることを確認してください。" },
+      { title: "ポリシー更新", content: "本プライバシーポリシーを随時更新する場合があります。変更は本ページに掲載され、必要に応じて登録ユーザーにメールで通知されます。" },
+      { title: "お問い合わせ", content: "本プライバシーポリシーについてご質問がある場合は、ウェブサイトのフィードバック機能を通じてお問い合わせください。" },
+    ],
+    es: [
+      { title: "Recopilación de Información", content: "NeuroAccess es una aplicación basada en navegador. El preprocesamiento de datos EEG (filtrado, análisis en dominio de tiempo/frecuencia) se realiza localmente en su navegador; los datos brutos no se cargan en los servidores de NeuroAccess. Cuando utiliza la función de análisis de IA, los datos resumidos procesados se envían a la API de OpenRouter para su procesamiento, pero no están vinculados a su identidad." },
+      { title: "Almacenamiento de Datos", content: "Sus archivos de datos EEG (.edf, etc.) solo se utilizan temporalmente durante el análisis y no se almacenan permanentemente en los servidores de NeuroAccess. Los informes de análisis se guardan en el almacenamiento local de su navegador (localStorage) y pueden borrarse en cualquier momento." },
+      { title: "Uso de Cookies", content: "Utilizamos sessionStorage para almacenar el estado de reproducción de animaciones y localStorage para almacenar sus preferencias de idioma e informes de análisis. No utilizamos cookies de seguimiento ni herramientas de análisis de terceros." },
+      { title: "Servicios de Terceros", content: "Cuando utiliza la función de análisis de IA, los resúmenes de datos EEG procesados se envían a los servidores de la API de OpenRouter para su procesamiento; las respuestas son generadas por modelos de IA. No utilizamos Google Analytics ni otros servicios de seguimiento. El procesamiento de datos de OpenRouter se rige por su política de privacidad." },
+      { title: "Seguridad de Datos", content: "Tomamos medidas de seguridad razonables para proteger su información. Sin embargo, debido a la naturaleza de la transmisión por internet, no podemos garantizar una seguridad del 100%. El análisis de IA implica enviar datos a servidores de terceros; evalúe los riesgos antes de cargar datos sensibles." },
+      { title: "Privacidad de los Niños", content: "NeuroAccess es una plataforma educativa adecuada para usuarios de todas las edades. No recopilamos intencionalmente información personal de niños menores de 13 años. Si utiliza datos de niños con fines educativos, asegúrese de haber obtenido el consentimiento apropiado." },
+      { title: "Actualizaciones de la Política", content: "Podemos actualizar esta política de privacidad de vez en cuando. Cualquier cambio se publicará en esta página y, cuando sea necesario, se notificará a los usuarios registrados por correo electrónico." },
+      { title: "Contáctenos", content: "Si tiene alguna pregunta sobre esta política de privacidad, contáctenos a través de la función de retroalimentación del sitio web." },
+    ],
+    fr: [
+      { title: "Collecte d'Informations", content: "NeuroAccess est une application basée sur navigateur. Le prétraitement des données EEG (filtrage, analyse en domaine temporel/fréquentiel) est effectué localement dans votre navigateur; les données brutes ne sont pas téléchargées sur les serveurs de NeuroAccess. Lorsque vous utilisez la fonction d'analyse IA, les données résumées traitées sont envoyées à l'API OpenRouter pour traitement, mais ne sont pas liées à votre identité." },
+      { title: "Stockage des Données", content: "Vos fichiers de données EEG (.edf, etc.) ne sont utilisés que temporairement pendant l'analyse et ne sont pas stockés en permanence sur les serveurs de NeuroAccess. Les rapports d'analyse sont enregistrés dans le stockage local de votre navigateur (localStorage) et peuvent être effacés à tout moment." },
+      { title: "Utilisation des Cookies", content: "Nous utilisons sessionStorage pour stocker l'état de lecture des animations et localStorage pour stocker vos préférences linguistiques et rapports d'analyse. Nous n'utilisons pas de cookies de suivi ni d'outils d'analyse tiers." },
+      { title: "Services Tiers", content: "Lorsque vous utilisez la fonction d'analyse IA, les résumés de données EEG traités sont envoyés aux serveurs de l'API OpenRouter pour traitement; les réponses sont générées par des modèles d'IA. Nous n'utilisons pas Google Analytics ni d'autres services de suivi. Le traitement des données par OpenRouter est régi par sa politique de confidentialité." },
+      { title: "Sécurité des Données", content: "Nous prenons des mesures de sécurité raisonnables pour protéger vos informations. Cependant, en raison de la nature de la transmission par internet, nous ne pouvons pas garantir une sécurité à 100%. L'analyse IA implique l'envoi de données à des serveurs tiers; veuillez évaluer les risques avant de télécharger des données sensibles." },
+      { title: "Confidentialité des Enfants", content: "NeuroAccess est une plateforme éducative adaptée aux utilisateurs de tous âges. Nous ne collectons pas intentionnellement d'informations personnelles auprès d'enfants de moins de 13 ans. Si vous utilisez des données d'enfants à des fins éducatives, assurez-vous d'avoir obtenu le consentement approprié." },
+      { title: "Mises à Jour de la Politique", content: "Nous pouvons mettre à jour cette politique de confidentialité de temps à autre. Toute modification sera publiée sur cette page et, si nécessaire, notifiée aux utilisateurs enregistrés par e-mail." },
+      { title: "Contactez-Nous", content: "Si vous avez des questions concernant cette politique de confidentialité, contactez-nous via la fonction de retour du site web." },
+    ],
+    de: [
+      { title: "Datenerhebung", content: "NeuroAccess ist eine browserbasierte Anwendung. Die Vorverarbeitung von EEG-Daten (Filterung, Zeit-/Frequenzbereichsanalyse) erfolgt lokal in Ihrem Browser; Rohdaten werden nicht auf NeuroAccess-Server hochgeladen. Wenn Sie die KI-Analysefunktion nutzen, werden verarbeitete Zusammenfassungsdaten zur Verarbeitung an die OpenRouter API gesendet, sind aber nicht mit Ihrer Identität verknüpft." },
+      { title: "Datenspeicherung", content: "Ihre EEG-Datendateien (.edf usw.) werden nur während der Analyse temporär verwendet und nicht dauerhaft auf NeuroAccess-Servern gespeichert. Analyseberichte werden im lokalen Speicher Ihres Browsers (localStorage) gespeichert und können jederzeit gelöscht werden." },
+      { title: "Cookie-Nutzung", content: "Wir verwenden sessionStorage zum Speichern des Animationswiedergabestatus und localStorage zum Speichern Ihrer Spracheinstellungen und Analyseberichte. Wir verwenden keine Tracking-Cookies oder Drittanbieter-Analysetools." },
+      { title: "Drittanbieterdienste", content: "Wenn Sie die KI-Analysefunktion nutzen, werden verarbeitete EEG-Datenzusammenfassungen zur Verarbeitung an OpenRouter API-Server gesendet; Antworten werden von KI-Modellen generiert. Wir verwenden kein Google Analytics oder andere Tracking-Dienste. Die Datenverarbeitung durch OpenRouter unterliegt deren Datenschutzrichtlinie." },
+      { title: "Datensicherheit", content: "Wir ergreifen angemessene Sicherheitsmaßnahmen zum Schutz Ihrer Informationen. Aufgrund der Natur der Internetübertragung können wir jedoch keine 100%ige Sicherheit garantieren. Die KI-Analyse beinhaltet das Senden von Daten an Drittanbieterserver; bitte bewerten Sie die Risiken, bevor Sie sensible Daten hochladen." },
+      { title: "Datenschutz von Kindern", content: "NeuroAccess ist eine Bildungsplattform für Nutzer aller Altersgruppen. Wir erheben nicht wissentlich personenbezogene Daten von Kindern unter 13 Jahren. Wenn Sie Kinderdaten für Bildungszwecke verwenden, stellen Sie sicher, dass eine angemessene Einwilligung vorliegt." },
+      { title: "Richtlinienaktualisierungen", content: "Wir können diese Datenschutzerklärung von Zeit zu Zeit aktualisieren. Änderungen werden auf dieser Seite veröffentlicht und gegebenenfalls registrierten Nutzern per E-Mail mitgeteilt." },
+      { title: "Kontaktieren Sie uns", content: "Wenn Sie Fragen zu dieser Datenschutzerklärung haben, kontaktieren Sie uns über die Feedback-Funktion der Website." },
+    ],
+    ko: [
+      { title: "정보 수집", content: "NeuroAccess는 브라우저 기반 애플리케이션입니다. EEG 데이터의 전처리(필터링, 시간/주파수 영역 분석)는 브라우저 내에서 로컬로 수행되며, 원본 데이터는 NeuroAccess 서버에 업로드되지 않습니다. AI 분석 기능을 사용할 때 처리된 요약 데이터는 OpenRouter API로 전송되어 처리되지만 귀하의 신원과 연결되지 않습니다." },
+      { title: "데이터 저장", content: "귀하의 EEG 데이터 파일(.edf 등)은 분석 중에만 임시로 사용되며 NeuroAccess 서버에 영구 저장되지 않습니다. 분석 보고서는 브라우저의 로컬 스토리지(localStorage)에 저장되며 언제든지 삭제할 수 있습니다." },
+      { title: "쿠키 사용", content: "애니메이션 재생 상태를 저장하기 위해 sessionStorage를 사용하고, 언어 설정과 분석 보고서를 저장하기 위해 localStorage를 사용합니다. 추적 쿠키나 제3자 분석 도구는 사용하지 않습니다." },
+      { title: "제3자 서비스", content: "AI 분석 기능을 사용할 때 처리된 EEG 데이터 요약이 OpenRouter API 서버로 전송되어 처리됩니다. 응답은 AI 모델에 의해 생성됩니다. Google Analytics나 다른 추적 서비스는 사용하지 않습니다. OpenRouter의 데이터 처리는 해당 개인정보 처리방침에 따릅니다." },
+      { title: "데이터 보안", content: "귀하의 정보를 보호하기 위해 합리적인 보안 조치를 취하고 있습니다. 그러나 인터넷 전송의 특성상 100%의 보안을 보장할 수는 없습니다. AI 분석에는 제3자 서버로 데이터를 전송하는 것이 포함되므로 민감한 데이터를 업로드하기 전에 위험을 평가하시기 바랍니다." },
+      { title: "아동 개인정보 보호", content: "NeuroAccess는 모든 연령대의 사용자에게 적합한 교육 플랫폼입니다. 13세 미만 아동의 개인정보를 고의로 수집하지 않습니다. 교육 목적으로 아동 데이터를 사용하는 경우 적절한 동의를 받았는지 확인하시기 바랍니다." },
+      { title: "정책 업데이트", content: "본 개인정보 처리방침을 수시로 업데이트할 수 있습니다. 변경 사항은 본 페이지에 게시되며 필요한 경우 등록된 사용자에게 이메일로 통지됩니다." },
+      { title: "문의하기", content: "본 개인정보 처리방침에 대해 궁금한 사항이 있으시면 웹사이트 피드백 기능을 통해 문의해 주세요." },
+    ],
   };
 
-  const content = (sections as any)[lang] || sections.en;
+  const content = (privacySections as any)[lang] || privacySections.en;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">

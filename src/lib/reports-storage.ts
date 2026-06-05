@@ -8,6 +8,7 @@ export interface StoredReport {
   quality: number;
   language?: string; // 分析时的语言
   analysis: Record<string, unknown>;
+  eegData?: any; // EEG 波形数据（前 N 秒降采样），用于报告详情页直接显示波形
 }
 
 /** 从 localStorage 读取所有报告 */
@@ -55,4 +56,13 @@ export function deleteReport(id: string): void {
 export function getReportById(id: string): StoredReport | null {
   const reports = loadReports();
   return reports.find((r) => r.id === id) || null;
+}
+
+/** 清空所有报告 */
+export function clearAllReports(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
 }

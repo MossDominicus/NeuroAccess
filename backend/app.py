@@ -4,6 +4,8 @@ NeuroAccess Backend v2.5.0
 - v2.5.0: 拆分为 utils.py / explanations.py / analysis.py
 """
 import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 import concurrent.futures
 import json
 from typing import Any, Optional, List, Dict
@@ -41,7 +43,7 @@ else:
 def save_upload(file: UploadFile) -> Dict[str, Any]:
     """保存上传文件到本地"""
     if not file or not file.filename:
-        return {"success": False, "error": "No file provided"}
+        return {"success": False, "error": "未提供文件"}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in [".edf", ".bdf", ".gdf", ".csv"]:
         return {"success": False, "error": f"Unsupported file format: {ext}"}
@@ -58,7 +60,7 @@ def save_upload(file: UploadFile) -> Dict[str, Any]:
         with open(path, "wb") as f:
             f.write(content)
     except Exception as e:
-        return {"success": False, "error": f"Failed to save file: {e}"}
+        return {"success": False, "error": f"文件保存失败: {e}"}
     return {"success": True, "path": path, "file_name": file.filename, "stored_name": stored_name, "file_size_mb": round(os.path.getsize(path)/1024/1024, 3)}
 
 
@@ -198,21 +200,22 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
         return {"success": False, "error": "Authentication required. Please login to analyze files."}
     token = auth_header.split(" ", 1)[1]
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": f"Auth module not available: {AUTH_IMPORT_ERROR}"}
+        return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
     payload = verify_token(token)
     if not payload:
-        return {"success": False, "error": "Invalid or expired token. Please login again."}
+        return {"success": False, "error": "登录凭证已过期，请重新登录"}
     user_id = int(payload["sub"])
     # ── Analysis ─────────────────────────────────────────────────
     lang = normalize_language(language)
     saved = save_upload(file)
+    file_path = saved.get("path")
     if not saved.get("success"):
         return {"success": False, "file_name": file.filename or "unknown", "error": saved.get("error", "Unknown error")}
     try:
         if analyze_edf is None:
             return {"success": False, "file_name": saved.get("file_name"), "error": f"analyze_edf not available: {ANALYSIS_IMPORT_ERROR}"}
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(analyze_edf, saved["path"], lang)
+            future = pool.submit(analyze_edf, file_path, lang)
             try:
                 raw_result = future.result(timeout=120)
             except concurrent.futures.TimeoutError:
@@ -226,6 +229,156 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
         error_detail = traceback.format_exc() if os.getenv("DEBUG") else "Enable DEBUG=1 for details"
         file_name = saved.get("file_name")
         return {"success": False, "file_name": file_name, "error": f"Internal server error: {str(e)}", "detail": error_detail if os.getenv("DEBUG") else "Enable DEBUG=1 for details"}
+    finally:
+        # 清理上传的临时文件
+        try:
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+        except:
+            pass
+
+
+# =================================================================
+# EEG Viewer API
+# =================================================================
+
+@app.post("/api/eeg/viewer")
+async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: float = Form(30.0)):
+    """
+    EEG 文件预览 API：上传 EEG 文件，返回波形数据用于前端绘图。
+    只读取前 duration 秒数据（默认30秒），避免数据过大。
+    """
+    file_path = None
+    try:
+        # ── Auth ─────────────────────────────────────────────────────
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return {"success": False, "error": "请先登录"}
+        token = auth_header.split(" ", 1)[1]
+        if not AUTH_AVAILABLE:
+            return {"success": False, "error": "认证模块不可用"}
+        payload = verify_token(token)
+        if not payload:
+            return {"success": False, "error": "登录凭证已过期，请重新登录"}
+
+        # ── Save upload ──────────────────────────────────────────────
+        saved = save_upload(file)
+        if not saved.get("success"):
+            return {"success": False, "error": saved.get("error", "文件上传失败")}
+
+        file_path = saved["path"]
+        file_name = saved.get("file_name", "unknown")
+
+        # ── Check MNE availability ───────────────────────────────────
+        try:
+            import mne
+            import numpy as np
+        except ImportError as imp_err:
+            return {"success": False, "error": f"EEG 解析模块未安装: {str(imp_err)}"}
+
+        # 读取 EEG 文件
+        ext = os.path.splitext(file_name)[1].lower()
+        raw = None
+        try:
+            if ext == ".edf":
+                raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
+            elif ext == ".bdf":
+                raw = mne.io.read_raw_bdf(file_path, preload=True, verbose=False)
+            elif ext == ".gdf":
+                raw = mne.io.read_raw_gdf(file_path, preload=True, verbose=False)
+            elif ext == ".csv":
+                # CSV: 假设第一列是时间，其余列是通道
+                import pandas as pd
+                df = pd.read_csv(file_path, nrows=int(1000 * duration))  # 最多读 duration 秒
+                time_col = df.columns[0]
+                data_cols = df.columns[1:]
+                sfreq = 1000  # 假设 1000Hz，或从文件推断
+                # 尝试从文件名或内容推断采样率
+                times = df[time_col].values
+                if len(times) > 1:
+                    inferred_sfreq = 1.0 / (times[1] - times[0]) if times[1] != times[0] else 1000
+                    sfreq = min(inferred_sfreq, 10000)
+                # 构造伪 raw 对象返回数据
+                ch_names = list(data_cols)
+                data_arr = df[data_cols].values.T  # (n_channels, n_times)
+                # 截断到 duration 秒
+                max_samples = int(sfreq * duration)
+                if data_arr.shape[1] > max_samples:
+                    data_arr = data_arr[:, :max_samples]
+                    times = times[:max_samples]
+                t_arr = np.arange(data_arr.shape[1]) / sfreq
+                return to_jsonable({
+                    "success": True,
+                    "file_name": file_name,
+                    "channel_names": ch_names,
+                    "sampling_rate": round(sfreq, 2),
+                    "duration_seconds": round(len(t_arr) / sfreq, 2),
+                    "times": t_arr.tolist()[:min(len(t_arr), 10000)],  # 最多返回10000个点
+                    "channels": {ch: data_arr[i][:min(data_arr.shape[1], 10000)].tolist() for i, ch in enumerate(ch_names)},
+                    "total_channels": len(ch_names),
+                    "total_samples": data_arr.shape[1],
+                })
+            else:
+                return {"success": False, "error": f"不支持的文件格式: {ext}"}
+        except Exception as load_err:
+            return {"success": False, "error": f"文件读取失败: {str(load_err)}"}
+
+        if raw is None:
+            return {"success": False, "error": "文件解析失败"}
+
+        # 获取基本信息
+        info = raw.info
+        ch_names = info["ch_names"]
+        sfreq = info["sfreq"]
+        total_duration = raw.times[-1] if len(raw.times) > 0 else 0
+
+        # 只取前 duration 秒数据
+        n_samples = min(int(sfreq * duration), raw.n_times)
+        start_sample = 0
+
+        # 获取数据 (n_channels, n_times)
+        data, times = raw[:]  # (n_channels, n_times) — MNE 返回单位是伏特(V)
+        data = data[:, start_sample:n_samples]
+        # 转换为微伏(μV)，前端以 μV 为单位显示波形
+        data = data * 1e6
+        times = times[start_sample:n_samples]
+
+        # 降采样：如果数据点太多，前端绘图会卡
+        max_points = 8000  # 前端绘图最多8000个点
+        if len(times) > max_points:
+            step = len(times) // max_points
+            data = data[:, ::step]
+            times = times[::step]
+
+        # 构造返回数据
+        channels_data = {}
+        for i, ch_name in enumerate(ch_names):
+            channels_data[ch_name] = data[i].tolist()
+
+        return to_jsonable({
+            "success": True,
+            "file_name": file_name,
+            "channel_names": ch_names,
+            "sampling_rate": round(sfreq, 2),
+            "duration_seconds": round(total_duration, 2),
+            "times": times.tolist(),
+            "channels": channels_data,
+            "total_channels": len(ch_names),
+            "total_samples": n_samples,
+            "view_duration": round(times[-1] - times[0], 2) if len(times) > 1 else 0,
+        })
+
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        return {"success": False, "error": f"EEG 数据处理失败: {str(e)}", "detail": error_detail}
+    finally:
+        # 清理上传的文件
+        try:
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+        except:
+            pass
 
 
 # =================================================================
@@ -235,7 +388,8 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
 try:
     from auth import (
         create_user, authenticate_user, create_access_token, verify_token, get_user_by_id,
-        generate_verification_code, verify_verification_code, update_password, get_db,
+        generate_verification_code, verify_verification_code, update_password, update_email, delete_user, get_db,
+        accept_terms, check_username_setup,
     )
     AUTH_AVAILABLE = True
 except Exception as _auth_e:
@@ -255,99 +409,227 @@ def get_current_user():
     return None  # Placeholder
 
 @app.post("/api/auth/register")
-def auth_register(username: str = Form(...), email: str = Form(...), password: str = Form(...)):
+def auth_register(username: str = Form(...), email: str = Form(...), password: str = Form(...), code: str = Form(...)):
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": f"Auth module not available: {AUTH_IMPORT_ERROR}"}
+        return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
     try:
+        # Verify registration code
+        if not verify_registration_code(email, code):
+            return {"success": False, "error": "验证码无效或已过期"}
         user = create_user(username, email, password)
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
-        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", "")}}
     except ValueError as e:
         return {"success": False, "error": str(e)}
 
 @app.post("/api/auth/login")
 def auth_login(username_or_email: str = Form(...), password: str = Form(...)):
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": f"Auth module not available: {AUTH_IMPORT_ERROR}"}
+        return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
     user = authenticate_user(username_or_email, password)
     if not user:
-        return {"success": False, "error": "Invalid credentials"}
+        return {"success": False, "error": "用户名或密码错误"}
     token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
-    return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+    terms_accepted = user.get("terms_accepted", 0)
+    needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
+    return {"success": True, "token": token, "terms_accepted": bool(terms_accepted), "needs_username_setup": needs_username_setup, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", "")}}
 
 @app.get("/api/auth/me")
 def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": "Auth module not available"}
+        return {"success": False, "error": "认证模块不可用"}
     token = credentials.credentials
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
     user = get_user_by_id(int(payload["sub"]))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", "")}}
 
 @app.post("/api/auth/logout")
 def auth_logout():
     return {"success": True, "message": "Logged out"}
 
 
+@app.post("/api/auth/accept-terms")
+def auth_accept_terms(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Mark user as having accepted terms."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "认证模块不可用"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    accepted = accept_terms(user_id)
+    if accepted:
+        return {"success": True, "message": "Terms accepted"}
+    return {"success": False, "error": "Failed to accept terms"}
 
-def send_verification_email(to_email: str, code: str) -> bool:
-    """Send verification code via Resend API. Returns True on success."""
-    resend_key = os.getenv("RESEND_API_KEY", "")
-    if not resend_key:
-        print(f"[Email] RESEND_API_KEY not configured. Code for {to_email}: {code}")
-        return False
-    
-    import json, urllib.request, urllib.error
-    url = "https://api.resend.com/emails"
-    payload = json.dumps({
-        "from": "NeuroAccess <onboarding@resend.dev>",
-        "to": [to_email],
-        "subject": "NeuroAccess - Password Change Verification Code",
-        "text": f"""Hello,
 
-You requested to change your password on NeuroAccess.
 
-Your verification code is: {code}
+def send_verification_email(to_email: str, code: str, purpose: str = "password_change") -> bool:
+    """Send verification code via SMTP (Tencent Cloud SES or Gmail fallback). Returns True on success."""
+    import os, smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
 
-This code expires in 10 minutes.
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SMTP_FROM", "")
 
-If you did not request this, please ignore this email.
+    # Determine subject and HTML body based on purpose
+    if purpose == "register":
+        subject = "NeuroAccess - 注册验证码"
+        html = f"""<html><body style="font-family: Arial, sans-serif;">
+                <h2 style="color: #3B82F6;">NeuroAccess 注册验证码</h2>
+                <p>您正在注册 NeuroAccess 账号。</p>
+                <p>您的验证码是：</p>
+                <div style="background: #f0f9ff; border: 2px solid #3B82F6; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                    <span style="font-size: 32px; font-weight: bold; color: #3B82F6; letter-spacing: 8px;">{code}</span>
+                </div>
+                <p>此验证码将于 10 分钟后过期。</p>
+                <p style="color: #666; font-size: 12px;">如非本人操作，请忽略此邮件。</p>
+            </body></html>"""
+    elif purpose == "email_change":
+        subject = "NeuroAccess - 邮箱变更验证码"
+        html = f"""<html><body style="font-family: Arial, sans-serif;">
+                <h2 style="color: #3B82F6;">NeuroAccess 邮箱变更验证码</h2>
+                <p>您正在请求变更 NeuroAccess 账号的邮箱地址。</p>
+                <p>您的验证码是：</p>
+                <div style="background: #f0f9ff; border: 2px solid #3B82F6; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                    <span style="font-size: 32px; font-weight: bold; color: #3B82F6; letter-spacing: 8px;">{code}</span>
+                </div>
+                <p>此验证码将于 10 分钟后过期。</p>
+                <p style="color: #666; font-size: 12px;">如非本人操作，请忽略此邮件。</p>
+            </body></html>"""
+    elif purpose == "delete_account":
+        subject = "NeuroAccess - 注销账号验证码"
+        html = f"""<html><body style="font-family: Arial, sans-serif;">
+                <h2 style="color: #DC2626;">NeuroAccess 注销账号验证码</h2>
+                <p>您正在请求注销 NeuroAccess 账号。<strong>此操作不可撤销！</strong></p>
+                <p>您的验证码是：</p>
+                <div style="background: #fef2f2; border: 2px solid #DC2626; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                    <span style="font-size: 32px; font-weight: bold; color: #DC2626; letter-spacing: 8px;">{code}</span>
+                </div>
+                <p>此验证码将于 10 分钟后过期。</p>
+                <p style="color: #666; font-size: 12px;">如非本人操作，请立即登录并修改密码。</p>
+            </body></html>"""
+    else:
+        subject = "NeuroAccess - 密码修改验证码"
+        html = f"""<html><body style="font-family: Arial, sans-serif;">
+                <h2 style="color: #3B82F6;">NeuroAccess 验证码</h2>
+                <p>您请求修改 NeuroAccess 账户密码。</p>
+                <p>您的验证码是：</p>
+                <div style="background: #f0f9ff; border: 2px solid #3B82F6; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                    <span style="font-size: 32px; font-weight: bold; color: #3B82F6; letter-spacing: 8px;">{code}</span>
+                </div>
+                <p>此验证码将于 10 分钟后过期。</p>
+                <p style="color: #666; font-size: 12px;">如非本人操作，请忽略此邮件。</p>
+            </body></html>"""
 
-Best regards,
-NeuroAccess Team
-"""
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {resend_key}",
-            "Content-Type": "application/json"
-        },
-        method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-            print(f"[Email] Resend success: {result}")
+    # Try SMTP first
+    if smtp_host and smtp_username and smtp_password:
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = smtp_from
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(html, "html", "utf-8"))
+
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.sendmail(smtp_from, [to_email], msg.as_string())
+            server.quit()
+            print(f"[Email] SMTP success: {to_email}")
             return True
+        except Exception as e:
+            print(f"[Email] SMTP failed: {e}")
+
+    # Fallback: print code to console (for development)
+    print(f"[Email] Would send code {code} to {to_email} (SMTP not configured)")
+    return False
+
+@app.post("/api/auth/register-verification-code")
+def auth_register_verification_code(email: str = Form(...), request: Request = None):
+    """Send verification code to email for registration. No login required. Rate limit: 1 per 60s."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "认证模块不可用"}
+    
+    # Check if email already registered
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email = ?", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return {"success": False, "error": "邮箱已被注册"}
+        cur.close()
+        conn.close()
     except Exception as e:
-        print(f"[Email] Resend failed: {e}")
-        return False
+        print(f"[DB] Error checking email: {e}")
+        return {"success": False, "error": "数据库错误"}
+    
+    # Rate limit: check last code sent within 60 seconds (from DB)
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT created_at FROM verification_codes WHERE email = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
+            (email, "register")
+        ).fetchone()
+        if row and row["created_at"]:
+            from datetime import datetime as _dt
+            last_created = _dt.fromisoformat(row["created_at"])
+            elapsed = (_dt.utcnow() - last_created).total_seconds()
+            if elapsed < 60:
+                remaining = int(60 - elapsed)
+                conn.close()
+                return {"success": False, "error": f"请等待 {remaining} 秒后再获取验证码"}
+        conn.close()
+    except Exception as e:
+        print(f"[RateLimit] Error: {e}")
+    
+    # Generate code (store in DB)
+    try:
+        code = generate_verification_code(email=email, purpose="register")
+    except Exception as e:
+        return {"success": False, "error": f"生成验证码失败: {e}"}
+    
+    # Send email
+    email_sent = send_verification_email(email, code, purpose="register")
+    result = {"success": True, "expires_in": 600}
+    if email_sent:
+        result["message"] = "Verification code sent to your email"
+    else:
+        result["message"] = "Verification code sent (email not configured)"
+        # Only return dev_code in DEBUG mode
+        if os.getenv("DEBUG") == "1":
+            result["dev_code"] = code
+    return result
+
+def verify_registration_code(email: str, code: str) -> bool:
+    """Verify registration code from DB. Returns True if valid."""
+    return verify_verification_code(email=email, code=code, purpose="register")
 
 @app.post("/api/auth/verification-code")
 def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Generate a 6-digit verification code for password change. Rate limit: 1 per minute."""
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": "Auth module not available"}
+        return {"success": False, "error": "认证模块不可用"}
     token = credentials.credentials
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
     user_id = int(payload["sub"])
     user = get_user_by_id(user_id)
     if not user:
@@ -368,7 +650,7 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
                 remaining = int(60 - elapsed)
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Please wait {remaining} seconds before requesting a new code",
+                    detail=f"请等待 {remaining} 秒后再获取验证码",
                 )
     finally:
         conn.close()
@@ -376,7 +658,15 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
     code = generate_verification_code(user_id, purpose="password_change")
     # Send email with verification code
     email_sent = send_verification_email(user["email"], code)
-    return {"success": True, "message": "Verification code sent to your email" if email_sent else "Verification code generated (email not configured, check server logs)", "expires_in": 600}
+    result = {"success": True, "expires_in": 600}
+    if email_sent:
+        result["message"] = "Verification code sent to your email"
+    else:
+        result["message"] = "Verification code generated (email not configured)"
+        # Only return dev_code in DEBUG mode
+        if os.getenv("DEBUG") == "1":
+            result["dev_code"] = code
+    return result
 
 
 @app.post("/api/auth/change-password")
@@ -387,26 +677,209 @@ def auth_change_password(
 ):
     """Change password with verification code."""
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": "Auth module not available"}
+        return {"success": False, "error": "认证模块不可用"}
     token = credentials.credentials
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
     user_id = int(payload["sub"])
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     # Verify the code
     if not verify_verification_code(user_id, verification_code, purpose="password_change"):
-        return {"success": False, "error": "Invalid or expired verification code"}
+        return {"success": False, "error": "验证码无效或已过期"}
     # Update password
     try:
         updated = update_password(user_id, new_password)
         if updated:
             return {"success": True, "message": "Password updated successfully"}
-        return {"success": False, "error": "Failed to update password"}
+        return {"success": False, "error": "密码更新失败"}
     except ValueError as e:
         return {"success": False, "error": str(e)}
+
+@app.post("/api/auth/send-email-change-code")
+def auth_send_email_change_code(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    new_email: str = Form(...),
+):
+    """Send verification code to NEW email for email change. Rate limit: 1 per 60s."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "认证模块不可用"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Check new_email format
+    import re
+    if not re.match(r"^[^@]+@[^@]+\.[^@]+$", new_email):
+        return {"success": False, "error": "邮箱格式无效"}
+    # Check new_email not already registered
+    conn = get_db()
+    try:
+        existing = conn.execute("SELECT id FROM users WHERE email = ?", (new_email,)).fetchone()
+        if existing:
+            conn.close()
+            return {"success": False, "error": "邮箱已被注册"}
+        conn.close()
+    except Exception as e:
+        conn.close()
+        return {"success": False, "error": "数据库错误"}
+
+    # Rate limit: check last unused code for this user+new_email
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT created_at FROM verification_codes WHERE user_id = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
+            (user_id, f"email_change:{new_email}"),
+        ).fetchone()
+        if row and row["created_at"]:
+            from datetime import datetime as _dt
+            last_created = _dt.fromisoformat(row["created_at"])
+            elapsed = (_dt.utcnow() - last_created).total_seconds()
+            if elapsed < 60:
+                remaining = int(60 - elapsed)
+                conn.close()
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"请等待 {remaining} 秒后再获取验证码",
+                )
+        conn.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+
+    # Generate code (use purpose = f"email_change:{new_email}" to isolate per email)
+    code = generate_verification_code(user_id, purpose=f"email_change:{new_email}")
+    # Send email to NEW email
+    email_sent = send_verification_email(new_email, code, purpose="email_change")
+    result = {"success": True, "expires_in": 600}
+    if email_sent:
+        result["message"] = "Verification code sent to new email"
+    else:
+        result["message"] = "Verification code generated (email not configured)"
+        # Only return dev_code in DEBUG mode
+        if os.getenv("DEBUG") == "1":
+            result["dev_code"] = code
+    return result
+
+
+@app.post("/api/auth/confirm-email-change")
+def auth_confirm_email_change(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    verification_code: str = Form(...),
+    new_email: str = Form(...),
+):
+    """Confirm email change with verification code."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "认证模块不可用"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Verify the code
+    if not verify_verification_code(user_id, verification_code, purpose=f"email_change:{new_email}"):
+        return {"success": False, "error": "验证码无效或已过期"}
+    # Update email
+    updated = update_email(user_id, new_email)
+    if updated:
+        updated_user = get_user_by_id(user_id)
+        return {"success": True, "message": "Email updated successfully", "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "avatar_url": updated_user.get("avatar_url", "")}}
+    return {"success": False, "error": "邮箱更新失败（可能已被注册）"}
+
+
+@app.post("/api/auth/send-delete-account-code")
+def auth_send_delete_account_code(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Send verification code to current email for account deletion. Rate limit: 1 per 60s."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "认证模块不可用"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Rate limit
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT created_at FROM verification_codes WHERE user_id = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
+            (user_id, "delete_account"),
+        ).fetchone()
+        if row and row["created_at"]:
+            from datetime import datetime as _dt
+            last_created = _dt.fromisoformat(row["created_at"])
+            elapsed = (_dt.utcnow() - last_created).total_seconds()
+            if elapsed < 60:
+                remaining = int(60 - elapsed)
+                conn.close()
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"请等待 {remaining} 秒后再获取验证码",
+                )
+        conn.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+
+    # Generate code
+    code = generate_verification_code(user_id, purpose="delete_account")
+    # Send email to current email
+    email_sent = send_verification_email(user["email"], code, purpose="delete_account")
+    result = {"success": True, "expires_in": 600}
+    if email_sent:
+        result["message"] = "Verification code sent to your email"
+    else:
+        result["message"] = "Verification code generated (email not configured)"
+        # Only return dev_code in DEBUG mode
+        if os.getenv("DEBUG") == "1":
+            result["dev_code"] = code
+    return result
+
+
+@app.post("/api/auth/confirm-delete-account")
+def auth_confirm_delete_account(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    verification_code: str = Form(...),
+):
+    """Confirm account deletion with verification code."""
+    if not AUTH_AVAILABLE:
+        return {"success": False, "error": "认证模块不可用"}
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Verify the code
+    if not verify_verification_code(user_id, verification_code, purpose="delete_account"):
+        return {"success": False, "error": "验证码无效或已过期"}
+    # Delete user and all related data
+    deleted = delete_user(user_id)
+    if deleted:
+        return {"success": True, "message": "Account deleted successfully"}
+    return {"success": False, "error": "账号删除失败"}
+
 
 @app.put("/api/auth/profile")
 async def auth_update_profile(
@@ -415,11 +888,11 @@ async def auth_update_profile(
 ):
     """Update user profile (username, avatar_url)."""
     if not AUTH_AVAILABLE:
-        return {"success": False, "error": "Auth module not available"}
+        return {"success": False, "error": "认证模块不可用"}
     token = credentials.credentials
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
     user_id = int(payload["sub"])
     user = get_user_by_id(user_id)
     if not user:

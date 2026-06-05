@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/language-context";
 import SettingsPanel from "./SettingsPanel";
 import {
+  Brain,
   LayoutDashboard,
   FileText,
   BookOpen,
   Stethoscope,
+  Activity,
   ChevronLeft,
   ChevronRight,
   Settings,
@@ -28,6 +30,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { lang, t } = useLang();
 
+  // 暴露全局方法供 TopNav 调用
+  useEffect(() => {
+    (window as any).__openSettingsPanel = () => setSettingsOpen(true);
+    return () => { delete (window as any).__openSettingsPanel; };
+  }, []);
+
   // 语言变化时重新计算菜单标签
   const menuItems = useMemo(() => {
     return menuKeys.map(item => ({
@@ -45,11 +53,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-14 flex items-center px-4 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2.5">
-          <img
-            src="/neuroaccess-logo.jpg"
-            alt="NeuroAccess"
-            className="w-8 h-8 rounded-xl object-cover"
-          />
+          <img src="/neuroaccess-logo.png" alt="NeuroAccess" className="w-8 h-8 rounded-lg object-cover" />
           {!collapsed && (
             <span className="font-bold tracking-tight text-[var(--color-text)]">NeuroAccess</span>
           )}

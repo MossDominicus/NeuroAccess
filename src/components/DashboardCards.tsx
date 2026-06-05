@@ -57,7 +57,7 @@ export default function DashboardCards({ analysisResult }: DashboardCardsProps) 
         return (
           <div
             key={i}
-            className="bg-white dark:bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300"
+            className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-10 h-10 rounded-xl ${card.bgColor} flex items-center justify-center`}>

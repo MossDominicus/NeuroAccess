@@ -17,17 +17,14 @@ const LangContext = createContext<LangContextType | undefined>(undefined);
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
 
-  // Mount 后检测：优先 localStorage，否则检测系统语言
+  // Mount 后检测：优先 localStorage，否则默认英文
   useEffect(() => {
     try {
       const saved = localStorage.getItem("neuroaccess-language");
       if (saved && LANGUAGES.includes(saved as Lang)) {
         setLangState(saved as Lang);
-      } else {
-        // 首次访问：检测系统语言
-        const sysLang = navigator.language || "en";
-        setLangState(sysLang.toLowerCase().startsWith("zh") ? "zh" : "en");
       }
+      // 无保存语言时保持默认英文，不根据系统语言自动切换
     } catch {}
   }, []);
 

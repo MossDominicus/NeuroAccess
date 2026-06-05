@@ -11,6 +11,11 @@ export default function LoginPage() {
   const { t } = useLang();
   const { login } = useAuth();
 
+  const tf = (key: string, fallback: string) => {
+    const val = t(key);
+    return val === key ? fallback : val;
+  };
+
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,12 +30,13 @@ export default function LoginPage() {
     try {
       const result = await login(usernameOrEmail, password);
       if (result.success) {
-        router.push("/");
+        // 强制整页刷新，确保 middleware 读取到新 cookie
+        window.location.href = "/";
       } else {
-        setError(result.error || "Login failed");
+        setError(result.error || "登录失败");
       }
     } catch (err: any) {
-      setError(err.message || "Network error");
+      setError(err.message || "网络错误");
     } finally {
       setSubmitting(false);
     }
@@ -40,32 +46,33 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]">
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
         <div className="text-center mb-8">
+          <img src="/neuroaccess-logo.png" alt="NeuroAccess" className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
           <h1 className="text-2xl font-bold text-[var(--color-text)]">
             NeuroAccess
           </h1>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            {t("login") || "Login"}
+            {tf("login", "登录")}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
-              {t("username") || "Username"} / {t("email") || "Email"}
+              {tf("username", "用户名")} / {tf("email", "邮箱")}
             </label>
             <input
               type="text"
               value={usernameOrEmail}
               onChange={(e) => setUsernameOrEmail(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-              placeholder={t("username") || "Username"}
+              placeholder={tf("username", "用户名")}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
-              {t("password") || "Password"}
+              {tf("password", "密码")}
             </label>
             <div className="relative">
               <input
@@ -73,7 +80,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3.5 py-2.5 pr-10 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-                placeholder={t("password") || "Password"}
+                placeholder={tf("password", "密码")}
                 required
               />
               <button
@@ -102,18 +109,18 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full py-2.5 px-4 rounded-2xl bg-[var(--color-primary)] text-[var(--color-bg)] font-semibold text-sm hover:opacity-90 disabled:opacity-40 transition-opacity"
           >
-            {submitting ? "..." : (t("loginButton") || "Login")}
+            {submitting ? "..." : tf("loginButton", "登录")}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-[var(--color-text-secondary)]">
-          {t("noAccount") || "Don't have an account?"}{" "}
+          {tf("noAccount", "没有账号？")}{" "}
           <Link href="/register" className="font-medium underline underline-offset-2 hover:opacity-70 transition-opacity">
-            {t("register") || "Register"}
+            {tf("register", "注册")}
           </Link>
         </div>
         <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
-          {t("loginHint") || "After logging in, you will be redirected automatically."}
+          {tf("loginHint", "登录后将自动跳转。")}
         </p>
       </div>
     </div>

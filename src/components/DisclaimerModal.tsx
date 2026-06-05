@@ -100,20 +100,12 @@ export default function DisclaimerModal() {
 
         {/* Footer */}
         <div className="px-6 pb-6 pt-2 flex flex-col gap-3">
-          {typeof window !== "undefined" && localStorage.getItem("neuroaccess-disclaimer-accepted") === "true" && (
-            <button
-              onClick={() => setVisible(false)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors"
-            >
-              {t("close") || "关闭"}
-            </button>
-          )}
           <button
             onClick={handleAccept}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-primary)] text-[var(--color-surface)] font-semibold text-sm hover:opacity-90 transition-opacity"
           >
             <CheckCircle className="w-4 h-4" />
-            {t("disclaimerAgree") || "我已了解并同意"}
+            {t("close") || "关闭"}
           </button>
         </div>
       </div>
