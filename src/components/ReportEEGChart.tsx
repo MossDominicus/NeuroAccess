@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLang } from "@/lib/language-context";
 import { Waves } from "lucide-react";
 
 interface ReportEEGChartProps {
   reportFileName: string;
-  eegData?: any; // 报告保存的波形数据，如有则直接显示
+  eegData?: any;
 }
 
 export default function ReportEEGChart({ reportFileName, eegData: savedEegData }: ReportEEGChartProps) {
@@ -15,6 +15,11 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
     savedEegData ? new Set(savedEegData.channel_names || []) : new Set()
   );
   const plotRef = useRef<HTMLDivElement>(null);
+  const plotlyRef = useRef<any>(null);
+  const initializedRef = useRef(false);
+  const moRef = useRef<MutationObserver | null>(null);
+  const noRef = useRef<MutationObserver | null>(null);
+  const cancelledRef = useRef(false);
 
   const toggleChannel = (ch: string) => {
     setSelectedChannels((prev) => {
@@ -25,14 +30,61 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
     });
   };
 
-  // Plotly chart rendering
-  useEffect(() => {
-    if (!savedEegData || !savedEegData.times || !savedEegData.channels || !plotRef.current)
-      return;
+  // 翻译 key 映射（大小写不敏感）
+  const getTooltipKey = useCallback((rawTitle: string): string | null => {
+    const map: Record<string, string> = {
+      pan: "plotlyPan",
+      "box select": "plotlyBoxSelect",
+      "zoom in": "plotlyZoomIn",
+      "zoom out": "plotlyZoomOut",
+      autoscale: "plotlyAutoscale",
+      "reset axes": "plotlyResetAxes",
+      "download plot as a png": "plotlyDownloadPng",
+      "toggle hover": "plotlyToggleHover",
+      "show closest data on hover": "plotlyToggleHover",
+    };
+    return map[rawTitle.toLowerCase()] ?? null;
+  }, []);
 
-    // @ts-expect-error no types for plotly.js-dist
-    import("plotly.js-dist").then((Plotly: any) => {
-      if (!plotRef.current) return;
+  // 清理所有 tooltip 相关元素，处理 data-title
+  const sanitizeToolbar = useCallback(() => {
+    if (!plotRef.current) return;
+
+    plotRef.current.querySelectorAll(".modebar-btn").forEach((btn: any) => {
+      // 1. 移除原生 title 属性（浏览器 tooltip）
+      btn.removeAttribute("title");
+
+      // 2. 翻译 data-title 为当前语言
+      const raw = btn.getAttribute("data-title") || "";
+      const key = getTooltipKey(raw);
+      if (key) {
+        const translated = t(key);
+        if (translated) {
+          btn.setAttribute("data-title", translated);
+        }
+      }
+
+      // 3. 删除 SVG <title> 元素（另一种原生 tooltip 来源）
+      btn.querySelectorAll("title").forEach((t: any) => t.remove());
+
+      // 4. 删掉 Plotly 的 tooltip div
+      btn.querySelectorAll(".modebar-tooltip").forEach((el: any) => el.remove());
+
+      // 5. 全局也清理一遍
+      document.querySelectorAll(".modebar-tooltip").forEach((el: any) => el.remove());
+    });
+  }, [t, getTooltipKey]);
+
+  // 初始化 Plotly
+  const initPlotly = useCallback(() => {
+    if (initializedRef.current || !savedEegData || !plotRef.current) return;
+    initializedRef.current = true;
+    cancelledRef.current = false;
+
+    import("plotly.js-dist" as any).then((Plotly: any) => {
+      plotlyRef.current = Plotly;
+      if (cancelledRef.current || !plotRef.current) return;
+
       const { times, channels, channel_names } = savedEegData;
       const plotData: any[] = [];
 
@@ -40,10 +92,8 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
         if (!selectedChannels.has(chName)) return;
         const chData = channels[chName];
         if (!chData) return;
-
         const offset = -idx * 100;
         const yData = chData.map((v: number) => v + offset);
-
         plotData.push({
           x: times,
           y: yData,
@@ -51,7 +101,7 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
           mode: "lines",
           name: chName,
           line: { width: 1 },
-          hovertemplate: `${t("hoverTime") || "Time"}: %{x:.2f}s<br>${t("hoverAmplitude") || "Amplitude"}: %{y:.2f}${t("hoverUnit") || "μV"}<extra></extra>`,
+          hovertemplate: `${t("hoverTime") || "Time"}: %{x:.2f}${t("timeUnitSec") || "s"}<br>${t("hoverAmplitude") || "Amplitude"}: %{y:.2f}${t("hoverUnit") || "μV"}<extra></extra>`,
         });
       });
 
@@ -71,45 +121,104 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
           font: { size: 16, color: isDark ? "#e5e7eb" : "#111827" },
         },
         xaxis: {
-          title: {
-            text: t("timeSec") || "Time (s)",
-            font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" },
-          },
+          title: { text: t("timeSec") || "Time (s)", font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
           showgrid: true,
           gridcolor: isDark ? "#374151" : "#e5e7eb",
           tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
         },
         yaxis: {
-          title: {
-            text: t("channelAxis") || "Channel",
-            font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" },
-          },
+          title: { text: t("channelAxis") || "Channel", font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
           tickmode: "array" as const,
           tickvals: yTicks,
           ticktext: yTickLabels,
           showgrid: true,
           gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
+          tickfont: { size: 11, color: isDark ? "#9ca3af" : "#6b7280" },
+          automargin: true,
         },
         plot_bgcolor: isDark ? "transparent" : "#fafafa",
         paper_bgcolor: "transparent",
-        margin: { t: 50, r: 30, l: 80, b: 50 },
+        margin: { t: 50, r: 30, l: 120, b: 50 },
         showlegend: false,
         hovermode: "closest" as const,
+        autosize: true,
         font: { color: isDark ? "#e5e7eb" : "#111827" },
       };
 
       const config = {
         responsive: true,
         displayModeBar: true,
-        modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d"],
+        displaylogo: false,
+        modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d", "toggleHover", "resetScale"],
       };
 
-      Plotly.newPlot(plotRef.current, plotData, layout, config);
-    });
-  }, [savedEegData, selectedChannels, reportFileName]);
+      // 动态高度
+      const activeChannelCount = yTickLabels.length;
+      const calculatedHeight = Math.min(1200, Math.max(500, activeChannelCount * 22 + 100));
+      if (plotRef.current) {
+        plotRef.current.style.height = `${calculatedHeight}px`;
+      }
 
-  // 没有 EEG 数据
+      Plotly.newPlot(plotRef.current, plotData, layout, config).then(() => {
+        if (cancelledRef.current || !plotRef.current) return;
+
+        // 强制 resize 确保尺寸正确
+        Plotly.Plots.resize(plotRef.current);
+
+        // 立即清理 toolbar
+        sanitizeToolbar();
+
+        // 持续监听 DOM 变化
+        const mo = new MutationObserver(() => {
+          if (cancelledRef.current) return;
+          sanitizeToolbar();
+        });
+        mo.observe(plotRef.current, { childList: true, subtree: true });
+        moRef.current = mo;
+
+        // 隐藏下载快照通知
+        const hideSnapshot = () => {
+          document.querySelectorAll('.notifier-note, .notifier-note--visible, [class*="notifier"]')
+            .forEach((el: any) => {
+              if (el.textContent?.includes('Snapshot') || el.textContent?.includes('snapshot')) {
+                el.style.display = 'none';
+              }
+            });
+        };
+        const no = new MutationObserver(hideSnapshot);
+        no.observe(document.body, { childList: true, subtree: true });
+        noRef.current = no;
+      });
+    });
+  }, [savedEegData, selectedChannels, reportFileName, t, sanitizeToolbar]);
+
+  // 主 effect：用 requestAnimationFrame 轮询直到容器可见，再初始化 Plotly
+  useEffect(() => {
+    if (!savedEegData || !savedEegData.times || !savedEegData.channels) return;
+    if (!plotRef.current) return;
+
+    cancelledRef.current = false;
+    initializedRef.current = false;
+
+    const waitForVisible = () => {
+      if (cancelledRef.current) return;
+      if (!plotRef.current) return;
+      // offsetParent === null 表示元素或父元素 display: none
+      if (plotRef.current.offsetParent !== null) {
+        initPlotly();
+      } else {
+        requestAnimationFrame(waitForVisible);
+      }
+    };
+    requestAnimationFrame(waitForVisible);
+
+    return () => {
+      cancelledRef.current = true;
+      moRef.current?.disconnect();
+      noRef.current?.disconnect();
+    };
+  }, [savedEegData, selectedChannels, initPlotly]);
+
   if (!savedEegData) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -123,7 +232,6 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
 
   return (
     <div className="space-y-6">
-      {/* File info */}
       <div className="bg-[var(--color-surface)] rounded-2xl p-6 shadow-sm border border-[var(--color-border)]">
         <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">
           {t("fileInfo") || "File info"}
@@ -143,12 +251,11 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
           </div>
           <div>
             <span className="text-[var(--color-text-secondary)]">{t("duration") || "Duration"}:</span>
-            <p className="font-medium text-[var(--color-text)]">{savedEegData.duration_seconds} s</p>
+            <p className="font-medium text-[var(--color-text)]">{savedEegData.duration_seconds} {t("timeUnitSec") || "s"}</p>
           </div>
         </div>
       </div>
 
-      {/* Channel selection */}
       <div className="bg-[var(--color-surface)] rounded-2xl p-6 shadow-sm border border-[var(--color-border)]">
         <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">{t("channelSelect") || "Select channels"}</h3>
         <div className="flex flex-wrap gap-2">
@@ -168,9 +275,8 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
         </div>
       </div>
 
-      {/* Chart */}
       <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
-        <div ref={plotRef} style={{ width: "100%", height: "600px" }} />
+        <div ref={plotRef} style={{ width: "100%", minHeight: "500px" }} />
       </div>
     </div>
   );

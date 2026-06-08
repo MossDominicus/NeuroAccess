@@ -445,7 +445,7 @@ def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     user = get_user_by_id(int(payload["sub"]))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", "")}}
+    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", ""), "terms_accepted": user.get("terms_accepted", 0)}}
 
 @app.post("/api/auth/logout")
 def auth_logout():
@@ -559,6 +559,51 @@ def send_verification_email(to_email: str, code: str, purpose: str = "password_c
     print(f"[Email] Would send code {code} to {to_email} (SMTP not configured)")
     return False
 
+def _has_active_code(conn, user_id: int = None, email: str = None, purpose_prefix: str = None) -> tuple[bool, int]:
+    """
+    Check if there's an active (unused, not expired) verification code for this user/email.
+    Returns (has_active, remaining_seconds). remaining_seconds = 0 if no active code.
+    """
+    from datetime import datetime as _dt
+    import sqlite3
+
+    if not user_id and not email:
+        return False, 0
+
+    try:
+        # Build query for any unused code for this user/email
+        if user_id:
+            row = conn.execute(
+                "SELECT created_at, expires_at FROM verification_codes WHERE user_id = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT created_at, expires_at FROM verification_codes WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
+                (email,),
+            ).fetchone()
+
+        if not row or not row["created_at"]:
+            return False, 0
+
+        last_created = _dt.fromisoformat(row["created_at"])
+        expires_at = _dt.fromisoformat(row["expires_at"])
+        now = _dt.utcnow()
+
+        # Already expired
+        if now >= expires_at:
+            return False, 0
+
+        # Within cooldown period (60 seconds)
+        elapsed = (now - last_created).total_seconds()
+        if elapsed < 60:
+            return True, int(60 - elapsed)
+
+        return False, 0
+    except Exception:
+        return False, 0
+
+
 @app.post("/api/auth/register-verification-code")
 def auth_register_verification_code(email: str = Form(...), request: Request = None):
     """Send verification code to email for registration. No login required. Rate limit: 1 per 60s."""
@@ -580,22 +625,13 @@ def auth_register_verification_code(email: str = Form(...), request: Request = N
         print(f"[DB] Error checking email: {e}")
         return {"success": False, "error": "数据库错误"}
     
-    # Rate limit: check last code sent within 60 seconds (from DB)
+    # Cross-operation mutex: no active code from any operation
     try:
         conn = get_db()
-        row = conn.execute(
-            "SELECT created_at FROM verification_codes WHERE email = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC LIMIT 1",
-            (email, "register")
-        ).fetchone()
-        if row and row["created_at"]:
-            from datetime import datetime as _dt
-            last_created = _dt.fromisoformat(row["created_at"])
-            elapsed = (_dt.utcnow() - last_created).total_seconds()
-            if elapsed < 60:
-                remaining = int(60 - elapsed)
-                conn.close()
-                return {"success": False, "error": f"请等待 {remaining} 秒后再获取验证码"}
+        has_active, remaining = _has_active_code(conn, email=email)
         conn.close()
+        if has_active:
+            return {"success": False, "error": f"已有验证码，请等待 {remaining} 秒后再试"}
     except Exception as e:
         print(f"[RateLimit] Error: {e}")
     
@@ -634,6 +670,19 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Cross-operation mutex: no active code from any operation
+    conn = get_db()
+    has_active, remaining = False, 0
+    try:
+        has_active, remaining = _has_active_code(conn, user_id=user_id)
+    finally:
+        conn.close()
+    if has_active:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"已有验证码，请等待 {remaining} 秒后再试",
+        )
 
     # Rate limit: check last unused code created within 60 seconds
     conn = get_db()
@@ -731,6 +780,19 @@ def auth_send_email_change_code(
         conn.close()
         return {"success": False, "error": "数据库错误"}
 
+    # Cross-operation mutex: no active code from any operation
+    conn = get_db()
+    has_active, remaining = False, 0
+    try:
+        has_active, remaining = _has_active_code(conn, user_id=user_id)
+    finally:
+        conn.close()
+    if has_active:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"已有验证码，请等待 {remaining} 秒后再试",
+        )
+
     # Rate limit: check last unused code for this user+new_email
     conn = get_db()
     try:
@@ -814,6 +876,19 @@ def auth_send_delete_account_code(
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Cross-operation mutex: no active code from any operation
+    conn = get_db()
+    has_active, remaining = False, 0
+    try:
+        has_active, remaining = _has_active_code(conn, user_id=user_id)
+    finally:
+        conn.close()
+    if has_active:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"已有验证码，请等待 {remaining} 秒后再试",
+        )
 
     # Rate limit
     conn = get_db()
@@ -904,7 +979,24 @@ async def auth_update_profile(
         body = {}
     username = body.get("username", "").strip()
     avatar_url = body.get("avatar_url", "").strip()
-    
+
+    # 名字校验：必须以文字开头（CJK/拉丁/希腊/西里尔/阿拉伯/泰/天城文等）
+    if username is not None and username != "":
+        # 用视觉长度（不把组合字符当 1 个）
+        import sys
+        sys.path.insert(0, "/home/ubuntu/NeuroAccess/backend")
+        from auth import _visual_length, _is_unicode_letter_start, _has_special_symbol
+        vlen = _visual_length(username)
+        if vlen < 1 or vlen > 20:
+            return {"success": False, "error": "名字长度必须在 1-20 个字符之间"}
+        if not _is_unicode_letter_start(username):
+            return {"success": False, "error": "名字开头必须是文字（不能是数字、空格、符号）"}
+        if _has_special_symbol(username):
+            return {"success": False, "error": "名字不能包含特殊符号（@#$%^&*()+=[]{}|\\;:'\"`<>/?`~!）"}
+        import re as _re
+        if _re.search(r"\s{2,}", username):
+            return {"success": False, "error": "名字中不能有连续空格"}
+
     conn = get_db()
     try:
         if username and username != user["username"]:
@@ -963,3 +1055,81 @@ Message:
     except Exception as e:
         print(f"[Feedback] Error: {e}")
         return {"success": False, "error": str(e)}
+
+
+# =================================================================
+# EEG Simulator API
+# =================================================================
+
+try:
+    from eeg_simulator import generate_synthetic_eeg, get_preset_states
+    EEG_SIMULATOR_AVAILABLE = True
+except Exception as _sim_e:
+    EEG_SIMULATOR_AVAILABLE = False
+    EEG_SIMULATOR_ERROR = str(_sim_e)
+
+@app.post("/api/eeg-simulator/generate")
+async def eeg_simulator_generate(request: Request):
+    """
+    EEG 模拟器：生成合成 EEG 信号
+    参数通过 JSON body 传递
+    """
+    try:
+        try:
+            body = await request.json()
+        except:
+            body = {}
+        
+        # 提取参数（带默认值）
+        duration_sec = float(body.get("duration_sec", 10.0))
+        sampling_rate = int(body.get("sampling_rate", 250))
+        n_channels = int(body.get("n_channels", 8))
+        alpha_power = float(body.get("alpha_power", 1.0))
+        beta_power = float(body.get("beta_power", 0.5))
+        theta_power = float(body.get("theta_power", 0.3))
+        delta_power = float(body.get("delta_power", 0.8))
+        alpha_freq = float(body.get("alpha_freq", 10.0))
+        beta_freq = float(body.get("beta_freq", 20.0))
+        theta_freq = float(body.get("theta_freq", 6.0))
+        delta_freq = float(body.get("delta_freq", 3.0))
+        noise_level = float(body.get("noise_level", 0.1))
+        artifact_blink = bool(body.get("artifact_blink", False))
+        artifact_muscle = bool(body.get("artifact_muscle", False))
+        artifact_powerline = bool(body.get("artifact_powerline", False))
+        
+        # 生成合成 EEG
+        if not EEG_SIMULATOR_AVAILABLE:
+            return {"success": False, "error": f"EEG simulator module not available: {EEG_SIMULATOR_ERROR}"}
+        
+        result = generate_synthetic_eeg(
+            duration_sec=duration_sec,
+            sampling_rate=sampling_rate,
+            n_channels=n_channels,
+            alpha_power=alpha_power,
+            beta_power=beta_power,
+            theta_power=theta_power,
+            delta_power=delta_power,
+            alpha_freq=alpha_freq,
+            beta_freq=beta_freq,
+            theta_freq=theta_freq,
+            delta_freq=delta_freq,
+            noise_level=noise_level,
+            artifact_blink=artifact_blink,
+            artifact_muscle=artifact_muscle,
+            artifact_powerline=artifact_powerline,
+        )
+        
+        return result
+        
+    except Exception as e:
+        import traceback
+        return {"success": False, "error": str(e), "detail": traceback.format_exc()}
+
+@app.get("/api/eeg-simulator/presets")
+def eeg_simulator_presets():
+    """获取预设的脑电状态（用于游戏模式）"""
+    if not EEG_SIMULATOR_AVAILABLE:
+        return {"success": False, "error": f"EEG simulator module not available: {EEG_SIMULATOR_ERROR}"}
+    
+    presets = get_preset_states()
+    return {"success": True, "presets": presets}

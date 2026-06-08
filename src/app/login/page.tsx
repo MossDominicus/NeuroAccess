@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
@@ -33,17 +34,22 @@ export default function LoginPage() {
         // 强制整页刷新，确保 middleware 读取到新 cookie
         window.location.href = "/";
       } else {
-        setError(result.error || "登录失败");
+        setError(result.error || tf("loginFailed", "登录失败"));
       }
     } catch (err: any) {
-      setError(err.message || "网络错误");
+      setError(err.message || tf("networkError", "网络错误"));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]">
+    <motion.div
+      className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
+    >
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
         <div className="text-center mb-8">
           <img src="/neuroaccess-logo.png" alt="NeuroAccess" className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
@@ -123,6 +129,6 @@ export default function LoginPage() {
           {tf("loginHint", "登录后将自动跳转。")}
         </p>
       </div>
-    </div>
+    </motion.div>
   );
 }

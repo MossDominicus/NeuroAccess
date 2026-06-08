@@ -22,7 +22,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
 
   const bandpowerData = frequencyData.average_bandpower
     ? Object.entries(frequencyData.average_bandpower).map(([band, power]) => ({
-        band: band.charAt(0).toUpperCase() + band.slice(1),
+        band: t("band" + band.charAt(0).toUpperCase() + band.slice(1)) || band.charAt(0).toUpperCase() + band.slice(1),
         power: Number((power as number).toExponential(2)),
       }))
     : [];
@@ -51,7 +51,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
             <XAxis dataKey="band" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip formatter={(value: any) => [`${value}`, t("energyLabel")]} />
-            <Legend />
+            <Legend formatter={() => t("chartLegendPower") || "Power"} />
             <Bar dataKey="power" fill="#4f46e5" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>

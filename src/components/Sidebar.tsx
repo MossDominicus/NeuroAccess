@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/language-context";
-import SettingsPanel from "./SettingsPanel";
+const SettingsPanel = dynamic(() => import("./SettingsPanel"), { ssr: false, loading: () => null });
 import {
   Brain,
   LayoutDashboard,
@@ -22,6 +23,7 @@ const menuKeys = [
   { key: "reports", href: "/reports", icon: FileText },
   { key: "sidebarGuide", href: "/guide", icon: BookOpen },
   { key: "cases", href: "/cases", icon: Stethoscope },
+  { key: "eegSimulator", href: "/eeg-simulator", icon: Activity },
 ];
 
 export default function Sidebar() {
@@ -115,7 +117,7 @@ export default function Sidebar() {
       </div>
 
       {/* 设置面板 */}
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {settingsOpen && <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />}
     </aside>
   );
 }

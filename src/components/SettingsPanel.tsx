@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
 import { Settings, Moon, Sun, Monitor, User, X, Eye, Key, MessageSquare, CheckCircle2, AlertTriangle, Cpu } from "lucide-react";
-import FeedbackPanel from "@/components/FeedbackPanel";
+const FeedbackPanel = dynamic(() => import("@/components/FeedbackPanel"), { ssr: false, loading: () => null });
 
 type SettingsPanelProps = {
   open: boolean;
@@ -94,7 +95,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--color-border)]">
               <h2 className="text-sm font-semibold flex items-center gap-2">
                 <Settings className="w-4 h-4" />
-                {t("settings") || "设置"}
+                {t("settings")}
               </h2>
               <button
                 onClick={onClose}
@@ -109,24 +110,24 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               {/* 主题 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
-                  {t("theme") || "主题"}
+                  {t("theme")}
                 </h3>
                 <div className="space-y-1">
                   <ThemeOption
                     icon={<Sun className="w-4 h-4" />}
-                    label={t("lightMode") || "浅色"}
+                    label={t("lightMode")}
                     active={theme === "light"}
                     onClick={() => setTheme("light")}
                   />
                   <ThemeOption
                     icon={<Moon className="w-4 h-4" />}
-                    label={t("darkMode") || "深色"}
+                    label={t("darkMode")}
                     active={theme === "dark"}
                     onClick={() => setTheme("dark")}
                   />
                   <ThemeOption
                     icon={<Monitor className="w-4 h-4" />}
-                    label={t("systemMode") || "跟随系统"}
+                    label={t("systemMode")}
                     active={theme === "system"}
                     onClick={() => setTheme("system")}
                   />
@@ -136,7 +137,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               {/* 语言 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
-                  {t("language") || "语言"}
+                  {t("language")}
                 </h3>
                 <div className="grid grid-cols-2 gap-1.5">
                   <LangBtn code="en" label="English" active={lang === "en"} onClick={() => setLang("en")} />
@@ -152,7 +153,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               {/* 反馈 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
-                  {t("feedback") || "反馈"}
+                  {t("feedback")}
                 </h3>
                 <div className="rounded-xl bg-[var(--color-bg)]">
                   <button
@@ -161,7 +162,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   >
                     <span className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                      {t("helpImprove") || "帮助改进 NeuroAccess"}
+                      {t("helpImprove")}
                     </span>
                     <span className="text-xs text-[var(--color-text-secondary)]">{t("clickToOpen") || "点击打开"}</span>
                   </button>
@@ -173,7 +174,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex items-start gap-3">
                   <Monitor className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-                    {t("mobileNotOptimized") || "This website is not optimized for mobile devices."}
+                    {t("mobileNotOptimized")}
                   </p>
                 </div>
               </section>
@@ -181,33 +182,33 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               {/* 关于 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
-                  {t("about") || "关于"}
+                  {t("about")}
                 </h3>
                 <div className="rounded-xl bg-[var(--color-bg)] p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[var(--color-text-secondary)]">
-                      {t("version") || "版本"}
+                      {t("version")}
                     </span>
                     <span className="text-sm font-mono text-[var(--color-text)]">v1.0.0</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[var(--color-text-secondary)]">
-                      {t("projectPositioning") || "项目定位"}
+                      {t("projectPositioning")}
                     </span>
                     <span className="text-sm text-[var(--color-text)] text-right max-w-[60%]">
-                      {t("projectDescription") || "EEG 科普教育平台"}
+                      {t("projectDescription")}
                     </span>
                   </div>
                   <div className="pt-2 border-t border-[var(--color-border)]">
                     <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                      {t("projectDescLong") || "NeuroAccess 是一个面向EEG初学者的科普教育工具，帮助理解脑电图数据的基本概念。本平台不提供医疗诊断建议。"}
+                      {t("projectDescLong")}
                     </p>
                   </div>
                 </div>
               </section>
 
-              {/* AI 状态 */}
-              {aiStatus && (
+              {/* AI 状态 — 仅未登录时显示 */}
+              {!token && aiStatus && (
                 <section>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] pt-4">
                     <div className="flex items-center gap-1.5">
@@ -245,7 +246,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowFeedback(false)} />
         <div className="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto bg-[var(--color-surface)] rounded-2xl shadow-2xl border border-[var(--color-border)]">
           <div className="sticky top-0 z-10 flex items-center justify-between px-5 h-14 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-            <h2 className="text-sm font-semibold">{t("feedback") || "反馈"}</h2>
+            <h2 className="text-sm font-semibold">{t("feedback")}</h2>
             <button onClick={() => setShowFeedback(false)} className="p-1.5 rounded-lg hover:bg-[var(--color-bg)] transition-colors">
               <X className="w-4 h-4 text-[var(--color-text-secondary)]" />
             </button>

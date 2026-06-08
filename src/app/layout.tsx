@@ -3,8 +3,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import PublicPreviewFooter from "@/components/PublicPreviewFooter";
-import DisclaimerModal from "@/components/DisclaimerModal";
-import PostLoginModals from "@/components/PostLoginModals";
+import { DisclaimerModal, PostLoginModals } from "@/components/LazyModals";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AnalysisProvider } from "@/lib/analysis-context";
@@ -26,26 +25,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.onerror = function(msg, url, line, col, error) {
-                var div = document.createElement('div');
-                div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:20px;z-index:99999;font-size:14px;font-family:monospace;white-space:pre-wrap;';
-                div.innerHTML = '客户端错误:\\n' + msg + '\\n\\n' + (error && error.stack ? error.stack : '');
-                document.body.appendChild(div);
-              };
-              window.addEventListener('error', function(e) {
-                var div = document.createElement('div');
-                div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:20px;z-index:99999;font-size:14px;font-family:monospace;white-space:pre-wrap;';
-                div.innerHTML = '客户端错误:\\n' + (e.error ? e.error.toString() : e.message) + '\\n\\n' + (e.error && e.error.stack ? e.error.stack : '');
-                document.body.appendChild(div);
-              });
-            `,
-          }}
-        />
+        {process.env.NODE_ENV === "development" && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.onerror = function(msg, url, line, col, error) {
+                  var div = document.createElement('div');
+                  div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:20px;z-index:99999;font-size:14px;font-family:monospace;white-space:pre-wrap;';
+                  div.innerHTML = 'DEV ERROR:\\n' + msg + '\\n\\n' + (error && error.stack ? error.stack : '');
+                  document.body.appendChild(div);
+                };
+              `,
+            }}
+          />
+        )}
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
         <AuthProvider>

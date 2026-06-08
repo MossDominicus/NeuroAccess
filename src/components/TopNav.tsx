@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
+import { getDisplayInitial } from "@/lib/display-initial";
 
 export default function TopNav() {
   const { t, lang } = useLang();
@@ -30,7 +31,7 @@ export default function TopNav() {
               className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
               style={{ backgroundColor: avatarColor }}
             >
-              {(user?.username || "?")[0].toUpperCase()}
+              {getDisplayInitial(user?.username || "?")}
             </div>
           </button>
         ) : (

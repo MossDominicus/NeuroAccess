@@ -1,6 +1,7 @@
 "use client";
 
 import { useLang } from "@/lib/language-context";
+import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { privacySections } from "@/lib/legal-content";
@@ -84,17 +85,22 @@ export default function PrivacyPolicy() {
   const content = (privacySections as any)[lang] || privacySections.en;
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
+    <motion.div
+      className="mx-auto max-w-3xl px-6 py-12"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+    >
       <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors">
         <ArrowLeft className="w-4 h-4" />
-        {t("backToHome") || "Back to Home"}
+        {t("backToHome")}
       </Link>
 
       <h1 className="mb-2 text-3xl font-bold text-[var(--color-text)]">
-        {t("privacyPolicy") || "Privacy Policy"}
+        {t("privacyPolicy")}
       </h1>
       <p className="mb-8 text-sm text-[var(--color-text-secondary)]">
-        {t("lastUpdatedDate") || "Last updated: May 29, 2026"}
+        {t("lastUpdatedDate")}
       </p>
 
       <div className="space-y-8">
@@ -111,8 +117,8 @@ export default function PrivacyPolicy() {
       </div>
 
       <div className="mt-12 border-t border-[var(--color-border)] pt-8 text-center text-sm text-[var(--color-text-secondary)]">
-        <p>NeuroAccess &copy; 2026. {(t("allRightsReserved") || "All rights reserved.")}</p>
+        <p>NeuroAccess &copy; 2026. {t("allRightsReserved")}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

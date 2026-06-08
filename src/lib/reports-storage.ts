@@ -11,7 +11,7 @@ export interface StoredReport {
   eegData?: any; // EEG 波形数据（前 N 秒降采样），用于报告详情页直接显示波形
 }
 
-/** 从 localStorage 读取所有报告 */
+/** 从 localStorage 读取所有报告（不包含 eegData 波形以减小体积） */
 export function loadReports(): StoredReport[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -24,9 +24,21 @@ export function loadReports(): StoredReport[] {
   }
 }
 
+/** 缓存，避免重复 parse */
+let _cache: StoredReport[] | null = null;
+function getCached(): StoredReport[] {
+  if (_cache) return _cache;
+  _cache = loadReports();
+  return _cache;
+}
+function invalidate() {
+  _cache = null;
+}
+
 /** 保存整组报告到 localStorage */
 export function saveReports(reports: StoredReport[]): void {
   try {
+    _cache = reports;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   } catch {
     // localStorage 满或不可用时忽略
@@ -35,7 +47,7 @@ export function saveReports(reports: StoredReport[]): void {
 
 /** 新增一条报告 */
 export function addReport(report: StoredReport): void {
-  const reports = loadReports();
+  const reports = getCached();
   // 如果已存在相同 id，替换
   const idx = reports.findIndex((r) => r.id === report.id);
   if (idx >= 0) {
@@ -48,14 +60,19 @@ export function addReport(report: StoredReport): void {
 
 /** 删除一条报告 */
 export function deleteReport(id: string): void {
-  const reports = loadReports();
+  const reports = getCached();
   saveReports(reports.filter((r) => r.id !== id));
 }
 
 /** 根据 ID 获取单条报告 */
 export function getReportById(id: string): StoredReport | null {
-  const reports = loadReports();
+  const reports = getCached();
   return reports.find((r) => r.id === id) || null;
+}
+
+/** 跨标签页同步时清除缓存 */
+export function clearReportsCache() {
+  invalidate();
 }
 
 /** 清空所有报告 */

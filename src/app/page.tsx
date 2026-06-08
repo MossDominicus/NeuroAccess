@@ -1,11 +1,13 @@
 "use client";
+export const dynamicPage = "force-dynamic";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import nextDynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useAnalysis } from "@//lib/analysis-context";
-import IntroAnimation from "@/components/IntroAnimation";
+const IntroAnimation = nextDynamic(() => import("@/components/IntroAnimation"), { ssr: false, loading: () => null });
 import {
   UploadCloud,
   FileText,
@@ -383,6 +385,8 @@ export default function DashboardPage() {
     failed:     files.filter((f: any) => f.status === "failed").length,
     processing:  files.filter((f: any) => f.status === "analyzing").length,
   };
+  // 分析进行中 = 正在运行且未暂停（暂停后可以继续上传文件）
+  const hasActiveAnalysis = running && !paused;
 
   return (
     <motion.div
@@ -394,24 +398,26 @@ export default function DashboardPage() {
       {/* EEG Analysis Panel */}
       <div className="space-y-6">
         {/* Upload area */}
-        <div
-          className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] cursor-pointer"
-          onDragOver={(e) => { e.preventDefault(); }}
-          onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
-          onClick={() => inputRef.current?.click()}
-        >
-          <UploadCloud className="mx-auto mb-4 h-10 w-10 text-[var(--color-text-secondary)]" />
-          <p className="text-sm font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".edf,.bdf,.gdf,.csv"
-            multiple
-            className="hidden"
-            onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
-          />
-        </div>
+        {!hasActiveAnalysis && (
+          <div
+            className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] cursor-pointer"
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
+            onClick={() => inputRef.current?.click()}
+          >
+            <UploadCloud className="mx-auto mb-4 h-10 w-10 text-[var(--color-text-secondary)]" />
+            <p className="text-sm font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".edf,.bdf,.gdf,.csv"
+              multiple
+              className="hidden"
+              onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
+            />
+          </div>
+        )}
 
         {/* File list */}
         {files.length > 0 && (

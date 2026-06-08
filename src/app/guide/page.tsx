@@ -13,12 +13,12 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
     {
       id: "alpha", category: "brainwaves", icon: "α", iconColor: "#059669",
       title: t("guideAlphaTitle"),
-      frequency: "8 – 12 Hz",
+      frequency: t("guideAlphaFrequency"),
       description: t("guideAlphaDesc"),
       details: {
         what: t("guideAlphaWhat"),
         why: t("guideAlphaWhy"),
-        ranges: "8 – 12 Hz, occipital dominant",
+        ranges: t("guideAlphaRanges"),
         pattern: t("guideAlphaPattern"),
         cannotTell: t("guideAlphaCannotTell"),
       }
@@ -26,36 +26,36 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
     {
       id: "beta", category: "brainwaves", icon: "β", iconColor: "#2563eb",
       title: t("guideBetaTitle"),
-      frequency: "12 – 30 Hz",
+      frequency: t("guideBetaFrequency"),
       description: t("guideBetaDesc"),
       details: {
         what: t("guideBetaWhat"),
         why: t("guideBetaWhy"),
-        ranges: "12 – 30 Hz, frontocentral dominant",
+        ranges: t("guideBetaRanges"),
         cannotTell: t("guideBetaCannotTell"),
       }
     },
     {
       id: "theta", category: "brainwaves", icon: "θ", iconColor: "#7c3aed",
       title: t("guideThetaTitle"),
-      frequency: "4 – 8 Hz",
+      frequency: t("guideThetaFrequency"),
       description: t("guideThetaDesc"),
       details: {
         what: t("guideThetaWhat"),
         why: t("guideThetaWhy"),
-        ranges: "4 – 8 Hz, frontotemporal dominant",
+        ranges: t("guideThetaRanges"),
         cannotTell: t("guideThetaCannotTell"),
       }
     },
     {
       id: "delta", category: "brainwaves", icon: "δ", iconColor: "#dc2626",
       title: t("guideDeltaTitle"),
-      frequency: "0.5 – 4 Hz",
+      frequency: t("guideDeltaFrequency"),
       description: t("guideDeltaDesc"),
       details: {
         what: t("guideDeltaWhat"),
         why: t("guideDeltaWhy"),
-        ranges: "0.5 – 4 Hz, widespread",
+        ranges: t("guideDeltaRanges"),
         cannotTell: t("guideDeltaCannotTell"),
       }
     },
@@ -76,7 +76,7 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
       details: {
         what: t("guideChannelsWhat"),
         why: t("guideChannelsWhy"),
-        ranges: "Standard: 19–21 (clinical), 32–256 (research)",
+        ranges: t("guideChannelsRanges"),
         cannotTell: t("guideChannelsCannotTell"),
       }
     },
@@ -87,7 +87,7 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
       details: {
         what: t("guideSamplingWhat"),
         why: t("guideSamplingWhy"),
-        ranges: "Clinical: 128–256 Hz; Research: 250–1000+ Hz",
+        ranges: t("guideSamplingRanges"),
         cannotTell: t("guideSamplingCannotTell"),
       }
     },
@@ -108,7 +108,7 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
       details: {
         what: t("guidePsdWhat"),
         why: t("guidePsdWhy"),
-        ranges: "Typical resolution: 0.5–2 Hz bins, analyzed 0.5–40 Hz",
+        ranges: t("guidePsdRanges"),
         cannotTell: t("guidePsdCannotTell"),
       }
     },
@@ -119,7 +119,7 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
       details: {
         what: t("guideBandpowerWhat"),
         why: t("guideBandpowerWhy"),
-        ranges: "Delta: 0.5–4 Hz; Theta: 4–8 Hz; Alpha: 8–12 Hz; Beta: 12–30 Hz",
+        ranges: t("guideBandpowerRanges"),
         cannotTell: t("guideBandpowerCannotTell"),
       }
     },

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
@@ -29,14 +30,20 @@ export default function RegisterPage() {
 
   const handleSendCode = async () => {
     if (!email || countdown > 0) return;
+    setError("");
     try {
       const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/register-verification-code`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ email }),
       });
-      const data = await resp.json();
-      if (data.success) {
+      let data: any;
+      try {
+        data = await resp.json();
+      } catch {
+        data = { detail: tf("sendCodeFailed", "验证码发送失败") };
+      }
+      if (resp.ok && data.success) {
         setCountdown(60);
         const timer = setInterval(() => {
           setCountdown(prev => {
@@ -44,15 +51,14 @@ export default function RegisterPage() {
             return prev - 1;
           });
         }, 1000);
-        // Show dev_code if present (development mode)
         if (data.dev_code) {
           alert(`开发模式：验证码是 ${data.dev_code}`);
         }
       } else {
-        setError(data.error || "验证码发送失败");
+        setError(data.detail || data.error || tf("sendCodeFailed", "验证码发送失败"));
       }
     } catch (err: any) {
-      setError(err.message || "网络错误");
+      setError(err.message || tf("networkError", "网络错误"));
     }
   };
 
@@ -72,17 +78,22 @@ export default function RegisterPage() {
       if (result.success) {
         window.location.href = "/";
       } else {
-        setError(result.error || "注册失败");
+        setError(result.error || tf("registerFailed", "注册失败"));
       }
     } catch (err: any) {
-      setError(err.message || "网络错误");
+      setError(err.message || tf("networkError", "网络错误"));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]">
+    <motion.div
+      className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
+    >
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
         <div className="text-center mb-8">
           <img src="/neuroaccess-logo.png" alt="NeuroAccess" className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
@@ -102,12 +113,42 @@ export default function RegisterPage() {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "") {
+                  setUsername(v);
+                  setError(tf("usernameRequired", "请填写用户名"));
+                  return;
+                }
+                // 第一个字符必须是文字
+                const firstChar = Array.from(v)[0] || "";
+                const isLetterStart = /^\p{L}/u.test(firstChar);
+                if (!isLetterStart) {
+                  setError(tf("usernameMustStartWithLetter", "名字开头必须是文字"));
+                  return;
+                }
+                // 禁止特殊符号（允许字母/数字/空格/中日韩/emoji/下划线/连字符）
+                if (/[!@#$%^&*()+\=\[\]{}|\\;:'"`/<>?~.,。]/.test(v)) {
+                  setError(tf("usernameNoSpecialChars", "名字不能包含特殊符号"));
+                  return;
+                }
+                if (/\s{2,}/.test(v)) {
+                  setError(tf("noConsecutiveSpaces", "名字中不能有连续空格"));
+                  return;
+                }
+                const vlen = Array.from(v).filter(ch => !/[\u0300-\u036f\u0483-\u0489]/.test(ch)).length;
+                if (vlen >= 1 && vlen <= 20) {
+                  setError("");
+                } else if (vlen > 20) {
+                  setError(tf("usernameTooLong", "名字最多 20 个字符"));
+                }
+                setUsername(v);
+              }}
               className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
               placeholder={tf("username", "用户名")}
               required
-              minLength={3}
-              maxLength={30}
+              minLength={1}
+              maxLength={20}
             />
           </div>
 
@@ -229,6 +270,6 @@ export default function RegisterPage() {
           </Link>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

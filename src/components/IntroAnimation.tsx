@@ -129,7 +129,7 @@ export default function IntroAnimation({ onComplete }: { onComplete: () => void 
         style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? "translateY(0)" : "translateY(8px)", transition: "all 0.5s 0.1s cubic-bezier(0.16,1,0.3,1)" }}>NeuroAccess</h1>
 
       <p className="mt-1 text-xs tracking-[0.2em] uppercase text-[#6b7280]"
-        style={{ opacity: phase >= 2 ? 1 : 0, transition: "opacity 0.5s 0.2s ease-out" }}>EEG Analysis Platform</p>
+        style={{ opacity: phase >= 2 ? 1 : 0, transition: "opacity 0.5s 0.2s ease-out" }}>{t("eegAnalysisPlatformSubtitle") || "EEG Analysis Platform"}</p>
 
       <div className="mt-10 w-full max-w-lg px-6"
         style={{ opacity: phase >= 1 ? 1 : 0, transition: "opacity 0.3s ease-out" }}>

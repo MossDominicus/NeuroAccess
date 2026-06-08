@@ -87,7 +87,7 @@ export function useAnalysis() {
 
 // ── Provider ────────────────────────────────────────────────────────
 export function AnalysisProvider({ children }: { children: ReactNode }) {
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const [files, setFiles] = useState<FileJob[]>([]);
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -218,7 +218,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
               body: formData,
             });
 
-            if (!data.success) throw new Error(data.error || "Analysis failed");
+            if (!data.success) throw new Error(data.error || t("analysisFailed") || "Analysis failed");
 
             // 检查本轮次是否已失效（fetch 期间被 pause/resume）
             if (runIdRef.current !== myRunId) {

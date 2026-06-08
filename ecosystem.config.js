@@ -19,6 +19,11 @@ module.exports = {
       env: {
         OPENROUTER_API_KEY: "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",
         OPENROUTER_MODEL: "qwen/qwen-2.5-7b-instruct",
+        SMTP_HOST: "smtp.gmail.com",
+        SMTP_PORT: "587",
+        SMTP_USERNAME: "neuroaccess2026@gmail.com",
+        SMTP_PASSWORD: "wjvajfrzybhpmfyde",
+        SMTP_FROM: "neuroaccess2026@gmail.com",
       },
     },
   ],

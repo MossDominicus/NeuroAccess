@@ -131,7 +131,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
 
     } catch (err: any) {
       console.error("HTML export failed:", err);
-      alert(t("htmlExportFailed") + (err?.message || "Unknown error"));
+      alert(t("htmlExportFailed") + (err?.message || t("unknownError")));
     } finally {
       setExporting(false);
     }
@@ -181,7 +181,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           <h2 className="text-base font-bold text-[var(--color-text)]">{t("eegOverview")}</h2>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <OverviewItem label={t("fileName")} value={overview.file_name || report.fileName} />
+          <OverviewItem label={t("fileName")} value={report.fileName || overview.file_name} />
           <OverviewItem label={t("duration")} value={overview.duration || "-"} />
           <OverviewItem label={t("samplingRate")} value={overview.sampling_rate ? `${overview.sampling_rate} Hz` : "-"} />
           <OverviewItem label={t("channelCount")} value={overview.channel_count || "-"} />
@@ -212,20 +212,20 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           />
           <QualityItem
             icon={XCircle}
-            label={t("clipping") || "Clipping"}
-            value={(signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected ? t("yes") || "Yes" : t("no") || "No"}
+            label={t("clipping")}
+            value={(signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected ? t("yes") : t("no")}
             color={(signalQuality as any)?.clipping_detected ? "text-red-600" : "text-emerald-600"}
           />
           <QualityItem
             icon={Eye}
-            label={t("blinkArtifacts") || "Blink Artifacts"}
+            label={t("blinkArtifacts")}
             value={((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0}
             color="text-amber-600"
           />
           <QualityItem
             icon={Radio}
-            label={t("highFreqNoise") || "High Freq Noise"}
-            value={(signalQuality as any)?.high_frequency_noise || (analysis as any).high_frequency_noise ? t("yes") || "Yes" : t("no") || "No"}
+            label={t("highFreqNoise")}
+            value={(signalQuality as any)?.high_frequency_noise || (analysis as any).high_frequency_noise ? t("yes") : t("no")}
             color={(signalQuality as any)?.high_frequency_noise ? "text-red-600" : "text-emerald-600"}
           />
         </div>
@@ -243,14 +243,14 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         {Object.keys(bandpowerPercent).length > 0 && (
           <div className="mb-6 grid grid-cols-4 gap-3">
             {[
-              { key: "delta", label: "δ Delta", color: "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400" },
-              { key: "theta", label: "θ Theta", color: "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400" },
-              { key: "alpha", label: "α Alpha", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
-              { key: "beta", label: "β Beta", color: "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400" },
-            ].map(({ key, label, color }) => (
+              { key: "delta", bandKey: "bandDelta", color: "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400" },
+              { key: "theta", bandKey: "bandTheta", color: "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400" },
+              { key: "alpha", bandKey: "bandAlpha", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
+              { key: "beta", bandKey: "bandBeta", color: "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400" },
+            ].map(({ key, bandKey, color }) => (
               <div key={key} className={`rounded-xl px-4 py-3 text-center ${color}`}>
                 <div className="text-lg font-bold">{(bandpowerPercent as any)[key] || "0%"}</div>
-                <div className="text-[10px] font-medium uppercase tracking-wider">{label}</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider">{t(bandKey)}</div>
               </div>
             ))}
           </div>
@@ -345,7 +345,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             </h2>
           </div>
           <p className="mb-3 text-sm text-red-700/80 dark:text-red-400/80">
-            {t("platformCannotDetermine") || "This platform cannot determine:"}
+            {t("platformCannotDetermine")}
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {cannotTellList.map((item: string, i: number) => (

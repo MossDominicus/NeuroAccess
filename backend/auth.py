@@ -115,10 +115,66 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _has_special_symbol(s: str) -> bool:
+    """检查字符串是否包含特殊符号
+    允许：字母/数字/空格/中日韩/emoji/下划线/连字符
+    禁止：.@#$%^&*()+=[]{}|\;:'"`<>/?`~!,。
+    """
+    import re as _re
+    return bool(_re.search(r"[!@#$%^&*()+\=\[\]{}|\\;:'\"`/<>?~.,。]", s))
+
+
+def _visual_length(s: str) -> int:
+    """计算字符串的视觉长度（CJK/emoji 算 1，组合字符不算）。
+    用 unicodedata.east_asian_width 判断，W/F（全角）= 2, 其他 = 1
+    但我们这里想要"几个字"的简单感觉，所以简化：code point 数
+    """
+    import unicodedata
+    count = 0
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        cat = unicodedata.category(ch)
+        # Skip combining marks (Mn, Mc, Me) for purposes of length counting
+        if cat in ("Mn", "Mc", "Me"):
+            i += 1
+            continue
+        # 简化：每个字符（包括 emoji）算 1 个字符长度
+        count += 1
+        i += 1
+    return count
+
+
+def _is_unicode_letter_start(s: str) -> bool:
+    """判断字符串首字符是否为 Unicode 字母（支持 CJK/拉丁/希腊/西里尔/阿拉伯/泰/天城文等所有语言的字母）
+    Python re 模块不支持 \p{L}，所以用 unicodedata.category 判断
+    """
+    if not s:
+        return False
+    ch = s[0]
+    import unicodedata
+    cat = unicodedata.category(ch)
+    # Lu = 大写字母, Ll = 小写字母, Lt = 标题字母, Lm = 修饰字母, Lo = 其他字母（含 CJK/希腊/西里尔/泰/天城文/阿拉伯等）
+    return cat.startswith("L")
+
+
 def create_user(username: str, email: str, password: str) -> Dict[str, Any]:
     """Create a new user. Returns user dict or raises ValueError."""
-    if len(username) < 3 or len(username) > 30:
-        raise ValueError("Username must be 3-30 characters")
+    if not username or not username.strip():
+        raise ValueError("请填写用户名")
+    username = username.strip()
+    vlen = _visual_length(username)
+    if vlen < 1 or vlen > 20:
+        raise ValueError("Username must be 1-20 characters")
+    # 名字必须以文字开头（Unicode 字母：CJK/拉丁/希腊/西里尔/阿拉伯/泰/天城文等）
+    if not _is_unicode_letter_start(username):
+        raise ValueError("名字开头必须是文字（不能是数字、空格、符号）")
+    # 禁止特殊符号（数字/字母/空格/CJK/emoji/下划线/连字符/点/逗号 都允许）
+    if _has_special_symbol(username):
+        raise ValueError("名字不能包含特殊符号（@#$%^&*()+=[]{}|\\;:'\"`<>/?`~!）")
+    import re as _re
+    if _re.search(r"\s{2,}", username):
+        raise ValueError("名字中不能有连续空格")
     if len(password) < 6:
         raise ValueError("Password must be at least 6 characters")
     if "@" not in email or "." not in email:
@@ -153,14 +209,14 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
     try:
         # Try username first
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, password_hash, created_at FROM users WHERE username = ?",
+            "SELECT id, username, email, avatar_url, password_hash, created_at, terms_accepted FROM users WHERE username = ?",
             (username_or_email,),
         ).fetchone()
 
         # If not found, try email
         if row is None:
             row = conn.execute(
-                "SELECT id, username, email, avatar_url, password_hash, created_at FROM users WHERE email = ?",
+                "SELECT id, username, email, avatar_url, password_hash, created_at, terms_accepted FROM users WHERE email = ?",
                 (username_or_email,),
             ).fetchone()
 
@@ -176,6 +232,7 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
             "email": row["email"],
             "avatar_url": row["avatar_url"] or "",
             "created_at": row["created_at"],
+            "terms_accepted": row["terms_accepted"],
         }
     finally:
         conn.close()
@@ -186,7 +243,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, created_at FROM users WHERE id = ?",
+            "SELECT id, username, email, avatar_url, created_at, terms_accepted FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
         if row:
@@ -231,47 +288,59 @@ def verify_verification_code(user_id: Optional[int] = None, email: Optional[str]
     """
     conn = get_db()
     try:
-        if user_id:
-            row = conn.execute(
-                "SELECT id, expires_at, attempts FROM verification_codes WHERE user_id = ? AND code = ? AND purpose = ? AND used = 0",
-                (user_id, code, purpose),
-            ).fetchone()
-        elif email:
-            row = conn.execute(
-                "SELECT id, expires_at, attempts FROM verification_codes WHERE email = ? AND code = ? AND purpose = ? AND used = 0",
-                (email, code, purpose),
-            ).fetchone()
-        else:
-            return False
-        
-        if not row:
-            # Code not found - increment attempts for existing codes with same purpose
+        # 兼容 expires_at 同时为 'YYYY-MM-DDTHH:MM:SS' (naive ISO) 和 'YYYY-MM-DD HH:MM:SS' (SQLite CURRENT_TIMESTAMP) 两种格式
+        def _parse_expires(s: str) -> datetime:
+            try:
+                return datetime.fromisoformat(s)
+            except ValueError:
+                return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+
+        def _all_active_codes() -> list:
+            """返回该 user/email + purpose 下所有未过期的有效验证码（按 created_at 倒序）"""
+            if user_id:
+                rows = conn.execute(
+                    "SELECT id, code, expires_at, attempts FROM verification_codes WHERE user_id = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC",
+                    (user_id, purpose),
+                ).fetchall()
+            elif email:
+                rows = conn.execute(
+                    "SELECT id, code, expires_at, attempts FROM verification_codes WHERE email = ? AND purpose = ? AND used = 0 ORDER BY created_at DESC",
+                    (email, purpose),
+                ).fetchall()
+            else:
+                return []
+            return [r for r in rows if _parse_expires(r["expires_at"]) > datetime.utcnow()]
+
+        # 1) 检查整个 purpose 下未过期且未使用次数超限的验证码，是否因为 attempts 已经被超限标记
+        active = _all_active_codes()
+        if not active:
+            return False  # 全部过期或无验证码
+
+        # 2) 找到匹配的 code
+        matched = next((r for r in active if r["code"] == code), None)
+        if not matched:
+            # Code not found - increment attempts for all active codes
             if user_id:
                 conn.execute(
                     "UPDATE verification_codes SET attempts = attempts + 1 WHERE user_id = ? AND purpose = ? AND used = 0",
-                    (user_id, purpose)
+                    (user_id, purpose),
                 )
             elif email:
                 conn.execute(
                     "UPDATE verification_codes SET attempts = attempts + 1 WHERE email = ? AND purpose = ? AND used = 0",
-                    (email, purpose)
+                    (email, purpose),
                 )
             conn.commit()
             return False
-        
-        # Check attempts
-        if row["attempts"] >= 3:
-            conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
+
+        # 3) 如果匹配的 code 已经超限
+        if matched["attempts"] >= 3:
+            conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (matched["id"],))
             conn.commit()
             return False
-        
-        # Check expiry
-        expires = datetime.fromisoformat(row["expires_at"])
-        if datetime.utcnow() > expires:
-            return False
-        
-        # Mark as used
-        conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
+
+        # 4) 标记使用
+        conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (matched["id"],))
         conn.commit()
         return True
     finally:

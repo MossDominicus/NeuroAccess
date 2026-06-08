@@ -138,10 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (data: { username?: string; avatar_url?: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: "未登录" };
+    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
-      const resp = await fetch(`${API_BASE}/api/auth/update-profile`, {
-        method: "POST",
+      const resp = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -155,14 +155,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("neuroaccess-user", JSON.stringify(updatedUser));
         return { success: true };
       }
-      return { success: false, error: result.error || "更新失败" };
+      return { success: false, error: result.error || tf("failedToUpdateProfile", "更新失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || "网络错误" };
+      return { success: false, error: e.message || tf("networkError", "网络错误") };
     }
   };
 
   const changePassword = async (data: { verification_code: string; new_password: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: "未登录" };
+    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: "POST",
@@ -179,14 +179,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || "修改失败" };
+      return { success: false, error: result.error || tf("failedToChangePassword", "修改失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || "网络错误" };
+      return { success: false, error: e.message || tf("networkError", "网络错误") };
     }
   };
 
   const sendVerificationCode = async (data: { email?: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: "未登录" };
+    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/verification-code`, {
         method: "POST",
@@ -194,18 +194,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           Authorization: `Bearer ${token}`,
         },
       });
-      const result = await resp.json();
+      let result: any;
+      try {
+        result = await resp.json();
+      } catch {
+        result = { detail: tf("sendCodeFailed", "验证码发送失败") };
+      }
+      if (!resp.ok) {
+        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "验证码发送失败") };
+      }
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || "发送失败" };
+      return { success: false, error: result.error || tf("sendFailed", "发送失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || "网络错误" };
+      return { success: false, error: e.message || tf("networkError", "网络错误") };
     }
   };
 
   const updateEmail = async (data: { new_email: string; verification_code: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: "未登录" };
+    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/confirm-email-change`, {
         method: "POST",
@@ -227,14 +235,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return { success: true };
       }
-      return { success: false, error: result.error || "修改失败" };
+      return { success: false, error: result.error || tf("failedToChangePassword", "修改失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || "网络错误" };
+      return { success: false, error: e.message || tf("networkError", "网络错误") };
     }
   };
 
   const sendDeleteAccountCode = async (): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: "未登录" };
+    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/send-delete-account-code`, {
         method: "POST",
@@ -242,18 +250,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           Authorization: `Bearer ${token}`,
         },
       });
-      const result = await resp.json();
+      let result: any;
+      try {
+        result = await resp.json();
+      } catch {
+        result = { detail: tf("sendCodeFailed", "验证码发送失败") };
+      }
+      if (!resp.ok) {
+        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "验证码发送失败") };
+      }
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || "发送失败" };
+      return { success: false, error: result.error || tf("sendFailed", "发送失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || "网络错误" };
+      return { success: false, error: e.message || tf("networkError", "网络错误") };
     }
   };
 
   const deleteAccount = async (data: { verification_code: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: "未登录" };
+    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/confirm-delete-account`, {
         method: "POST",
@@ -277,9 +293,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("neuroaccess-terms-accepted");
         return { success: true };
       }
-      return { success: false, error: result.error || "删除失败" };
+      return { success: false, error: result.error || tf("deleteAccountFailed", "删除失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || "网络错误" };
+      return { success: false, error: e.message || tf("networkError", "网络错误") };
     }
   };
 

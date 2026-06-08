@@ -5,6 +5,98 @@ import { getText, Lang } from "@/lib/translations";
 
 const LANGUAGES: Lang[] = ["zh", "en", "es", "fr", "de", "ja", "ko"];
 
+// 支持的语言变体映射表
+// 键：浏览器语言代码（含变体），值：网站支持的语言代码
+const LANGUAGE_ALIASES: Record<string, Lang> = {
+  // 中文变体
+  "zh": "zh",
+  "zh-CN": "zh",
+  "zh-TW": "zh",
+  "zh-HK": "zh",
+  "zh-SG": "zh",
+  "zh-Hans": "zh",
+  "zh-Hant": "zh",
+  // 英文变体
+  "en": "en",
+  "en-US": "en",
+  "en-GB": "en",
+  "en-AU": "en",
+  "en-CA": "en",
+  "en-NZ": "en",
+  "en-IE": "en",
+  "en-ZA": "en",
+  "en-IN": "en",
+  // 西班牙文变体
+  "es": "es",
+  "es-ES": "es",
+  "es-MX": "es",
+  "es-AR": "es",
+  "es-CO": "es",
+  "es-CL": "es",
+  "es-PE": "es",
+  "es-VE": "es",
+  // 法文变体
+  "fr": "fr",
+  "fr-FR": "fr",
+  "fr-CA": "fr",
+  "fr-BE": "fr",
+  "fr-CH": "fr",
+  "fr-LU": "fr",
+  // 德文变体
+  "de": "de",
+  "de-DE": "de",
+  "de-AT": "de",
+  "de-CH": "de",
+  "de-LU": "de",
+  // 日文变体
+  "ja": "ja",
+  "ja-JP": "ja",
+  // 韩文变体
+  "ko": "ko",
+  "ko-KR": "ko",
+};
+
+/**
+ * 检测用户系统语言并匹配网站支持的语言
+ * 优先使用 navigator.languages，fallback 到 navigator.language
+ * 返回匹配的语言代码，如果不支持则返回 'en'
+ */
+function detectSystemLanguage(): Lang {
+  if (typeof navigator === "undefined") return "en";
+
+  // 收集浏览器语言列表（去重保序）
+  const browserLangs: string[] = [];
+  if (navigator.languages && navigator.languages.length > 0) {
+    browserLangs.push(...navigator.languages);
+  }
+  if (navigator.language) {
+    browserLangs.push(navigator.language);
+  }
+  const seen = new Set<string>();
+  const uniqueLangs: string[] = [];
+  for (const lang of browserLangs) {
+    const normalized = lang.trim();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueLangs.push(normalized);
+    }
+  }
+
+  for (const lang of uniqueLangs) {
+    // 1. 精确匹配（含变体如 zh-CN）
+    const exactMatch = LANGUAGE_ALIASES[lang];
+    if (exactMatch) return exactMatch;
+
+    // 2. 主语言代码匹配（zh-CN → zh）
+    const mainCode = lang.split("-")[0].split("_")[0].toLowerCase();
+    const mainMatch = LANGUAGE_ALIASES[mainCode];
+    if (mainMatch) return mainMatch;
+  }
+
+  // 无匹配，默认英文
+  return "en";
+}
+
 type LangContextType = {
   lang: Lang;
   setLang: (lang: Lang) => void;
@@ -15,23 +107,35 @@ type LangContextType = {
 const LangContext = createContext<LangContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
+  // SSR 和 CSR 初始值必须一致，避免 hydration mismatch
   const [lang, setLangState] = useState<Lang>("en");
+  const [isReady, setIsReady] = useState(false);
 
-  // Mount 后检测：优先 localStorage，否则默认英文
+  // Mount 后检测语言（localStorage 优先 → 系统语言检测）
   useEffect(() => {
     try {
+      // 1. 优先：用户已保存的语言偏好（localStorage）
       const saved = localStorage.getItem("neuroaccess-language");
       if (saved && LANGUAGES.includes(saved as Lang)) {
         setLangState(saved as Lang);
+        setIsReady(true);
+        return;
       }
-      // 无保存语言时保持默认英文，不根据系统语言自动切换
-    } catch {}
+      // 2. 无保存值：检测系统语言
+      const detected = detectSystemLanguage();
+      setLangState(detected);
+      setIsReady(true);
+    } catch {
+      setIsReady(true);
+    }
   }, []);
 
-  // 语言变化时写入 localStorage
+  // 语言变化时写入 localStorage + 更新 <html lang>
   useEffect(() => {
     try {
       localStorage.setItem("neuroaccess-language", lang);
+      document.documentElement.lang = lang;
+      document.documentElement.setAttribute("data-lang", lang);
     } catch {}
   }, [lang]);
 
@@ -59,7 +163,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 export function useLang(): LangContextType {
   const ctx = useContext(LangContext);
   if (!ctx) {
-    // SSR fallback: return default en context without throwing
     return {
       lang: "en",
       setLang: () => {},

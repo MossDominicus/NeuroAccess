@@ -91,10 +91,10 @@ export default function PostLoginModals() {
           updateUser(data.user);
         }
       } else {
-        setUsernameError(data.error || "Failed");
+        setUsernameError(data.error || t("failed") || "Failed");
       }
     } catch (e: any) {
-      setUsernameError(e.message || "Network error");
+      setUsernameError(e.message || t("networkError") || "网络错误");
     } finally {
       setUsernameLoading(false);
     }

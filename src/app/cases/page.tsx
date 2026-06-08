@@ -92,10 +92,20 @@ const cases: CaseStudy[] = [
     limitations: {
       zh: ["仅记录 5 分钟，可能无法捕捉到 intermittent 异常", "没有同时记录行为数据（如 eye tracking），无法确认 Alpha 阻断"],
       en: ["Only 5 minutes recorded; may not capture intermittent abnormalities", "No concurrent behavioral data (e.g., eye tracking) to confirm Alpha blocking"],
+      es: ["Solo se registraron 5 minutos; puede que no capture anomalías intermitentes", "No hay datos conductuales simultáneos (p. ej., eye tracking) para confirmar el bloqueo Alpha"],
+      fr: ["Seulement 5 minutes enregistrées ; peut ne pas capturer les anomalies intermittentes", "Pas de données comportementales concurrentes (p. ex., eye tracking) pour confirmer le blocage Alpha"],
+      de: ["Nur 5 Minuten aufgezeichnet; kann intermittierende Anomalien möglicherweise nicht erfassen", "Keine gleichzeitigen Verhaltensdaten (z. B. Eye-Tracking) zur Bestätigung der Alpha-Blockade"],
+      ja: ["わずか5分間の記録；間欠的な異常を補足できない可能性があります", "同時行動データ（アイトラッキングなど）がなく、Alphaブロッキングを確認できません"],
+      ko: ["단 5분만 기록됨; 간헐적 이상을 포착하지 못할 수 있음", "동시 행동 데이터 (예: 아이트래킹) 가 없어 Alpha 차단을 확인할 수 없음"],
     },
     what_this_data_cannot_tell: {
       zh: ["智商高低", "是否患有精神疾病", "具体的情绪状态"],
       en: ["Intelligence level", "Whether the person has a mental illness", "Specific emotional state"],
+      es: ["Nivel de inteligencia", "Si la persona tiene una enfermedad mental", "Estado emocional específico"],
+      fr: ["Niveau d'intelligence", "Si la personne a une maladie mentale", "État émotionnel spécifique"],
+      de: ["Intelligenzniveau", "Ob die Person eine psychische Erkrankung hat", "Spezifischer emotionaler Zustand"],
+      ja: ["知能レベル", "その人が精神疾患を持っているかどうか", "具体的な感情状態"],
+      ko: ["지능 수준", "그 사람이 정신 질환을 가지고 있는지 여부", "구체적인 감정 상태"],
     },
     tags: ["alpha", "resting", "healthyAdult", "highQuality"],
     readTime: "5 分钟",
@@ -1002,7 +1012,7 @@ export default function CasesPage() {
             <div className="flex items-center gap-2">
               <span className="text-xs text-[var(--color-text-secondary)]">{t("tags")}</span>
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/30 px-2.5 py-0.5 text-xs text-blue-700 dark:text-blue-400">
-                {t("tag" + selectedTag.charAt(0).toUpperCase() + selectedTag.slice(1))}
+                {t("tag" + selectedTag.charAt(0).toUpperCase() + selectedTag.slice(1)) || selectedTag}
                 <button onClick={() => setSelectedTag(null)} className="ml-1 hover:text-blue-900 dark:hover:text-blue-200">×</button>
               </span>
             </div>
@@ -1172,7 +1182,7 @@ export default function CasesPage() {
                                   : "bg-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-text)]/10"
                               }`}
                             >
-                              {t("tag" + tag.charAt(0).toUpperCase() + tag.slice(1))}
+                              {t("tag" + tag.charAt(0).toUpperCase() + tag.slice(1)) || tag}
                             </button>
                           ))}
                         </div>
