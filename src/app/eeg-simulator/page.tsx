@@ -4,22 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLang } from "@/lib/language-context";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
 
-interface Preset {
-  name: string;
-  name_en: string;
-  description: string;
-  description_en: string;
-  params: Record<string, any>;
-}
-
-const STATE_KEY_MAP: Record<string, string> = {
-  "Eyes Closed Relaxation": "stateEyesClosed",
-  "Eyes Open Attention": "stateEyesOpen",
-  "Drowsy / Light Sleep": "stateDrowsy",
-  "Deep Sleep": "stateDeepSleep",
-  "Seizure (Simulated)": "stateSeizure",
-};
-
 export default function EegSimulatorPage() {
   const { t } = useLang();
 
@@ -45,16 +29,11 @@ export default function EegSimulatorPage() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [gameMode, setGameMode] = useState(false);
-  const [currentPreset, setCurrentPreset] = useState<Preset | null>(null);
-  const [userGuess, setUserGuess] = useState("");
-  const [gameResult, setGameResult] = useState<"correct" | "wrong" | "">("");
 
   // 生成 EEG 信号
   const generateEEG = useCallback(async () => {
     setLoading(true);
     setError("");
-    setGameResult("");
 
     try {
       const token = localStorage.getItem("neuroaccess_token") || localStorage.getItem("neuroaccess-token") || "";
@@ -81,52 +60,6 @@ export default function EegSimulatorPage() {
       setLoading(false);
     }
   }, [params]);
-
-  // 加载预设状态
-  const loadPresets = useCallback(async (): Promise<Preset[]> => {
-    try {
-      const resp = await fetch("/api/eeg-simulator/presets");
-      const data = await resp.json();
-      if (data.success) {
-        return data.presets;
-      }
-    } catch (err) {
-      console.error("Failed to load presets:", err);
-    }
-    return [];
-  }, []);
-
-  // 开始游戏模式
-  const startGame = useCallback(async () => {
-    const presets = await loadPresets();
-    if (presets.length === 0) {
-      setError("无法加载预设");
-      return;
-    }
-
-    const randomPreset = presets[Math.floor(Math.random() * presets.length)];
-    setCurrentPreset(randomPreset);
-    setParams((prev) => ({ ...prev, ...randomPreset.params }));
-    setGameMode(true);
-    setUserGuess("");
-    setGameResult("");
-
-    // 自动生成 EEG
-    setTimeout(() => {
-      generateEEG();
-    }, 100);
-  }, [loadPresets, generateEEG]);
-
-  // 提交猜测
-  const submitGuess = useCallback(() => {
-    if (!currentPreset) return;
-    const guess = userGuess.trim();
-    if (guess === currentPreset.name || guess === currentPreset.name_en) {
-      setGameResult("correct");
-    } else {
-      setGameResult("wrong");
-    }
-  }, [currentPreset, userGuess]);
 
   // 准备时域波形图数据（采样到 ~250 点）
   const waveformData = useMemo(() => {
@@ -219,65 +152,6 @@ export default function EegSimulatorPage() {
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
                 {t("signalParameters")}
               </h2>
-
-              {/* 游戏模式切换 */}
-              <div className="mb-6 p-4 bg-[var(--color-bg)] rounded-xl border border-[var(--color-border)]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gameMode}
-                    onChange={(e) => setGameMode(e.target.checked)}
-                    className="rounded accent-[var(--color-primary)]"
-                  />
-                  <span className="text-sm font-medium text-[var(--color-text)]">
-                    {t("gameMode")}
-                  </span>
-                </label>
-
-                {gameMode && (
-                  <div className="mt-3">
-                    <button
-                      onClick={startGame}
-                      className="w-full px-4 py-2 bg-[var(--color-primary)] text-[var(--color-bg)] rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
-                    >
-                      {t("newGame")}
-                    </button>
-
-                    {currentPreset && (
-                      <div className="mt-3 p-3 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)]">
-                        <p className="text-sm text-[var(--color-text)] mb-2 font-medium">
-                          {t("whatStateIsThis")}
-                        </p>
-                        <input
-                          type="text"
-                          value={userGuess}
-                          onChange={(e) => setUserGuess(e.target.value)}
-                          placeholder={t("enterYourGuess")}
-                          className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm bg-[var(--color-bg)] text-[var(--color-text)]"
-                        />
-                        <button
-                          onClick={submitGuess}
-                          className="mt-2 w-full px-4 py-2 bg-[var(--color-primary)] text-[var(--color-bg)] rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
-                        >
-                          {t("submitGuess")}
-                        </button>
-
-                        {gameResult === "correct" && (
-                          <div className="mt-2 p-2 rounded-lg text-sm text-center bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/30">
-                            ✅ {t("correctGuess")}
-                          </div>
-                        )}
-
-                        {gameResult === "wrong" && (
-                          <div className="mt-2 p-2 rounded-lg text-sm text-center bg-red-500/10 text-red-600 border border-red-500/30">
-                            ❌ {t("wrongGuess")}：{t(STATE_KEY_MAP[currentPreset.name_en] || "")}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
 
               {/* 频段功率 */}
               <div className="mb-6">

@@ -15,17 +15,18 @@ export const metadata: Metadata = {
   applicationName: "NeuroAccess",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
-      { url: "/neuroaccess-logo-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico?v=3", sizes: "16x16 32x32 48x48 64x64", type: "image/x-icon" },
+      { url: "/icon.svg?v=3", type: "image/svg+xml" },
+      { url: "/favicon.png?v=3", sizes: "32x32", type: "image/png" },
+      { url: "/neuroaccess-logo-512.png?v=3", sizes: "512x512", type: "image/png" },
     ],
-    shortcut: "/favicon.png",
+    shortcut: "/favicon.ico?v=3",
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-      { url: "/neuroaccess-logo-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" },
+      { url: "/neuroaccess-logo-512.png?v=3", sizes: "512x512", type: "image/png" },
     ],
   },
-  manifest: "/manifest.json",
+  manifest: "/manifest.json?v=3",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
