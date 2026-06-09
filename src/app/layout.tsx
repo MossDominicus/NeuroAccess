@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
@@ -12,11 +12,34 @@ import { AuthProvider } from "@/lib/auth-context";
 export const metadata: Metadata = {
   title: "NeuroAccess - EEG Literacy Platform",
   description: "EEG 科普教育平台，将脑电图数据翻译成人话",
+  applicationName: "NeuroAccess",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/neuroaccess-logo-512.png", sizes: "512x512", type: "image/png" },
+    ],
     shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/neuroaccess-logo-512.png", sizes: "512x512", type: "image/png" },
+    ],
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "NeuroAccess",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
