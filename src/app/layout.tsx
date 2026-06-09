@@ -51,6 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><defs><linearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22><stop offset=%220%25%22 stop-color=%22%233b82f6%22/><stop offset=%22100%25%22 stop-color=%22%2306b6d4%22/></linearGradient></defs><rect x=%222%22 y=%222%22 width=%2260%22 height=%2260%22 rx=%2214%22 fill=%22url(%23g)%22/><path d=%22M8 32 Q16 18 24 32 T40 32 T56 32%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%223.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/><circle cx=%2232%22 cy=%2232%22 r=%223%22 fill=%22%23fff%22/></svg>" />
         {process.env.NODE_ENV === "development" && (
           <script
             dangerouslySetInnerHTML={{
