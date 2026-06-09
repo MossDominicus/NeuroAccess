@@ -349,7 +349,7 @@ export default function EegSimulatorPage() {
               <button
                 onClick={generateEEG}
                 disabled={loading}
-                className="w-full px-6 py-3 bg-[var(--color-primary)] text-white rounded-xl hover:opacity-90 transition-opacity font-medium disabled:opacity-50"
+                className="w-full px-6 py-3 bg-[var(--color-primary)] text-[var(--color-bg)] rounded-xl hover:opacity-90 transition-opacity font-medium disabled:opacity-50"
               >
                 {loading ? t("generatingEEG") : t("generateEEG")}
               </button>

@@ -231,7 +231,7 @@ export default function EEGViewerPage() {
           <button
             onClick={handleUpload}
             disabled={!file || loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            className="px-6 py-2 bg-[var(--color-primary)] text-[var(--color-bg)] rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity text-sm font-medium"
           >
             {loading ? t("processing") : t("uploadAndView")}
           </button>
