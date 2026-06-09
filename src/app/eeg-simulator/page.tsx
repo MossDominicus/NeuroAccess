@@ -147,10 +147,10 @@ export default function EegSimulatorPage() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[var(--color-text)] mb-2">
-            {t("eegSimulator") || "EEG 模拟器"}
+            {t("eegSimulator")}
           </h1>
           <p className="text-[var(--color-text-secondary)]">
-            {t("eegSimulatorDesc") || "调整参数，生成合成 EEG 信号，观察不同脑电状态"}
+            {t("eegSimulatorDesc")}
           </p>
         </div>
         
@@ -159,7 +159,7 @@ export default function EegSimulatorPage() {
           <div className="lg:col-span-1">
             <div className="bg-[var(--color-surface)] rounded-2xl shadow-sm border border-[var(--color-border)] p-6">
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
-                {t("signalParameters") || "信号参数"}
+                {t("signalParameters")}
               </h2>
               
               {/* 游戏模式切换 */}
@@ -172,7 +172,7 @@ export default function EegSimulatorPage() {
                     className="rounded"
                   />
                   <span className="text-sm font-medium text-[var(--color-text)]">
-                    {t("gameMode") || "游戏模式：猜猜这是什么状态？"}
+                    {t("gameMode")}
                   </span>
                 </label>
                 
@@ -182,37 +182,37 @@ export default function EegSimulatorPage() {
                       onClick={startGame}
                       className="w-full px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
                     >
-                      {t("newGame") || "新游戏"}
+                      {t("newGame")}
                     </button>
                     
                     {currentPreset && (
                       <div className="mt-3 p-3 bg-white rounded-lg">
                         <p className="text-sm text-[var(--color-text)] mb-2">
-                          {t("whatStateIsThis") || "这是什么脑电状态？"}
+                          {t("whatStateIsThis")}
                         </p>
                         <input
                           type="text"
                           value={userGuess}
                           onChange={(e) => setUserGuess(e.target.value)}
-                          placeholder={t("enterYourGuess") || "输入你的猜测..."}
+                          placeholder={t("enterYourGuess")}
                           className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm"
                         />
                         <button
                           onClick={submitGuess}
                           className="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
                         >
-                          {t("submitGuess") || "提交猜测"}
+                          {t("submitGuess")}
                         </button>
                         
                         {gameResult === "correct" && (
                           <div className="mt-2 p-2 bg-green-100 text-green-800 rounded-lg text-sm text-center">
-                            ✅ {t("correctGuess") || "正确！"}
+                            ✅ {t("correctGuess")}
                           </div>
                         )}
                         
                         {gameResult.startsWith("wrong") && (
                           <div className="mt-2 p-2 bg-red-100 text-red-800 rounded-lg text-sm text-center">
-                            ❌ {t("wrongGuess") || "错误！正确答案是："}{gameResult.split(":")[1]}
+                            ❌ {t("wrongGuess")}{gameResult.split(":")[1]}
                           </div>
                         )}
                       </div>
@@ -224,7 +224,7 @@ export default function EegSimulatorPage() {
               {/* 频段功率 */}
               <div className="mb-6">
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
-                  {t("bandPower") || "频段功率"}
+                  {t("bandPower")}
                 </h3>
                 {renderSlider("Alpha (8-13 Hz)", "alpha_power", 0, 2, 0.1)}
                 {renderSlider("Beta (13-30 Hz)", "beta_power", 0, 2, 0.1)}
@@ -235,7 +235,7 @@ export default function EegSimulatorPage() {
               {/* 频段频率 */}
               <div className="mb-6">
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
-                  {t("bandFrequency") || "频段频率"}
+                  {t("bandFrequency")}
                 </h3>
                 {renderSlider("Alpha Freq (Hz)", "alpha_freq", 8, 13, 0.5)}
                 {renderSlider("Beta Freq (Hz)", "beta_freq", 13, 30, 1)}
@@ -246,7 +246,7 @@ export default function EegSimulatorPage() {
               {/* 噪声和伪影 */}
               <div className="mb-6">
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
-                  {t("noiseAndArtifacts") || "噪声与伪影"}
+                  {t("noiseAndArtifacts")}
                 </h3>
                 {renderSlider("Noise Level", "noise_level", 0, 1, 0.05)}
                 
@@ -258,7 +258,7 @@ export default function EegSimulatorPage() {
                     className="rounded"
                   />
                   <span className="text-sm text-[var(--color-text)]">
-                    {t("artifactBlink") || "眨眼伪影"}
+                    {t("artifactBlink")}
                   </span>
                 </label>
                 
@@ -270,7 +270,7 @@ export default function EegSimulatorPage() {
                     className="rounded"
                   />
                   <span className="text-sm text-[var(--color-text)]">
-                    {t("artifactMuscle") || "肌电伪影"}
+                    {t("artifactMuscle")}
                   </span>
                 </label>
                 
@@ -282,7 +282,7 @@ export default function EegSimulatorPage() {
                     className="rounded"
                   />
                   <span className="text-sm text-[var(--color-text)]">
-                    {t("artifactPowerline") || "工频干扰 (50Hz)"}
+                    {t("artifactPowerline")}
                   </span>
                 </label>
               </div>
@@ -293,7 +293,7 @@ export default function EegSimulatorPage() {
                 disabled={loading}
                 className="w-full px-6 py-3 bg-[var(--color-primary)] text-white rounded-xl hover:opacity-90 transition-opacity font-medium disabled:opacity-50"
               >
-                {loading ? (t("generating") || "生成中...") : (t("generateEEG") || "生成 EEG")}
+                {loading ? (t("generating")) : (t("generateEEG"))}
               </button>
               
               {error && (
@@ -308,19 +308,19 @@ export default function EegSimulatorPage() {
           <div className="lg:col-span-2">
             <div className="bg-[var(--color-surface)] rounded-2xl shadow-sm border border-[var(--color-border)] p-6">
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
-                {t("visualization") || "可视化"}
+                {t("visualization")}
               </h2>
               
               {!result && !loading && (
                 <div className="text-center py-20 text-[var(--color-text-secondary)]">
-                  <p>{t("clickToGenerate") || "点击生成 EEG 按钮开始"}</p>
+                  <p>{t("clickToGenerate")}</p>
                 </div>
               )}
               
               {loading && (
                 <div className="text-center py-20 text-[var(--color-text-secondary)]">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto mb-4"></div>
-                  <p>{t("generatingEEG") || "正在生成 EEG 信号..."}</p>
+                  <p>{t("generatingEEG")}</p>
                 </div>
               )}
               
@@ -329,16 +329,16 @@ export default function EegSimulatorPage() {
                   {/* 时域波形 */}
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2">
-                      {t("timeDomainWaveform") || "时域波形"}
+                      {t("timeDomainWaveform")}
                     </h3>
                     <div className="bg-[var(--color-bg)] rounded-xl p-4 overflow-x-auto">
                       <pre className="text-xs text-[var(--color-text-secondary)]">
                         {JSON.stringify(result.channels, null, 2).slice(0, 500)}...
                       </pre>
                       <p className="text-xs text-[var(--color-text-secondary)] mt-2">
-                        {t("channelCount") || "通道数"}: {result.channel_names?.length} | 
-                        {t("samplingRate") || "采样率"}: {result.sampling_rate} Hz | 
-                        {t("duration") || "时长"}: {result.duration_seconds} s
+                        {t("channelCount")}: {result.channel_names?.length} | 
+                        {t("samplingRate")}: {result.sampling_rate} Hz | 
+                        {t("duration")}: {result.duration_seconds} s
                       </p>
                     </div>
                   </div>
@@ -347,11 +347,11 @@ export default function EegSimulatorPage() {
                   {result.psd && (
                     <div>
                       <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2">
-                        {t("psdSpectrum") || "PSD 频谱"}
+                        {t("psdSpectrum")}
                       </h3>
                       <div className="bg-[var(--color-bg)] rounded-xl p-4">
                         <p className="text-xs text-[var(--color-text-secondary)]">
-                          {t("psdDescription") || "功率谱密度（Power Spectral Density）显示各频段的能量分布"}
+                          {t("psdDescription")}
                         </p>
                         <pre className="text-xs text-[var(--color-text-secondary)] mt-2">
                           {JSON.stringify({

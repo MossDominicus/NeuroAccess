@@ -55,7 +55,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-14 flex items-center px-4 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2.5">
-          <img src="/neuroaccess-logo.png" alt="NeuroAccess" className="w-8 h-8 rounded-lg object-cover" />
+          <img src="/neuroaccess-logo-small.png" alt="NeuroAccess" className="w-8 h-8 rounded-lg object-contain bg-[var(--color-bg)]" />
           {!collapsed && (
             <span className="font-bold tracking-tight text-[var(--color-text)]">NeuroAccess</span>
           )}
@@ -101,7 +101,7 @@ export default function Sidebar() {
           }`}
         >
           <Settings className="w-5 h-5 flex-shrink-0" />
-          {!collapsed && <span className="font-medium">{t("settings") || "设置"}</span>}
+          {!collapsed && <span className="font-medium">{t("settings")}</span>}
         </button>
 
         <button
