@@ -247,7 +247,7 @@ export default function EegSimulatorPage() {
                   <div className="mt-3">
                     <button
                       onClick={startGame}
-                      className="w-full px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                      className="w-full px-4 py-2 bg-[var(--color-primary)] text-[var(--color-bg)] rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
                     >
                       {t("newGame")}
                     </button>
@@ -266,19 +266,19 @@ export default function EegSimulatorPage() {
                         />
                         <button
                           onClick={submitGuess}
-                          className="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                          className="mt-2 w-full px-4 py-2 bg-[var(--color-primary)] text-[var(--color-bg)] rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
                         >
                           {t("submitGuess")}
                         </button>
 
                         {gameResult === "correct" && (
-                          <div className="mt-2 p-2 bg-green-100 text-green-800 rounded-lg text-sm text-center">
+                          <div className="mt-2 p-2 rounded-lg text-sm text-center bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/30">
                             ✅ {t("correctGuess")}
                           </div>
                         )}
 
                         {gameResult === "wrong" && (
-                          <div className="mt-2 p-2 bg-red-100 text-red-800 rounded-lg text-sm text-center">
+                          <div className="mt-2 p-2 rounded-lg text-sm text-center bg-red-500/10 text-red-600 border border-red-500/30">
                             ❌ {t("wrongGuess")}：{t(STATE_KEY_MAP[currentPreset.name_en] || "")}
                           </div>
                         )}
@@ -364,7 +364,7 @@ export default function EegSimulatorPage() {
               </button>
 
               {error && (
-                <div className="mt-4 p-3 bg-red-100 text-red-800 rounded-lg text-sm">
+                <div className="mt-4 p-3 rounded-lg text-sm bg-red-500/10 text-red-600 border border-red-500/30">
                   {error}
                 </div>
               )}
