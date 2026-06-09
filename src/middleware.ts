@@ -5,8 +5,8 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 免认证路径：登录、注册、API、静态资源
-  const publicPaths = ["/login", "/register", "/reports", "/api/", "/_next/", "/favicon.ico", "/neuroaccess-logo.png", "/opengraph-image.png", "/twitter-image.png"];
-  const isPublic = publicPaths.some((p) => pathname.startsWith(p));
+  const publicPaths = ["/login", "/register", "/reports", "/api/", "/_next/", "/favicon.ico", "/favicon.png", "/icon.svg", "/apple-touch-icon.png", "/manifest.json", "/neuroaccess-logo.png", "/neuroaccess-logo-512.png", "/neuroaccess-logo-small.png", "/neuroaccess-logo.jpg", "/neuroaccess-logo-fixed.png", "/opengraph-image.png", "/twitter-image.png"];
+  const isPublic = publicPaths.some((p) => pathname === p || pathname.startsWith(p));
   if (isPublic) {
     return NextResponse.next();
   }
