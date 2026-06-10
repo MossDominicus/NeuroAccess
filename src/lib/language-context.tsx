@@ -106,13 +106,19 @@ type LangContextType = {
 
 const LangContext = createContext<LangContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
+export function LanguageProvider({ children, initialLang }: { children: ReactNode; initialLang?: Lang }) {
   // SSR 和 CSR 初始值必须一致，避免 hydration mismatch
-  const [lang, setLangState] = useState<Lang>("en");
+  // 优先使用服务端传入的 initialLang（来自 cookie），否则默认 "en"
+  const [lang, setLangState] = useState<Lang>(initialLang || "en");
   const [isReady, setIsReady] = useState(false);
 
   // Mount 后检测语言（localStorage 优先 → 系统语言检测）
+  // 如果服务端已传入 initialLang，跳过检测（避免覆盖）
   useEffect(() => {
+    if (initialLang) {
+      setIsReady(true);
+      return;
+    }
     try {
       // 1. 优先：用户已保存的语言偏好（localStorage）
       const saved = localStorage.getItem("neuroaccess-language");

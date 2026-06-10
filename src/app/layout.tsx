@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
 import PublicPreviewFooter from "@/components/PublicPreviewFooter";
 import { DisclaimerModal, PostLoginModals } from "@/components/LazyModals";
+import type { Lang } from "@/lib/translations";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AnalysisProvider } from "@/lib/analysis-context";
@@ -110,7 +111,7 @@ export default async function RootLayout({
       <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
         <AuthProvider>
           <ThemeProvider>
-            <LanguageProvider>
+            <LanguageProvider initialLang={lang as Lang}>
               <AnalysisProvider>
                 <DisclaimerModal />
                 <PostLoginModals />
