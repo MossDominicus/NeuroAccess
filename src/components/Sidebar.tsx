@@ -34,9 +34,6 @@ export default function Sidebar() {
   const { lang, t } = useLang();
   const { user } = useAuth();
 
-  // 未登录时不显示侧边栏
-  if (!user) return null;
-
   // 暴露全局方法供 TopNav 调用
   useEffect(() => {
     (window as any).__openSettingsPanel = () => setSettingsOpen(true);
@@ -50,6 +47,9 @@ export default function Sidebar() {
       label: t(item.key),
     }));
   }, [lang]);
+
+  // 未登录时不显示侧边栏
+  if (!user) return null;
 
   return (
     <aside
