@@ -121,7 +121,7 @@ export default async function RootLayout({
                     <main className="flex-1 overflow-y-auto">
                       {children}
                     </main>
-                    <PublicPreviewFooter />
+                    <PublicPreviewFooter lang={lang} />
                   </div>
                 </div>
               </AnalysisProvider>
