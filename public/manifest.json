@@ -13,6 +13,6 @@
     { "src": "/neuroaccess-logo-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "categories": ["education", "medical", "science"],
-  "lang": "zh-CN",
+  "lang": "zh-Hans-CN",
   "dir": "ltr"
 }
