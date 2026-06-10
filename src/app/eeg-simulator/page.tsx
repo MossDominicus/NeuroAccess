@@ -3,6 +3,20 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLang } from "@/lib/language-context";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { Info } from "lucide-react";
+
+// 每个参数的中文科普说明 (7 语言 key 都会自动翻译)
+const PARAM_HELP_KEYS: Record<string, string> = {
+  alpha_power: "alphaPowerHelp",
+  beta_power: "betaPowerHelp",
+  theta_power: "thetaPowerHelp",
+  delta_power: "deltaPowerHelp",
+  alpha_freq: "alphaFreqHelp",
+  beta_freq: "betaFreqHelp",
+  theta_freq: "thetaFreqHelp",
+  delta_freq: "deltaFreqHelp",
+  noise_level: "noiseHelp",
+};
 
 export default function EegSimulatorPage() {
   const { t } = useLang();
@@ -125,22 +139,34 @@ export default function EegSimulatorPage() {
     min: number,
     max: number,
     step: number
-  ) => (
-    <div key={key} className="mb-4">
-      <label className="block text-sm font-medium text-[var(--color-text)] mb-1">
-        {label}: <span className="text-[var(--color-primary)] font-bold">{params[key as keyof typeof params]}</span>
-      </label>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={params[key as keyof typeof params] as number}
-        onChange={(e) => setParams({ ...params, [key]: parseFloat(e.target.value) })}
-        className="w-full accent-[var(--color-primary)]"
-      />
-    </div>
-  );
+  ) => {
+    const helpKey = PARAM_HELP_KEYS[key];
+    const helpText = helpKey ? t(helpKey) : "";
+    return (
+      <div key={key} className="mb-4">
+        <label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-text)] mb-1">
+          <span>{label}: <span className="text-[var(--color-primary)] font-bold">{params[key as keyof typeof params]}</span></span>
+          {helpText && helpText !== helpKey && (
+            <span className="group relative inline-flex">
+              <Info className="w-3.5 h-3.5 text-[var(--color-text-secondary)] cursor-help opacity-60 hover:opacity-100" />
+              <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute left-0 top-5 z-50 w-64 p-2 text-xs font-normal text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg pointer-events-none">
+                {helpText}
+              </span>
+            </span>
+          )}
+        </label>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={params[key as keyof typeof params] as number}
+          onChange={(e) => setParams({ ...params, [key]: parseFloat(e.target.value) })}
+          className="w-full accent-[var(--color-primary)]"
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
@@ -149,9 +175,12 @@ export default function EegSimulatorPage() {
           {/* 左侧：控制面板 */}
           <div className="lg:col-span-1">
             <div className="bg-[var(--color-surface)] rounded-2xl shadow-sm border border-[var(--color-border)] p-6">
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1">
                 {t("signalParameters")}
               </h2>
+              <p className="text-xs text-[var(--color-text-secondary)] mb-4 italic">
+                {t("hoverAnySlider")}
+              </p>
 
               {/* 频段功率 */}
               <div className="mb-6">

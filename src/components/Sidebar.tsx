@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/language-context";
 const SettingsPanel = dynamic(() => import("./SettingsPanel"), { ssr: false, loading: () => null });
+import { useAuth } from "@/lib/auth-context";
 import {
   Brain,
   LayoutDashboard,
@@ -31,6 +32,10 @@ export default function Sidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const pathname = usePathname();
   const { lang, t } = useLang();
+  const { user } = useAuth();
+
+  // 未登录时不显示侧边栏
+  if (!user) return null;
 
   // 暴露全局方法供 TopNav 调用
   useEffect(() => {

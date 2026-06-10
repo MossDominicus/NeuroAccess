@@ -5,10 +5,31 @@ import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { getDisplayInitial } from "@/lib/display-initial";
 
-export default function TopNav() {
-  const { t, lang } = useLang();
+interface TopNavProps {
+  lang?: string;
+}
+
+// 根据 lang 直接返回翻译（SSR 期间 useLang() 返回默认值 en，不能用 t()）
+const getLoginText = (lang: string): string => {
+  const map: Record<string, string> = {
+    zh: "登录",
+    en: "Login",
+    es: "Iniciar sesión",
+    fr: "Connexion",
+    de: "Anmelden",
+    ja: "ログイン",
+    ko: "로그인",
+  };
+  return map[lang] || map.en;
+};
+
+export default function TopNav({ lang: serverLang }: TopNavProps) {
+  const { t, lang: clientLang } = useLang();
   const { user } = useAuth();
   const router = useRouter();
+
+  // SSR 期间 serverLang 正确，客户端水合后 clientLang 正确
+  const lang = serverLang || clientLang;
 
   const avatarColor = user?.avatar_url || "#3B82F6";
 
@@ -17,7 +38,7 @@ export default function TopNav() {
       {/* Left: logo */}
       <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
         <span className="text-sm font-semibold text-[var(--color-text)]">NeuroAccess</span>
-        <span className="text-xs text-[var(--color-text-secondary)]">v1.0</span>
+        <span className="text-xs text-[var(--color-text-secondary)]">v1.3</span>
       </a>
 
       {/* Right: user avatar */}
@@ -39,7 +60,7 @@ export default function TopNav() {
             href="/login"
             className="text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity"
           >
-            {t("login") || "登录"}
+            {getLoginText(lang)}
           </a>
         )}
       </div>

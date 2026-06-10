@@ -568,6 +568,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     stateDeepSleep: "深度睡眠",
     stateSeizure: "癫痫发作（模拟）",
     correctAnswer: "正确答案是",
+    login: "登录",
+    networkErrorMsg: "网络错误",
+    failedToChangePasswordMsg: "密码修改失败",
   },
 
   en: {
@@ -1184,6 +1187,9 @@ channelNames: "Channel Names",
     viewDurationSec: "View duration (seconds)",
     viewInReports: "View report →",
     yes: "Yes",
+    login: "Login",
+    networkErrorMsg: "Network error",
+    failedToChangePasswordMsg: "Failed to change password",
 },
 
   // ─────────────────────────────────────────────
@@ -1780,6 +1786,9 @@ channelNames: "Nombres de Canales",
     viewDurationSec: "Duración de visualización (segundos)",
     viewInReports: "Ver informe →",
     yes: "Sí",
+    login: "Iniciar sesión",
+    networkErrorMsg: "Error de red",
+    failedToChangePasswordMsg: "Error al cambiar la contraseña",
 },
 
   // ─────────────────────────────────────────────
@@ -2376,6 +2385,9 @@ channelNames: "Noms des Canaux",
     viewDurationSec: "Durée de visualisation (secondes)",
     viewInReports: "Voir le rapport →",
     yes: "Oui",
+    login: "Connexion",
+    networkErrorMsg: "Erreur réseau",
+    failedToChangePasswordMsg: "Échec du changement de mot de passe",
 },
 
   // ─────────────────────────────────────────────
@@ -2972,6 +2984,9 @@ channelNames: "Kanalnamen",
     viewDurationSec: "Anzeigedauer (Sekunden)",
     viewInReports: "Bericht anzeigen →",
     yes: "Ja",
+    login: "Anmelden",
+    networkErrorMsg: "Netzwerkfehler",
+    failedToChangePasswordMsg: "Fehler beim Ändern des Passworts",
 },
 
   // ─────────────────────────────────────────────
@@ -3568,6 +3583,9 @@ channelNames: "チャンネル名",
     viewDurationSec: "表示時間（秒）",
     viewInReports: "レポートを表示 →",
     yes: "はい",
+    login: "ログイン",
+    networkErrorMsg: "ネットワークエラー",
+    failedToChangePasswordMsg: "パスワード変更失敗",
 },
 
   // ─────────────────────────────────────────────
@@ -4164,6 +4182,9 @@ channelNames: "채널 이름",
     viewDurationSec: "표시 시간(초)",
     viewInReports: "보고서 보기 →",
     yes: "예",
+    login: "로그인",
+    networkErrorMsg: "네트워크 오류",
+    failedToChangePasswordMsg: "비밀번호 변경 실패",
 },
 };
 

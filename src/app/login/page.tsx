@@ -37,7 +37,7 @@ export default function LoginPage() {
         setError(result.error || tf("loginFailed", "登录失败"));
       }
     } catch (err: any) {
-      setError(err.message || tf("networkError", "网络错误"));
+      setError(err.message || tf("networkErrorMsg", "网络错误"));
     } finally {
       setSubmitting(false);
     }

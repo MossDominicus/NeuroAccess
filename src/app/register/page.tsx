@@ -58,7 +58,7 @@ export default function RegisterPage() {
         setError(data.detail || data.error || tf("sendCodeFailed", "验证码发送失败"));
       }
     } catch (err: any) {
-      setError(err.message || tf("networkError", "网络错误"));
+      setError(err.message || tf("networkErrorMsg", "网络错误"));
     }
   };
 
@@ -81,7 +81,7 @@ export default function RegisterPage() {
         setError(result.error || tf("registerFailed", "注册失败"));
       }
     } catch (err: any) {
-      setError(err.message || tf("networkError", "网络错误"));
+      setError(err.message || tf("networkErrorMsg", "网络错误"));
     } finally {
       setSubmitting(false);
     }

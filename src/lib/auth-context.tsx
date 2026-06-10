@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: data.error || tf("loginFailed", "登录失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: data.error || tf("registerFailed", "注册失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -157,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: result.error || tf("failedToUpdateProfile", "更新失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -179,9 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || tf("failedToChangePassword", "修改失败") };
+      return { success: false, error: result.error || tf("failedToChangePasswordMsg", "修改失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: result.error || tf("sendFailed", "发送失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -235,9 +235,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return { success: true };
       }
-      return { success: false, error: result.error || tf("failedToChangePassword", "修改失败") };
+      return { success: false, error: result.error || tf("failedToChangePasswordMsg", "修改失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -264,7 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: result.error || tf("sendFailed", "发送失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 
@@ -295,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { success: false, error: result.error || tf("deleteAccountFailed", "删除失败") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkError", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
     }
   };
 

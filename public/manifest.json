@@ -1,5 +1,5 @@
 {
-  "name": "NeuroAccess - EEG Literacy Platform",
+  "name": "NeuroAccess",
   "short_name": "NeuroAccess",
   "description": "EEG 科普教育平台，将脑电图数据翻译成人话",
   "start_url": "/",
@@ -7,9 +7,12 @@
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "icons": [
-    { "src": "/favicon.png?v=3", "sizes": "32x32", "type": "image/png" },
-    { "src": "/neuroaccess-logo-small.png?v=3", "sizes": "128x128", "type": "image/png" },
-    { "src": "/apple-touch-icon.png?v=3", "sizes": "180x180", "type": "image/png" },
-    { "src": "/neuroaccess-logo-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    { "src": "/favicon.png?v=4", "sizes": "32x32", "type": "image/png" },
+    { "src": "/neuroaccess-logo-small.png?v=4", "sizes": "128x128", "type": "image/png" },
+    { "src": "/apple-touch-icon.png?v=4", "sizes": "180x180", "type": "image/png" },
+    { "src": "/neuroaccess-logo-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["education", "medical", "science"],
+  "lang": "zh-CN",
+  "dir": "ltr"
 }
