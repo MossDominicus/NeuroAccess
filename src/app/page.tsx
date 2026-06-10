@@ -6,7 +6,7 @@ import nextDynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { useAnalysis } from "@//lib/analysis-context";
+import { useAnalysis } from "@/lib/analysis-context";
 const IntroAnimation = nextDynamic(() => import("@/components/IntroAnimation"), { ssr: false, loading: () => null });
 import {
   UploadCloud,
