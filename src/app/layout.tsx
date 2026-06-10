@@ -40,10 +40,44 @@ export async function generateMetadata(): Promise<Metadata> {
     ko: "뇌파 데이터를 이해하기 쉬운 언어로 번역하는 EEG 교육 플랫폼",
   };
 
+  const baseUrl = "https://neuroaccess.cloud";
+
+  const ogLocales: Record<string, string> = {
+    zh: "zh_CN",
+    en: "en_US",
+    es: "es_ES",
+    fr: "fr_FR",
+    de: "de_DE",
+    ja: "ja_JP",
+    ko: "ko_KR",
+  };
+
   return {
     title: titles[lang] || titles.zh,
     description: descriptions[lang] || descriptions.zh,
     applicationName: "NeuroAccess",
+    openGraph: {
+      title: titles[lang] || titles.zh,
+      description: descriptions[lang] || descriptions.zh,
+      url: baseUrl,
+      siteName: "NeuroAccess",
+      images: [
+        {
+          url: `${baseUrl}/neuroaccess-logo-512.png`,
+          width: 512,
+          height: 512,
+          alt: titles[lang] || titles.zh,
+        },
+      ],
+      locale: ogLocales[lang] || ogLocales.zh,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: titles[lang] || titles.zh,
+      description: descriptions[lang] || descriptions.zh,
+      images: [`${baseUrl}/neuroaccess-logo-512.png`],
+    },
     icons: {
       icon: [
         { url: "/favicon.ico?v=4", sizes: "16x16 32x32 48x48 64x64", type: "image/x-icon" },
