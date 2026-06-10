@@ -53,7 +53,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col transition-all duration-300 ${
+      className={`bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col transition-[width] duration-300 ${
         collapsed ? "w-[68px]" : "w-[240px]"
       }`}
     >
@@ -78,7 +78,7 @@ export default function Sidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-200 ${
                     isActive
                       ? "bg-[var(--color-primary)] text-[var(--color-surface)] shadow-lg shadow-[var(--color-primary)_/10]"
                       : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
@@ -97,7 +97,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-[var(--color-border)] space-y-1">
         <button
           onClick={() => setSettingsOpen(true)}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
             collapsed ? "justify-center" : ""
           } ${
             settingsOpen
