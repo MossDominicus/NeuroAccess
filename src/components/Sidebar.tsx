@@ -60,7 +60,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-14 flex items-center px-4 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2.5">
-          <img src="/neuroaccess-logo-small.png" alt="NeuroAccess" className="w-8 h-8 rounded-lg object-contain bg-[var(--color-bg)]" />
+          <img src="/neuroaccess-logo-small.png" alt="NeuroAccess" width={32} height={32} className="w-8 h-8 rounded-lg object-contain bg-[var(--color-bg)]" />
           {!collapsed && (
             <span className="font-bold tracking-tight text-[var(--color-text)]">NeuroAccess</span>
           )}

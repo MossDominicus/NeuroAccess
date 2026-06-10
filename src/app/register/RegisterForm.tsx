@@ -99,7 +99,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
     >
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
         <div className="text-center mb-8">
-          <img src="/neuroaccess-logo.png" alt="NeuroAccess" className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
+          <img src="/neuroaccess-logo.png" alt="NeuroAccess" width={48} height={48} className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
           <h1 className="text-2xl font-bold text-[var(--color-text)]">
             NeuroAccess
           </h1>
