@@ -38,7 +38,7 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
       {/* Left: logo */}
       <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
         <span className="text-sm font-semibold text-[var(--color-text)]">NeuroAccess</span>
-        <span className="text-xs text-[var(--color-text-secondary)]">v1.3</span>
+        <span className="text-xs text-[var(--color-text-secondary)]">v1.5</span>
       </a>
 
       {/* Right: user avatar */}
