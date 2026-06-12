@@ -43,7 +43,7 @@ def contains_beginner_jargon(text: str) -> bool:
     return count >= 3
 
 
-def call_openrouter(prompt: str, timeout: int = 60) -> Dict[str, Any]:
+def call_openrouter(prompt: str, timeout: int = 30) -> Dict[str, Any]:
     """调用 OpenRouter API；失败返回 { success: False, error }"""
     if not OPENROUTER_API_KEY:
         return {"success": False, "error": "OpenRouter API key not configured"}
@@ -262,7 +262,7 @@ def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str,
         future_primary = executor.submit(_generate_explanations_for_lang, analysis, primary_lang)
         future_en = executor.submit(_generate_explanations_for_lang, analysis, "en")
         try:
-            results[primary_lang] = future_primary.result(timeout=120)
+            results[primary_lang] = future_primary.result(timeout=60)
         except Exception:
             results[primary_lang] = {
                 "beginner": template_beginner(analysis, primary_lang),
@@ -270,7 +270,7 @@ def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str,
                 "research": template_research(analysis, primary_lang),
             }
         try:
-            results["en"] = future_en.result(timeout=120)
+            results["en"] = future_en.result(timeout=60)
         except Exception:
             results["en"] = {
                 "beginner": template_beginner(analysis, "en"),
