@@ -8,3 +8,4 @@ matplotlib
 requests
 passlib
 python-jose
+python-dotenv

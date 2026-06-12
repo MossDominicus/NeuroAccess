@@ -390,6 +390,7 @@ try:
         create_user, authenticate_user, create_access_token, verify_token, get_user_by_id,
         generate_verification_code, verify_verification_code, update_password, update_email, delete_user, get_db,
         accept_terms, check_username_setup,
+        get_user_by_phone, create_user_with_phone, authenticate_by_phone, update_phone,
     )
     AUTH_AVAILABLE = True
 except Exception as _auth_e:
@@ -418,7 +419,7 @@ def auth_register(username: str = Form(...), email: str = Form(...), password: s
             return {"success": False, "error": "验证码无效或已过期"}
         user = create_user(username, email, password)
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
-        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", "")}}
+        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", "")}}
     except ValueError as e:
         return {"success": False, "error": str(e)}
 
@@ -432,7 +433,7 @@ def auth_login(username_or_email: str = Form(...), password: str = Form(...)):
     token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
     terms_accepted = user.get("terms_accepted", 0)
     needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
-    return {"success": True, "token": token, "terms_accepted": bool(terms_accepted), "needs_username_setup": needs_username_setup, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", "")}}
+    return {"success": True, "token": token, "terms_accepted": bool(terms_accepted), "needs_username_setup": needs_username_setup, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", "")}}
 
 @app.get("/api/auth/me")
 def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -445,7 +446,7 @@ def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     user = get_user_by_id(int(payload["sub"]))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "avatar_url": user.get("avatar_url", ""), "terms_accepted": user.get("terms_accepted", 0)}}
+    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", ""), "terms_accepted": user.get("terms_accepted", 0)}}
 
 @app.post("/api/auth/logout")
 def auth_logout():
@@ -1014,7 +1015,7 @@ async def auth_update_profile(
     conn.close()
     
     updated_user = get_user_by_id(user_id)
-    return {"success": True, "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "avatar_url": updated_user.get("avatar_url", "")}}
+    return {"success": True, "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "phone": updated_user.get("phone", ""), "avatar_url": updated_user.get("avatar_url", "")}}
 
 # =================================================================
 # Feedback API

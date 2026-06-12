@@ -116,7 +116,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     if (!selected || selected.length === 0) return;
     const valid = Array.from(selected).filter((f) => {
       const ext = f.name.split(".").pop()?.toLowerCase();
-      return ["edf", "bdf", "gdf", "csv"].includes(ext || "");
+      return ["edf", "bdf", "gdf"].includes(ext || "");
     });
     if (valid.length === 0) return;
     setFiles((prev) => [

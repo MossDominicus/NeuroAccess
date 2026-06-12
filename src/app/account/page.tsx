@@ -8,6 +8,7 @@ import { t } from "@/lib/translations";
 import { getDisplayInitial } from "@/lib/display-initial";
 import { ArrowLeft, User, Key, Mail, AlertTriangle, Eye, EyeOff } from "lucide-react";
 
+
 const AVATAR_COLORS = [
   "#EF4444", "#F97316", "#EAB308", "#22C55E",
   "#3B82F6", "#8B5CF6", "#EC4899", "#14B8A6",
@@ -28,7 +29,7 @@ export default function AccountPage() {
   // ---------- 编辑资料 ----------
   const [editUsername, setEditUsername] = useState(user?.username || "");
   const [editAvatarUrl, setEditAvatarUrl] = useState(
-    AVATAR_COLORS.includes(user?.avatar_url || "") ? (user?.avatar_url || "") : (AVATAR_COLORS[0] || "#3B82F6")
+    user?.avatar_url && AVATAR_COLORS.includes(user.avatar_url) ? user.avatar_url : AVATAR_COLORS[0]
   );
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
@@ -69,7 +70,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (user) {
       setEditUsername(user.username || "");
-      setEditAvatarUrl(user.avatar_url || "");
+      setEditAvatarUrl(user.avatar_url || AVATAR_COLORS[0]);
     }
   }, [user]);
 
@@ -93,10 +94,10 @@ export default function AccountPage() {
           updateUser(updated);
         }
       } else {
-        setEditError(result.error || "更新失败");
+        setEditError(result.error || t(lang, "failedToUpdateProfile") || "更新失败");
       }
     } catch (e: any) {
-      setEditError(e.message || "更新失败");
+      setEditError(e.message || t(lang, "failedToUpdateProfile") || "更新失败");
     }
     setEditLoading(false);
   };
@@ -159,10 +160,10 @@ export default function AccountPage() {
         setPwNew("");
         setPwConfirm("");
       } else {
-        setPwError(result.error || "修改失败");
+        setPwError(result.error || t(lang, "failedToChangePasswordMsg") || "修改失败");
       }
     } catch (e: any) {
-      setPwError(e.message || "修改失败");
+      setPwError(e.message || t(lang, "failedToChangePasswordMsg") || "修改失败");
     }
     setPwLoading(false);
   };
@@ -230,10 +231,10 @@ export default function AccountPage() {
         setEmailNew("");
         setEmailCode("");
       } else {
-        setEmailError(result.error || "修改失败");
+        setEmailError(result.error || t(lang, "failedToChangeEmail") || "邮箱修改失败");
       }
     } catch (e: any) {
-      setEmailError(e.message || "修改失败");
+      setEmailError(e.message || t(lang, "failedToChangeEmail") || "邮箱修改失败");
     }
     setEmailLoading(false);
   };
@@ -243,6 +244,7 @@ export default function AccountPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleteSuccess, setDeleteSuccess] = useState("");
+
   const sendDeleteCode = async () => {
     setDeleteError("");
     setDeleteLoading(true);
@@ -277,10 +279,10 @@ export default function AccountPage() {
         setDeleteSuccess(t(lang, "accountDeleted") || "账号已注销");
         setTimeout(() => { logout(); router.push("/"); }, 1500);
       } else {
-        setDeleteError(result.error || "注销失败");
+        setDeleteError(result.error || t(lang, "failedToDeleteAccount") || "注销失败");
       }
     } catch (e: any) {
-      setDeleteError(e.message || "注销失败");
+      setDeleteError(e.message || t(lang, "failedToDeleteAccount") || "注销失败");
     }
     setDeleteLoading(false);
   };
@@ -288,7 +290,7 @@ export default function AccountPage() {
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center">
-        <div className="text-[var(--color-text-secondary)]">加载中...</div>
+        <div className="text-[var(--color-text-secondary)]">{t(lang, "loading") || "加载中..."}</div>
       </div>
     );
   }
@@ -382,8 +384,8 @@ export default function AccountPage() {
                 <>{t(lang, "save") || "保存"}</>
               )}
             </button>
-            {editError && <p className="text-xs text-red-500">{editError}</p>}
-            {editSuccess && <p className="text-xs text-emerald-500">{editSuccess}</p>}
+            {editError && <p className="text-xs text-red-500 dark:text-red-400">{editError}</p>}
+            {editSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{editSuccess}</p>}
           </div>
         </section>
 
@@ -468,8 +470,8 @@ export default function AccountPage() {
             >
               {pwLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "changePassword") || "修改密码")}
             </button>
-            {pwError && <p className="text-xs text-red-500">{pwError}</p>}
-            {pwSuccess && <p className="text-xs text-emerald-500">{pwSuccess}</p>}
+            {pwError && <p className="text-xs text-red-500 dark:text-red-400">{pwError}</p>}
+            {pwSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{pwSuccess}</p>}
           </div>
         </section>
 
@@ -495,7 +497,7 @@ export default function AccountPage() {
                   type="email"
                   value={emailNew}
                   onChange={(e) => setEmailNew(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder={t(lang, "emailPlaceholder") || "name@example.com"}
                   className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
                 <button
@@ -528,8 +530,8 @@ export default function AccountPage() {
             >
               {emailLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "confirmChange") || "确认修改")}
             </button>
-            {emailError && <p className="text-xs text-red-500">{emailError}</p>}
-            {emailSuccess && <p className="text-xs text-emerald-500">{emailSuccess}</p>}
+            {emailError && <p className="text-xs text-red-500 dark:text-red-400">{emailError}</p>}
+            {emailSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{emailSuccess}</p>}
           </div>
         </section>
 
@@ -565,7 +567,7 @@ export default function AccountPage() {
                 value={deleteCode}
                 onChange={(e) => setDeleteCode(e.target.value)}
                 placeholder={t(lang, "enterCode") || "请输入验证码"}
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
               />
             </div>
             {/* 注销按钮 */}
@@ -576,8 +578,8 @@ export default function AccountPage() {
             >
               {deleteLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "confirmDeleteAccount") || "确认注销账号")}
             </button>
-            {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
-            {deleteSuccess && <p className="text-xs text-emerald-500">{deleteSuccess}</p>}
+            {deleteError && <p className="text-xs text-red-500 dark:text-red-400">{deleteError}</p>}
+            {deleteSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{deleteSuccess}</p>}
           </div>
         </section>
 

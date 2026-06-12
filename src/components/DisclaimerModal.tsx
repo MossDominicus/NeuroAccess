@@ -48,8 +48,8 @@ export default function DisclaimerModal() {
       <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 pt-6 pb-3">
-          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 dark:bg-yellow-500/20 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-[var(--color-text)]">
@@ -63,7 +63,7 @@ export default function DisclaimerModal() {
 
         {/* Content */}
         <div className="px-6 py-4 space-y-3 text-sm text-[var(--color-text)] leading-relaxed max-h-[50vh] overflow-y-auto">
-          <p className="font-medium text-red-500">
+          <p className="font-medium text-red-500 dark:text-red-400">
             {t("disclaimerImportant") || "重要提示："}
           </p>
           <ul className="space-y-2 pl-4 list-disc text-[var(--color-text-secondary)]">

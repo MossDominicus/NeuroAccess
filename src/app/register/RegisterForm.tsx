@@ -15,7 +15,6 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const router = useRouter();
   const { register } = useAuth();
 
-  // Helper: get translation directly from translations object (no useLang needed)
   const tf = (key: string, fallback: string) => {
     const val = translations[lang as keyof typeof translations]?.[key];
     return val || fallback;
@@ -95,9 +94,14 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
       className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      transition={{ duration: 0.05 }}
     >
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
+        {/* 网站介绍 */}
+        <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 text-xs leading-relaxed text-[var(--color-text)]">
+          {tf("siteIntro", "")}
+        </div>
+
         <div className="text-center mb-8">
           <img src="/neuroaccess-logo.png" alt="NeuroAccess" width={48} height={48} className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
           <h1 className="text-2xl font-bold text-[var(--color-text)]">
@@ -123,14 +127,12 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
                   setError(tf("usernameRequired", "请填写用户名"));
                   return;
                 }
-                // 第一个字符必须是文字
                 const firstChar = Array.from(v)[0] || "";
                 const isLetterStart = /^\p{L}/u.test(firstChar);
                 if (!isLetterStart) {
                   setError(tf("usernameMustStartWithLetter", "名字开头必须是文字"));
                   return;
                 }
-                // 禁止特殊符号（允许字母/数字/空格/中日韩/emoji/下划线/连字符）
                 if (/[!@#$%^&*()+\=\[\]{}|\\;:'"`/<>?~.,。]/.test(v)) {
                   setError(tf("usernameNoSpecialChars", "名字不能包含特殊符号"));
                   return;
@@ -252,7 +254,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm">
               {error}
             </div>
           )}

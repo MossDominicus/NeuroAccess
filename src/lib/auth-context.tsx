@@ -7,6 +7,7 @@ interface User {
   id: number;
   username: string;
   email: string;
+  phone?: string;
   avatar_url?: string;
 }
 
@@ -81,9 +82,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Handle terms acceptance and username setup flags
         const ta = !!data.terms_accepted;
         const nu = !!data.needs_username_setup;
-        setTermsAccepted(ta);
         setNeedsUsernameSetup(nu);
-        localStorage.setItem("neuroaccess-terms-accepted", ta ? "true" : "false");
+        // termsAccepted: 仅首次注册时要求勾选，后续登录不再重置
+        // 如果 localStorage 已标记为同意，保持 true
+        const savedTerms = localStorage.getItem("neuroaccess-terms-accepted");
+        if (savedTerms === "true") {
+          setTermsAccepted(true);
+        } else {
+          setTermsAccepted(ta);
+          localStorage.setItem("neuroaccess-terms-accepted", ta ? "true" : "false");
+        }
         return { success: true, termsAccepted: ta, needsUsernameSetup: nu };
       }
       return { success: false, error: data.error || tf("loginFailed", "登录失败") };

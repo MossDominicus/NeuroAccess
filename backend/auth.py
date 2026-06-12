@@ -72,6 +72,21 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 0")
     except Exception:
         pass  # column already exists
+    # Add phone column if not exists (for phone login)
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN phone TEXT UNIQUE DEFAULT ''")
+    except Exception:
+        pass  # column already exists
+    # Add phone_verified column if not exists
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists
+    # Add phone column to verification_codes if not exists
+    try:
+        conn.execute("ALTER TABLE verification_codes ADD COLUMN phone TEXT")
+    except Exception:
+        pass  # column already exists
     # Add email column if not exists (for registration codes)
     try:
         conn.execute("ALTER TABLE verification_codes ADD COLUMN email TEXT")
@@ -422,6 +437,103 @@ def check_username_setup(user_id: int) -> bool:
             return False
         username = row["username"]
         return username == "User" or username.strip() == ""
+    finally:
+        conn.close()
+
+
+# ── Phone Number Authentication ──────────────────────────────────────
+
+def _is_valid_phone(phone: str) -> bool:
+    """Validate phone number format (simple: digits, 8-15 chars)."""
+    import re
+    phone = phone.strip()
+    return bool(re.match(r"^\+?[0-9]{8,15}$", phone))
+
+
+def get_user_by_phone(phone: str) -> Optional[Dict[str, Any]]:
+    """Get user by phone number. Returns user dict or None."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, username, email, phone, avatar_url, created_at, terms_accepted FROM users WHERE phone = ?",
+            (phone.strip(),),
+        ).fetchone()
+        if row:
+            return dict(row)
+        return None
+    finally:
+        conn.close()
+
+
+def create_user_with_phone(username: str, phone: str, password: str) -> Dict[str, Any]:
+    """Create a new user with phone as primary credential. Returns user dict or raises ValueError."""
+    if not _is_valid_phone(phone):
+        raise ValueError("Invalid phone number format")
+    if len(password) < 6:
+        raise ValueError("Password must be at least 6 characters")
+
+    conn = get_db()
+    try:
+        # Use phone as default email placeholder
+        email = f"phone_{phone.replace('+','')}@neuroaccess.local"
+        cursor = conn.execute(
+            "INSERT INTO users (username, email, phone, password_hash, phone_verified) VALUES (?, ?, ?, ?, 1)",
+            (username, email, phone.strip(), hash_password(password)),
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        return {
+            "id": user_id,
+            "username": username,
+            "email": "",
+            "phone": phone.strip(),
+            "avatar_url": "",
+            "created_at": datetime.utcnow().isoformat(),
+        }
+    except sqlite3.IntegrityError:
+        raise ValueError("Phone number already exists")
+    finally:
+        conn.close()
+
+
+def authenticate_by_phone(phone: str, password: str) -> Optional[Dict[str, Any]]:
+    """Authenticate user by phone + password. Returns user dict or None."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, username, email, phone, avatar_url, password_hash, created_at, terms_accepted FROM users WHERE phone = ?",
+            (phone.strip(),),
+        ).fetchone()
+        if row is None:
+            return None
+        if not verify_password(password, row["password_hash"]):
+            return None
+        return {
+            "id": row["id"],
+            "username": row["username"],
+            "email": row["email"],
+            "phone": row["phone"],
+            "avatar_url": row["avatar_url"] or "",
+            "created_at": row["created_at"],
+            "terms_accepted": row["terms_accepted"],
+        }
+    finally:
+        conn.close()
+
+
+def update_phone(user_id: int, new_phone: str) -> bool:
+    """Update user phone number. Returns True on success."""
+    conn = get_db()
+    try:
+        existing = conn.execute("SELECT id FROM users WHERE phone = ? AND id != ?", (new_phone.strip(), user_id)).fetchone()
+        if existing:
+            return False
+        cursor = conn.execute(
+            "UPDATE users SET phone = ?, phone_verified = 1 WHERE id = ?",
+            (new_phone.strip(), user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()
 

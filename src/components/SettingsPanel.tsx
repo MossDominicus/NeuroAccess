@@ -213,9 +213,9 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] pt-4">
                     <div className="flex items-center gap-1.5">
                       {aiStatus.online ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
                       ) : (
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
                       )}
                       <span className={aiStatus.online ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
                         {aiStatus.online ? t("aiOnline") : t("aiOffline")}
@@ -223,7 +223,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     </div>
                     {aiStatus.online && (
                       <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
                         <span>{aiStatus.model}</span>
                       </div>
                     )}
@@ -279,7 +279,7 @@ function ThemeOption({
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
         active
-          ? "bg-gray-900 text-white shadow-lg shadow-gray-900/10"
+          ? "bg-[var(--color-text)] text-[var(--color-bg)] shadow-lg"
           : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
       }`}
     >
@@ -305,7 +305,7 @@ function LangBtn({
       onClick={onClick}
       className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
         active
-          ? "bg-gray-900 text-white shadow-lg shadow-gray-900/10"
+          ? "bg-[var(--color-text)] text-[var(--color-bg)] shadow-lg"
           : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-border)]"
       }`}
     >

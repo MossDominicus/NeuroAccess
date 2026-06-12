@@ -136,10 +136,11 @@ export function LanguageProvider({ children, initialLang }: { children: ReactNod
     }
   }, []);
 
-  // 语言变化时写入 localStorage + 更新 <html lang>
+  // 语言变化时写入 localStorage + 写入 cookie (供 SSR 读取) + 更新 <html lang>
   useEffect(() => {
     try {
       localStorage.setItem("neuroaccess-language", lang);
+      document.cookie = `lang=${lang}; path=/; max-age=2592000`;
       document.documentElement.lang = lang;
       document.documentElement.setAttribute("data-lang", lang);
     } catch {}

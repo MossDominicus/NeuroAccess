@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import nextDynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/language-context";
+
+export const dynamic = "force-static";
+
+
+const EEGViewerPlot = nextDynamic(() => import("@/components/PlotlyEEGViewerWaveform"), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-96" />,
+});
 
 export default function EEGViewerPage() {
   const { t, lang } = useLang();
@@ -14,7 +23,6 @@ export default function EEGViewerPage() {
   const [eegData, setEegData] = useState<any>(null);
   const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set());
   const [duration, setDuration] = useState(30);
-  const plotRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("neuroaccess-token") || "";
@@ -99,82 +107,6 @@ export default function EEGViewerPage() {
     });
   };
 
-  // 绘制 EEG 波形（使用 Plotly.js 原生 API）
-  useEffect(() => {
-    if (!eegData || !eegData.times || !eegData.channels || !plotRef.current) return;
-
-    // 动态导入 Plotly.js
-    // @ts-expect-error no types for plotly.js-dist
-    import("plotly.js-dist").then((Plotly: any) => {
-      if (!plotRef.current) return;
-      const { times, channels, channel_names } = eegData;
-      const plotData: any[] = [];
-
-      channel_names.forEach((chName: string, idx: number) => {
-        if (!selectedChannels.has(chName)) return;
-        const chData = channels[chName];
-        if (!chData) return;
-
-        const offset = -idx * 100;
-        const yData = chData.map((v: number) => v + offset);
-
-        plotData.push({
-          x: times,
-          y: yData,
-          type: "scatter",
-          mode: "lines",
-          name: chName,
-          line: { width: 1 },
-          hovertemplate: `%{fullData.name}<br>${t("hoverTime")}: %{x:.2f}s<br>${t("hoverAmplitude")}: %{y:.2f}${t("hoverUnit")}<extra></extra>`,
-        });
-      });
-
-      const yTicks: number[] = [];
-      const yTickLabels: string[] = [];
-      channel_names.forEach((chName: string, idx: number) => {
-        if (selectedChannels.has(chName)) {
-          yTicks.push(-idx * 100);
-          yTickLabels.push(chName);
-        }
-      });
-
-      // 检测深色模式
-      const isDark = document.documentElement.classList.contains("dark");
-      const layout = {
-        title: { text: `${t("eegWaveformTitle")} - ${eegData.file_name}`, font: { size: 16, color: isDark ? "#e5e7eb" : "#111827" } },
-        xaxis: {
-          title: { text: t("timeSec"), font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
-          showgrid: true,
-          gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        yaxis: {
-          title: { text: t("channelAxis"), font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
-          tickmode: "array" as const,
-          tickvals: yTicks,
-          ticktext: yTickLabels,
-          showgrid: true,
-          gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        plot_bgcolor: isDark ? "transparent" : "#fafafa",
-        paper_bgcolor: "transparent",
-        margin: { t: 50, r: 30, l: 80, b: 50 },
-        showlegend: false,
-        hovermode: "closest" as const,
-        font: { color: isDark ? "#e5e7eb" : "#111827" },
-      };
-
-      const config = {
-        responsive: true,
-        displayModeBar: true,
-        modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d"],
-      };
-
-      Plotly.newPlot(plotRef.current, plotData, layout, config);
-    });
-  }, [eegData, selectedChannels, t]);
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* 页面标题 */}
@@ -198,7 +130,7 @@ export default function EEGViewerPage() {
           <input
             id="eeg-file-input"
             type="file"
-            accept=".edf,.bdf,.gdf,.csv"
+            accept=".edf,.bdf,.gdf"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -281,7 +213,7 @@ export default function EEGViewerPage() {
                   onClick={() => toggleChannel(ch)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     selectedChannels.has(ch)
-                      ? "bg-blue-600 text-white"
+                      ? "bg-blue-600 text-white dark:bg-blue-500"
                       : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
                   }`}
                 >
@@ -292,9 +224,7 @@ export default function EEGViewerPage() {
           </div>
 
           {/* 波形图 */}
-          <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
-            <div ref={plotRef} style={{ width: "100%", height: "600px" }} />
-          </div>
+          <EEGViewerPlot eegData={eegData} selectedChannels={selectedChannels} />
         </div>
       )}
     </div>

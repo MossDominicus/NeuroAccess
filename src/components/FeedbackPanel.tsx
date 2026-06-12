@@ -94,7 +94,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
       >
-        <CheckCircle className="mx-auto mb-3 h-10 w-10 text-emerald-500" />
+        <CheckCircle className="mx-auto mb-3 h-10 w-10 text-emerald-500 dark:text-emerald-400" />
         <p className="text-sm font-medium text-emerald-800 dark:text-emerald-400">{t("feedbackThankYou")}</p>
       </motion.div>
     );

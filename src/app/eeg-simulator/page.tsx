@@ -1,9 +1,27 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Info } from "lucide-react";
+import { motion } from "framer-motion";
+
+export const dynamic = "force-static";
+
+
+// 动态导入图表组件（recharts 太大，客户端才加载）
+const WaveformChart = nextDynamic(() => import("./WaveformChart"), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64" />,
+});
+const PSDChart = nextDynamic(() => import("./PSDChart"), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64" />,
+});
+const BandPowerChart = nextDynamic(() => import("./BandPowerChart"), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-48" />,
+});
 
 // 每个参数的中文科普说明 (7 语言 key 都会自动翻译)
 const PARAM_HELP_KEYS: Record<string, string> = {
@@ -16,10 +34,29 @@ const PARAM_HELP_KEYS: Record<string, string> = {
   theta_freq: "thetaFreqHelp",
   delta_freq: "deltaFreqHelp",
   noise_level: "noiseHelp",
+  artifact_blink: "artifactBlinkHelp",
+  artifact_muscle: "artifactMuscleHelp",
+  artifact_powerline: "artifactPowerlineHelp",
 };
 
 export default function EegSimulatorPage() {
   const { t } = useLang();
+
+  // 设置页面标题
+  useEffect(() => {
+    document.title = `NeuroAccess`;
+  }, [t]);
+
+  // 每个滑块可展开的注释面板状态
+  const [helpOpen, setHelpOpen] = useState<Set<string>>(new Set());
+  const toggleHelp = (key: string) => {
+    setHelpOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // 模拟参数
   const [params, setParams] = useState({
@@ -62,7 +99,7 @@ export default function EegSimulatorPage() {
 
       const data = await resp.json();
       if (!data.success) {
-        setError(data.error || "生成失败");
+        setError(data.error || t("generatingEEG") || "生成失败");
         setLoading(false);
         return;
       }
@@ -70,7 +107,7 @@ export default function EegSimulatorPage() {
       setResult(data);
       setLoading(false);
     } catch (err: any) {
-      setError(err.message || "请求失败");
+      setError(err.message || t("networkErrorMsg") || "请求失败");
       setLoading(false);
     }
   }, [params]);
@@ -123,12 +160,12 @@ export default function EegSimulatorPage() {
   // 频段功率对比图数据
   const bandData = useMemo(() => {
     return [
-      { name: "δ Delta", value: params.delta_power, range: "0.5-4 Hz", fill: "#a78bfa" },
-      { name: "θ Theta", value: params.theta_power, range: "4-8 Hz", fill: "#60a5fa" },
-      { name: "α Alpha", value: params.alpha_power, range: "8-13 Hz", fill: "#34d399" },
-      { name: "β Beta", value: params.beta_power, range: "13-30 Hz", fill: "#fbbf24" },
+      { name: `δ ${t("bandDelta")}`, value: params.delta_power, range: "0.5-4 Hz", fill: "#a78bfa" },
+      { name: `θ ${t("bandTheta")}`, value: params.theta_power, range: "4-8 Hz", fill: "#60a5fa" },
+      { name: `α ${t("bandAlpha")}`, value: params.alpha_power, range: "8-13 Hz", fill: "#34d399" },
+      { name: `β ${t("bandBeta")}`, value: params.beta_power, range: "13-30 Hz", fill: "#fbbf24" },
     ];
-  }, [params]);
+  }, [params, t]);
 
   const CHANNEL_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
 
@@ -142,19 +179,31 @@ export default function EegSimulatorPage() {
   ) => {
     const helpKey = PARAM_HELP_KEYS[key];
     const helpText = helpKey ? t(helpKey) : "";
+    const isOpen = helpOpen.has(key);
     return (
       <div key={key} className="mb-4">
         <label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-text)] mb-1">
           <span>{label}: <span className="text-[var(--color-primary)] font-bold">{params[key as keyof typeof params]}</span></span>
           {helpText && helpText !== helpKey && (
-            <span className="group relative inline-flex">
-              <Info className="w-3.5 h-3.5 text-[var(--color-text-secondary)] cursor-help opacity-60 hover:opacity-100" />
-              <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute left-0 top-5 z-50 w-64 p-2 text-xs font-normal text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg pointer-events-none">
-                {helpText}
-              </span>
-            </span>
+            <button
+              type="button"
+              onClick={() => toggleHelp(key)}
+              className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors ${
+                isOpen
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
+              }`}
+              title="查看注释"
+            >
+              <Info className="w-3 h-3" />
+            </button>
           )}
         </label>
+        {isOpen && helpText && helpText !== helpKey && (
+          <div className="mb-2 p-3 text-xs leading-relaxed text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-sm">
+            {helpText}
+          </div>
+        )}
         <input
           type="range"
           min={min}
@@ -162,14 +211,65 @@ export default function EegSimulatorPage() {
           step={step}
           value={params[key as keyof typeof params] as number}
           onChange={(e) => setParams({ ...params, [key]: parseFloat(e.target.value) })}
-          className="w-full accent-[var(--color-primary)]"
+            className="w-full accent-[var(--color-primary)]"
         />
       </div>
     );
   };
 
+  // 渲染复选框（含注释按钮）
+  const renderCheckbox = (
+    label: string,
+    key: string,
+  ) => {
+    const helpKey = PARAM_HELP_KEYS[key];
+    const helpText = helpKey ? t(helpKey) : "";
+    const isOpen = helpOpen.has(key);
+    return (
+      <div key={key} className="mt-3">
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 cursor-pointer flex-1">
+            <input
+              type="checkbox"
+              checked={params[key as keyof typeof params] as boolean}
+              onChange={(e) => setParams({ ...params, [key]: e.target.checked })}
+              className="rounded accent-[var(--color-primary)]"
+            />
+            <span className="text-sm text-[var(--color-text)]">
+              {label}
+            </span>
+          </label>
+          {helpText && helpText !== helpKey && (
+            <button
+              type="button"
+              onClick={() => toggleHelp(key)}
+              className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors shrink-0 ${
+                isOpen
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
+              }`}
+              title="查看注释"
+            >
+              <Info className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {isOpen && helpText && helpText !== helpKey && (
+          <div className="mt-2 p-3 text-xs leading-relaxed text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-sm">
+            {helpText}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-[var(--color-bg)]">
+    <motion.div
+      className="min-h-screen bg-[var(--color-bg)]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.05 }}
+    >
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左侧：控制面板 */}
@@ -187,10 +287,10 @@ export default function EegSimulatorPage() {
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
                   {t("bandPower")}
                 </h3>
-                {renderSlider("Alpha (8-13 Hz)", "alpha_power", 0, 2, 0.1)}
-                {renderSlider("Beta (13-30 Hz)", "beta_power", 0, 2, 0.1)}
-                {renderSlider("Theta (4-8 Hz)", "theta_power", 0, 2, 0.1)}
-                {renderSlider("Delta (0.5-4 Hz)", "delta_power", 0, 2, 0.1)}
+                {renderSlider(`${t("bandAlpha")} (8-13 Hz)`, "alpha_power", 0, 2, 0.1)}
+                {renderSlider(`${t("bandBeta")} (13-30 Hz)`, "beta_power", 0, 2, 0.1)}
+                {renderSlider(`${t("bandTheta")} (4-8 Hz)`, "theta_power", 0, 2, 0.1)}
+                {renderSlider(`${t("bandDelta")} (0.5-4 Hz)`, "delta_power", 0, 2, 0.1)}
               </div>
 
               {/* 频段频率 */}
@@ -198,10 +298,10 @@ export default function EegSimulatorPage() {
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
                   {t("bandFrequency")}
                 </h3>
-                {renderSlider("Alpha Freq (Hz)", "alpha_freq", 8, 13, 0.5)}
-                {renderSlider("Beta Freq (Hz)", "beta_freq", 13, 30, 1)}
-                {renderSlider("Theta Freq (Hz)", "theta_freq", 4, 8, 0.5)}
-                {renderSlider("Delta Freq (Hz)", "delta_freq", 0.5, 4, 0.5)}
+                {renderSlider(`${t("bandAlpha")} ${t("timeUnitSec") !== "s" ? "Freq (Hz)" : "Freq (Hz)"}`, "alpha_freq", 8, 13, 0.5)}
+                {renderSlider(`${t("bandBeta")} Freq (Hz)`, "beta_freq", 13, 30, 1)}
+                {renderSlider(`${t("bandTheta")} Freq (Hz)`, "theta_freq", 4, 8, 0.5)}
+                {renderSlider(`${t("bandDelta")} Freq (Hz)`, "delta_freq", 0.5, 4, 0.5)}
               </div>
 
               {/* 噪声和伪影 */}
@@ -211,41 +311,9 @@ export default function EegSimulatorPage() {
                 </h3>
                 {renderSlider("Noise Level", "noise_level", 0, 1, 0.05)}
 
-                <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={params.artifact_blink}
-                    onChange={(e) => setParams({ ...params, artifact_blink: e.target.checked })}
-                    className="rounded accent-[var(--color-primary)]"
-                  />
-                  <span className="text-sm text-[var(--color-text)]">
-                    {t("artifactBlink")}
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={params.artifact_muscle}
-                    onChange={(e) => setParams({ ...params, artifact_muscle: e.target.checked })}
-                    className="rounded accent-[var(--color-primary)]"
-                  />
-                  <span className="text-sm text-[var(--color-text)]">
-                    {t("artifactMuscle")}
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={params.artifact_powerline}
-                    onChange={(e) => setParams({ ...params, artifact_powerline: e.target.checked })}
-                    className="rounded accent-[var(--color-primary)]"
-                  />
-                  <span className="text-sm text-[var(--color-text)]">
-                    {t("artifactPowerline")}
-                  </span>
-                </label>
+                {renderCheckbox(t("artifactBlink"), "artifact_blink")}
+                {renderCheckbox(t("artifactMuscle"), "artifact_muscle")}
+                {renderCheckbox(t("artifactPowerline"), "artifact_powerline")}
               </div>
 
               {/* 生成按钮 */}
@@ -312,42 +380,7 @@ export default function EegSimulatorPage() {
                       {t("timeDomainWaveform")}
                     </h3>
                     <div className="bg-[var(--color-bg)] rounded-xl p-4 border border-[var(--color-border)]">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={waveformData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                          <XAxis
-                            dataKey="time"
-                            stroke="var(--color-text-secondary)"
-                            label={{ value: 'Time (s)', position: 'insideBottom', offset: -5, fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                            tick={{ fontSize: 10 }}
-                          />
-                          <YAxis
-                            stroke="var(--color-text-secondary)"
-                            label={{ value: 'μV', angle: -90, position: 'insideLeft', fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                            tick={{ fontSize: 10 }}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'var(--color-surface)',
-                              border: '1px solid var(--color-border)',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                            }}
-                          />
-                          <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          {(result.channel_names || []).map((ch: string, i: number) => (
-                            <Line
-                              key={ch}
-                              type="monotone"
-                              dataKey={ch}
-                              stroke={CHANNEL_COLORS[i % CHANNEL_COLORS.length]}
-                              dot={false}
-                              strokeWidth={1}
-                              isAnimationActive={false}
-                            />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <WaveformChart data={waveformData} channelNames={result.channel_names} channelColors={CHANNEL_COLORS} />
                     </div>
                   </div>
 
@@ -361,40 +394,7 @@ export default function EegSimulatorPage() {
                         {t("psdDescription")}
                       </p>
                       <div className="bg-[var(--color-bg)] rounded-xl p-4 border border-[var(--color-border)]">
-                        <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={psdData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                            <XAxis
-                              dataKey="freq"
-                              stroke="var(--color-text-secondary)"
-                              label={{ value: 'Frequency (Hz)', position: 'insideBottom', offset: -5, fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                              tick={{ fontSize: 10 }}
-                            />
-                            <YAxis
-                              stroke="var(--color-text-secondary)"
-                              label={{ value: 'Power (μV²/Hz)', angle: -90, position: 'insideLeft', fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                              tick={{ fontSize: 10 }}
-                              tickFormatter={(v) => v.toExponential(0)}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: 'var(--color-surface)',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '8px',
-                                fontSize: '12px',
-                              }}
-                              formatter={(value: any) => Number(value).toExponential(2)}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="power"
-                              stroke="var(--color-primary)"
-                              dot={false}
-                              strokeWidth={1.5}
-                              isAnimationActive={false}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <PSDChart data={psdData} />
                       </div>
                     </div>
                   )}
@@ -405,26 +405,7 @@ export default function EegSimulatorPage() {
                       {t("bandPower")}
                     </h3>
                     <div className="bg-[var(--color-bg)] rounded-xl p-4 border border-[var(--color-border)]">
-                      <ResponsiveContainer width="100%" height={180}>
-                        <BarChart data={bandData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                          <XAxis dataKey="name" stroke="var(--color-text-secondary)" tick={{ fontSize: 11 }} />
-                          <YAxis stroke="var(--color-text-secondary)" tick={{ fontSize: 10 }} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'var(--color-surface)',
-                              border: '1px solid var(--color-border)',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                            }}
-                          />
-                          <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                            {bandData.map((entry, index) => (
-                              <Bar key={index} dataKey="value" fill={entry.fill} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <BandPowerChart data={bandData} />
                     </div>
                   </div>
                 </div>
@@ -433,6 +414,6 @@ export default function EegSimulatorPage() {
           </div>
         </div>
       </main>
-    </div>
+    </motion.div>
   );
 }

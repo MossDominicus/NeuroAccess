@@ -6,6 +6,8 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { termsSections } from "@/lib/legal-content";
 
+export const dynamic = "force-static";
+
 export default function TermsOfService() {
   const { t, lang } = useLang();
 
@@ -89,7 +91,7 @@ export default function TermsOfService() {
       className="mx-auto max-w-3xl px-6 py-12"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
+      transition={{ duration: 0.05 }}
     >
       <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors">
         <ArrowLeft className="w-4 h-4" />

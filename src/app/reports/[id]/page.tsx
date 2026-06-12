@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import nextDynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -8,7 +9,11 @@ import { ArrowLeft, FileX, FileText, Waves } from "lucide-react";
 import { StoredReport, getReportById } from "@/lib/reports-storage";
 import { useLang } from "@/lib/language-context";
 import ReportDetail from "@/components/ReportDetail";
-import ReportEEGChart from "@/components/ReportEEGChart";
+
+const ReportEEGChart = nextDynamic(() => import("@/components/ReportEEGChart"), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64" />,
+});
 
 type Tab = "analysis" | "eeg";
 
@@ -74,7 +79,7 @@ export default function ReportDetailPage() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.05 }}
     >
       {/* Header with back button */}
       <div className="px-6 pt-6">

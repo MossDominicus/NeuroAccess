@@ -1,13 +1,13 @@
 "use client";
-export const dynamicPage = "force-dynamic";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import nextDynamic from "next/dynamic";
 import { motion } from "framer-motion";
+import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { useAnalysis } from "@/lib/analysis-context";
+import { AnalysisProvider, useAnalysis } from "@/lib/analysis-context";
 const IntroAnimation = nextDynamic(() => import("@/components/IntroAnimation"), { ssr: false, loading: () => null });
+const EEGWaveform = nextDynamic(() => import("@/components/PlotlyEEGWaveform"), { ssr: false, loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64 mt-4" /> });
 import {
   UploadCloud,
   FileText,
@@ -158,101 +158,6 @@ function ExplanationCards({ analysis }: { analysis: any }) {
   );
 }
 
-// ── EEG Waveform (inline) ────────────────────────────────────────────
-function EEGWaveform({ eegData }: { eegData: any }) {
-  const { t } = useLang();
-  const plotRef = useRef<HTMLDivElement>(null);
-  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(
-    new Set(eegData.channel_names || [])
-  );
-
-  const toggleChannel = (ch: string) => {
-    setSelectedChannels(prev => {
-      const next = new Set(prev);
-      if (next.has(ch)) next.delete(ch); else next.add(ch);
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (!eegData || !eegData.times || !eegData.channels || !plotRef.current) return;
-    // @ts-expect-error no types for plotly.js-dist
-    import("plotly.js-dist").then((Plotly: any) => {
-      if (!plotRef.current) return;
-      const { times, channels, channel_names } = eegData;
-      const plotData: any[] = [];
-
-      channel_names.forEach((chName: string, idx: number) => {
-        if (!selectedChannels.has(chName)) return;
-        const chData = channels[chName];
-        if (!chData) return;
-        const offset = -idx * 100;
-        const yData = chData.map((v: number) => v + offset);
-        plotData.push({
-          x: times,
-          y: yData,
-          type: "scatter",
-          mode: "lines",
-          name: chName,
-          line: { width: 1 },
-          hovertemplate: `%{fullData.name}<br>${t("hoverTime")}: %{x:.2f}s<br>${t("hoverAmplitude")}: %{y:.2f}${t("hoverUnit")}<extra></extra>`,
-        });
-      });
-
-      const yTicks: number[] = [];
-      const yTickLabels: string[] = [];
-      channel_names.forEach((chName: string, idx: number) => {
-        if (selectedChannels.has(chName)) { yTicks.push(-idx * 100); yTickLabels.push(chName); }
-      });
-
-      const isDark = document.documentElement.classList.contains("dark");
-      const layout = {
-        title: { text: `${t("eegWaveformTitle")} - ${eegData.file_name}`, font: { size: 16, color: isDark ? "#e5e7eb" : "#111827" } },
-        xaxis: {
-          title: { text: t("timeSec"), font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
-          showgrid: true, gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        yaxis: {
-          title: { text: t("channelAxis"), font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
-          tickmode: "array" as const, tickvals: yTicks, ticktext: yTickLabels,
-          showgrid: true, gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        plot_bgcolor: isDark ? "transparent" : "#fafafa",
-        paper_bgcolor: "transparent",
-        margin: { t: 50, r: 30, l: 80, b: 50 },
-        showlegend: false, hovermode: "closest" as const,
-        font: { color: isDark ? "#e5e7eb" : "#111827" },
-      };
-
-      Plotly.newPlot(plotRef.current, plotData, layout, { responsive: true, displayModeBar: true, modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d"] });
-    });
-  }, [eegData, selectedChannels]);
-
-  if (!eegData) return null;
-
-  return (
-    <div className="space-y-4 mt-4">
-      <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
-        <h4 className="text-sm font-semibold text-[var(--color-text)] mb-3">{t("channelSelect")}</h4>
-        <div className="flex flex-wrap gap-2">
-          {eegData.channel_names?.map((ch: string) => (
-            <button key={ch} onClick={() => toggleChannel(ch)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                selectedChannels.has(ch) ? "bg-blue-600 text-white" : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
-              }`}
-            >{ch}</button>
-          ))}
-        </div>
-      </div>
-      <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
-        <div ref={plotRef} style={{ width: "100%", height: "400px" }} />
-      </div>
-    </div>
-  );
-}
-
 // ── FileCard ────────────────────────────────────────────────────────
 function FileCard({
   item, expanded, onToggle, onRemove, running, paused,
@@ -322,10 +227,10 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  MAIN DASHBOARD PAGE
+//  DASHBOARD INNER (consumes context from AnalysisProvider)
 // ═══════════════════════════════════════════════════════════════
 
-export default function DashboardPage() {
+function DashboardInner() {
   const { t } = useLang();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { user } = useAuth();
@@ -390,11 +295,16 @@ export default function DashboardPage() {
 
   return (
     <motion.div
-      className="mx-auto max-w-5xl space-y-6 px-6 py-8"
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      transition={{ duration: 0.05 }}
+      className="mx-auto max-w-5xl space-y-6 px-6 py-8"
     >
+      {/* 网站介绍 */}
+      <div className="rounded-2xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 p-5 text-sm leading-relaxed text-[var(--color-text)]">
+        {t("siteIntro")}
+      </div>
+
       {/* EEG Analysis Panel */}
       <div className="space-y-6">
         {/* Upload area */}
@@ -411,7 +321,7 @@ export default function DashboardPage() {
             <input
               ref={inputRef}
               type="file"
-              accept=".edf,.bdf,.gdf,.csv"
+              accept=".edf,.bdf,.gdf"
               multiple
               className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
@@ -493,9 +403,9 @@ export default function DashboardPage() {
         <div className="flex items-center justify-center gap-4 py-2 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] mt-4">
           <div className="flex items-center gap-1.5">
             {aiStatus.online ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
             ) : (
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
             )}
             <span className={aiStatus.online ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
               {aiStatus.online ? t("aiOnline") : t("aiOffline")}
@@ -503,7 +413,7 @@ export default function DashboardPage() {
           </div>
           {aiStatus.online && (
             <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
               <span>{aiStatus.model}</span>
             </div>
           )}
@@ -515,4 +425,12 @@ export default function DashboardPage() {
       )}
     </motion.div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN DASHBOARD PAGE (AnalysisProvider is in root layout)
+// ═══════════════════════════════════════════════════════════════
+
+export default function DashboardPage() {
+  return <DashboardInner />;
 }

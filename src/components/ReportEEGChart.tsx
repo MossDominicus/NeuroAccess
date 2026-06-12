@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLang } from "@/lib/language-context";
 import { Waves } from "lucide-react";
+import { loadPlotly } from "@/lib/plotly-loader";
 
 interface ReportEEGChartProps {
   reportFileName: string;
@@ -81,7 +82,7 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
     initializedRef.current = true;
     cancelledRef.current = false;
 
-    import("plotly.js-dist" as any).then((Plotly: any) => {
+    loadPlotly().then((Plotly: any) => {
       plotlyRef.current = Plotly;
       if (cancelledRef.current || !plotRef.current) return;
 
@@ -265,7 +266,7 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
               onClick={() => toggleChannel(ch)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 selectedChannels.has(ch)
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white dark:bg-blue-500"
                   : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
               }`}
             >

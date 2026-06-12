@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { StoredReport } from "@/lib/reports-storage";
-import FrequencyChart from "@/components/FrequencyChart";
 import AIExplanation from "@/components/AIExplanation";
 import {
   FileText, Activity, BarChart3, Brain, TrendingUp,
@@ -14,6 +14,11 @@ import {
   getConfidenceLevelText, getConfidenceBadgeClass, getConfidenceReasons,
   getLimitations, getCannotTell, normalizeLevel,
 } from "@/lib/report-i18n";
+
+const FrequencyChart = dynamic(() => import("@/components/FrequencyChart"), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-2xl h-64" />,
+});
 
 // ── 辅助：小进度条 ──────────────────────────────────────
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {

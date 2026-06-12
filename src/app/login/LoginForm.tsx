@@ -15,7 +15,6 @@ export default function LoginForm({ lang }: LoginFormProps) {
   const router = useRouter();
   const { login } = useAuth();
 
-  // Helper: get translation directly from translations object (no useLang needed)
   const tf = (key: string, fallback: string) => {
     const val = translations[lang as keyof typeof translations]?.[key];
     return val || fallback;
@@ -35,7 +34,6 @@ export default function LoginForm({ lang }: LoginFormProps) {
     try {
       const result = await login(usernameOrEmail, password);
       if (result.success) {
-        // 强制整页刷新，确保 middleware 读取到新 cookie
         window.location.href = "/";
       } else {
         setError(result.error || tf("loginFailed", "登录失败"));
@@ -52,9 +50,14 @@ export default function LoginForm({ lang }: LoginFormProps) {
       className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      transition={{ duration: 0.05 }}
     >
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
+        {/* 网站介绍 */}
+        <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 text-xs leading-relaxed text-[var(--color-text)]">
+          {tf("siteIntro", "")}
+        </div>
+
         <div className="text-center mb-8">
           <img src="/neuroaccess-logo.png" alt="NeuroAccess" width={48} height={48} className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
           <h1 className="text-2xl font-bold text-[var(--color-text)]">
@@ -109,7 +112,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm">
               {error}
             </div>
           )}

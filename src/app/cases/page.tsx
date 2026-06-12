@@ -20,6 +20,8 @@ import {
 import { useLang } from "@/lib/language-context";
 import type { Lang } from "@/lib/translations";
 
+export const dynamic = "force-static";
+
 /* 案例数据类型（多语言） */
 type LangString = Partial<Record<Lang, string>>;
 type LangStringArray = Partial<Record<Lang, string[]>>;
@@ -931,7 +933,7 @@ export default function CasesPage() {
       className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      transition={{ duration: 0.05 }}
     >
       <section className="max-w-6xl mx-auto px-5 py-8">
         {/* 标题 */}
@@ -965,7 +967,7 @@ export default function CasesPage() {
                   onClick={() => setSelectedCategory(cat)}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
                     selectedCategory === cat
-                      ? "bg-blue-600 text-white border-blue-600 dark:bg-blue-600 dark:text-white"
+                      ? "bg-blue-600 text-white dark:bg-blue-500 border-blue-600 dark:bg-blue-600 dark:text-white"
                       : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:bg-[var(--color-border)]"
                   }`}
                 >
@@ -983,7 +985,7 @@ export default function CasesPage() {
                   onClick={() => setSelectedDifficulty(d)}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
                     selectedDifficulty === d
-                      ? "bg-blue-600 text-white border-blue-600 dark:bg-blue-600 dark:text-white"
+                      ? "bg-blue-600 text-white dark:bg-blue-500 border-blue-600 dark:bg-blue-600 dark:text-white"
                       : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:bg-[var(--color-border)]"
                   }`}
                 >
@@ -1037,7 +1039,7 @@ export default function CasesPage() {
                 key={c.id}
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06 }}
+                transition={{ delay: i * 0.015 }}
                 className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] overflow-hidden hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300"
               >
                 {/* 卡片头部（点击展开） */}
@@ -1083,7 +1085,7 @@ export default function CasesPage() {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ duration: 0.05 }}
                       className="overflow-hidden"
                     >
                       <div className="px-5 pb-5 space-y-6 border-t border-[var(--color-border)]">
@@ -1118,7 +1120,7 @@ export default function CasesPage() {
                             {/* Beginner */}
                             <div className="bg-green-50/50 border border-green-200 rounded-xl p-4 dark:bg-green-950/30 dark:border-green-800">
                               <div className="flex items-center gap-2 mb-2">
-                                <User className="w-4 h-4 text-green-600" />
+                                <User className="w-4 h-4 text-green-600 dark:text-green-400" />
                                 <span className="text-xs font-bold text-green-700 dark:text-green-400">{t("beginnerMode")}</span>
                               </div>
                               <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{beginnerExp}</p>
@@ -1149,7 +1151,7 @@ export default function CasesPage() {
                             <ul className="space-y-1">
                               {limitations.map((lim, j) => (
                                 <li key={j} className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)]">
-                                  <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+                                  <AlertTriangle className="w-3 h-3 text-yellow-500 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                                   {lim}
                                 </li>
                               ))}

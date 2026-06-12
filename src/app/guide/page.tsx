@@ -7,6 +7,8 @@ import type { Lang } from "@/lib/translations";
 import KnowledgeCard, { KnowledgeCardData } from "@/components/KnowledgeCard";
 import { BookOpen, Search, Filter } from "lucide-react";
 
+export const dynamic = "force-static";
+
 // ── 知识卡片数据（key 由 t() 翻译）────────────────────
 function getCards(t: (key: string) => string): KnowledgeCardData[] {
   return [
@@ -155,11 +157,8 @@ export default function GuidePage() {
   }, [cards, category, search]);
 
   return (
-    <motion.div
+    <div
       className="mx-auto max-w-4xl space-y-8 px-6 py-8"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
     >
       {/* 标题区 */}
       <div className="flex items-center gap-4">
@@ -191,7 +190,7 @@ export default function GuidePage() {
               onClick={() => setCategory(cat.key)}
               className={`rounded-xl px-4 py-2.5 text-xs font-medium transition-all ${
                 category === cat.key
-                  ? "bg-blue-600 text-white shadow-sm dark:bg-blue-600 dark:text-white"
+                  ? "bg-blue-600 text-white dark:bg-blue-500 shadow-sm dark:bg-blue-600 dark:text-white"
                   : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]"
               }`}
             >
@@ -209,9 +208,9 @@ export default function GuidePage() {
           filtered.map((card, i) => (
             <motion.div
               key={card.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
+              transition={{ delay: i * 0.01, duration: 0.05 }}
             >
               <KnowledgeCard card={card} />
             </motion.div>
@@ -223,6 +222,6 @@ export default function GuidePage() {
       <div className="rounded-2xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-900/30 p-5">
         <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-400">{t("guideDisclaimer")}</p>
       </div>
-    </motion.div>
+    </div>
   );
 }

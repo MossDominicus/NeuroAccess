@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { X, FileText, Shield, AlertTriangle } from "lucide-react";
-import { privacySections, termsSections } from "@/lib/legal-content";
+import { privacySections, termsSections, disclaimerSections } from "@/lib/legal-content";
 
 export default function PostLoginModals() {
   const { t, lang } = useLang();
@@ -133,7 +133,7 @@ export default function PostLoginModals() {
                   type="checkbox"
                   checked={agreedPrivacy}
                   onChange={(e) => setAgreedPrivacy(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-[var(--color-border)] text-blue-600 focus:ring-blue-500"
+                  className="mt-0.5 w-4 h-4 rounded border-[var(--color-border)] text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
@@ -159,7 +159,7 @@ export default function PostLoginModals() {
                   type="checkbox"
                   checked={agreedTerms}
                   onChange={(e) => setAgreedTerms(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-[var(--color-border)] text-blue-600 focus:ring-blue-500"
+                  className="mt-0.5 w-4 h-4 rounded border-[var(--color-border)] text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
@@ -185,7 +185,7 @@ export default function PostLoginModals() {
                   type="checkbox"
                   checked={agreedDisclaimer}
                   onChange={(e) => setAgreedDisclaimer(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-[var(--color-border)] text-blue-600 focus:ring-blue-500"
+                  className="mt-0.5 w-4 h-4 rounded border-[var(--color-border)] text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
@@ -209,7 +209,7 @@ export default function PostLoginModals() {
             {/* Footer */}
             <div className="p-6 pt-4 border-t border-[var(--color-border)] flex flex-col gap-3">
               {termsError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm">
                   {termsError}
                 </div>
               )}
@@ -242,7 +242,7 @@ export default function PostLoginModals() {
             <div className="p-6 pb-4 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
@@ -259,7 +259,7 @@ export default function PostLoginModals() {
 
             <form onSubmit={handleUsernameSubmit} className="p-6 space-y-4">
               {usernameError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm">
                   {usernameError}
                 </div>
               )}
@@ -336,22 +336,21 @@ export default function PostLoginModals() {
                 </div>
               )}
               {showContent === "disclaimer" && (
-                <>
-                  <p className="font-medium text-red-500">
-                    {t("disclaimerImportant") || "重要提示："}
-                  </p>
-                  <ul className="space-y-2 pl-4 list-disc text-[var(--color-text-secondary)]">
-                    <li>{t("disclaimerPoint1") || "NeuroAccess 是一个 EEG 科普教育平台，旨在帮助用户理解脑电图数据，不构成医疗诊断、医疗建议或治疗建议。"}</li>
-                    <li>{t("disclaimerPoint2") || "EEG 数据的专业解释需要由合格的医疗专业人员结合完整的临床背景进行判断。"}</li>
-                    <li>{t("disclaimerPoint3") || "本平台不会、也不能判断任何疾病、心理状态、智力水平、人格特征或健康风险。"}</li>
-                    <li>{t("disclaimerPoint4") || "所有分析结果和 AI 解释仅供科普学习使用，不应作为任何医疗决策的依据。"}</li>
-                    <li>{t("disclaimerPoint5") || "如有任何健康问题或疑虑，请务必咨询专业的医疗人员。"}</li>
-                    <li>{t("disclaimerPoint6") || "上传的 EEG 文件仅用于实时分析，不会被长期存储或用于其他目的。"}</li>
-                  </ul>
+                <div className="space-y-6">
+                  {(disclaimerSections as any)[lang]?.map((section: any, i: number) => (
+                    <div key={i}>
+                      <h4 className="mb-2 text-base font-semibold text-[var(--color-text)]">
+                        {i + 1}. {section.title}
+                      </h4>
+                      <p className="text-[var(--color-text-secondary)] leading-relaxed">
+                        {section.content}
+                      </p>
+                    </div>
+                  ))}
                   <div className="pt-2 border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]">
                     {t("disclaimerAgreement") || '点击"我已了解并同意"即表示您理解并同意上述条款。'}
                   </div>
-                </>
+                </div>
               )}
             </div>
             <div className="p-4 border-t border-[var(--color-border)] flex justify-end">

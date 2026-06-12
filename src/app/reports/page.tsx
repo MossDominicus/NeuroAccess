@@ -22,6 +22,7 @@ import {
   deleteReport as deleteReportFromStorage,
 } from "@/lib/reports-storage";
 
+
 /* 模式颜色 */
 const modeColor: Record<string, string> = {
   Beginner: "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400",
@@ -420,7 +421,7 @@ export default function ReportsPage() {
       className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      transition={{ duration: 0.05 }}
     >
       <section className="mx-auto max-w-6xl px-5 py-8">
         {/* 标题栏 */}
@@ -451,7 +452,7 @@ export default function ReportsPage() {
                 key={i}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
+                transition={{ delay: i * 0.0125 }}
                 className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
               >
                 <div className="mb-2 flex items-center gap-2">
@@ -501,7 +502,7 @@ export default function ReportsPage() {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                  transition={{ delay: i * 0.05 }}
+                  transition={{ delay: i * 0.0125 }}
                   className="grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3.5 border-t border-[var(--color-border)] hover:bg-[var(--color-bg)]/50 transition-colors items-center"
                 >
                   <input
@@ -541,7 +542,7 @@ export default function ReportsPage() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(report); }}
-                      className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-red-50 hover:text-red-500"
+                      className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-red-50 hover:text-red-500 dark:text-red-400"
                       title={t("delete")}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -574,7 +575,7 @@ export default function ReportsPage() {
             >
               <div className="px-6 py-5 text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-                  <AlertTriangle className="h-6 w-6 text-red-500" />
+                  <AlertTriangle className="h-6 w-6 text-red-500 dark:text-red-400" />
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-[var(--color-text)]">{t("batchDelete")}</h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">
@@ -620,7 +621,7 @@ export default function ReportsPage() {
             >
               <div className="px-6 py-5 text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-                  <AlertTriangle className="h-6 w-6 text-red-500" />
+                  <AlertTriangle className="h-6 w-6 text-red-500 dark:text-red-400" />
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-[var(--color-text)]">{t("confirmDelete")}</h3>
                 <p className="text-sm text-[var(--color-text-secondary)]">{t("confirmDeleteDesc")}</p>

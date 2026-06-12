@@ -171,6 +171,15 @@ button, a, input, textarea {
   color: var(--color-text-secondary);
 }
 
+/* 页面淡入动画 - 用于 SSG 页面切换 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
 /* Plotly modebar 按钮放大更明显 */
 .modebar {
   padding: 4px !important;
