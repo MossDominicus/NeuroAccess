@@ -1,7 +1,7 @@
 """
-NeuroAccess Backend v2.5.0
+NeuroAccess Backend v1.5.0
 - /analyze 唯一接口：上传 → MNE 分析 → Ollama 三层解释 → 完整 JSON
-- v2.5.0: 拆分为 utils.py / explanations.py / analysis.py
+- v1.5.0: 修复 GDF 文件支持、分析超时、仪表盘清空bug
 """
 import os
 from dotenv import load_dotenv
@@ -23,7 +23,7 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # FastAPI init
-app = FastAPI(title="NeuroAccess Backend", version="2.5.0")
+app = FastAPI(title="NeuroAccess Backend", version="1.5.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # Import analysis engine
@@ -177,7 +177,7 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
 
 @app.get("/")
 def root():
-    return {"success": True, "service": "NeuroAccess Backend", "version": "2.5.0", "model": "qwen2.5:7b"}
+    return {"success": True, "service": "NeuroAccess Backend", "version": "1.5.0", "model": "qwen2.5:7b"}
 
 @app.get("/api/health")
 def health():
