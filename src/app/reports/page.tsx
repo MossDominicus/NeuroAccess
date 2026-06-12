@@ -522,7 +522,9 @@ export default function ReportsPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className={`h-2 w-2 rounded-full ${report.quality >= 80 ? "bg-green-500" : report.quality >= 60 ? "bg-yellow-500" : "bg-red-500"}`} />
-                    <span className="text-sm font-medium">{report.quality}</span>
+                    <span className={`text-sm font-medium ${report.quality >= 80 ? "text-green-600 dark:text-green-400" : report.quality >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                      {report.quality}
+                    </span>
                   </div>
                   <div className="flex items-center justify-end gap-1">
                     <Link
