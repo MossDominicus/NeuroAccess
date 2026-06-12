@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from "react";
 import { useLang } from "@/lib/language-context";
-import { addReport, clearAllReports, type StoredReport } from "@/lib/reports-storage";
+import { addReport, type StoredReport } from "@/lib/reports-storage";
 
 // ── Types ───────────────────────────────────────────────────────────
 export type Status = "pending" | "analyzing" | "completed" | "failed";
@@ -147,7 +147,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     runningRef.current = false;
     shouldPauseRef.current = false;
     runIdRef.current = 0;
-    clearAllReports(); // 同时清空 reports
+    // 注意：不清空 reports（报告页独立管理，仪表盘清空不影响已保存的报告）
   }, []);
 
   // ── 暂停分析 ─────────────────────────────────────────────────
