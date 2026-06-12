@@ -224,6 +224,9 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
         explanations = generate_explanations(enhanced, lang)
         analysis_out = {**enhanced, "explanations": explanations, "disclaimer": {"zh": "本报告仅用于 EEG 科普教育。不构成医疗建议、诊断或治疗推荐。EEG 数据不能单独用于诊断任何疾病。如有健康问题，请咨询专业医生。", "en": "This report is for EEG educational purposes only. It does not constitute medical advice, diagnosis, or treatment recommendations. EEG data alone cannot diagnose any disease. For health concerns, consult a qualified physician."}, "file_size_mb": saved.get("file_size_mb", 0)}
         return {"success": True, "file_name": saved.get("file_name"), "analysis": analysis_out}
+    except ValueError as e:
+        # User-input errors (bad file format, corrupted file, etc.) — show clean message
+        return {"success": False, "file_name": saved.get("file_name"), "error": str(e)}
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc() if os.getenv("DEBUG") else "Enable DEBUG=1 for details"

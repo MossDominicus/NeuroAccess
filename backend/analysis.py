@@ -84,8 +84,28 @@ class EEGAnalyzer:
         self.waveform = None
 
     def load_data(self) -> EEGOverview:
-        """加载 EDF 文件并生成概览（含预处理滤波）"""
-        self.raw = mne.io.read_raw_edf(self.edf_path, preload=True, verbose=False)
+        """加载 EEG 文件并生成概览（支持 .edf/.bdf/.gdf，含预处理滤波）"""
+        import os
+        ext = os.path.splitext(self.edf_path)[1].lower()
+        try:
+            if ext == ".edf":
+                self.raw = mne.io.read_raw_edf(self.edf_path, preload=True, verbose=False)
+            elif ext == ".bdf":
+                self.raw = mne.io.read_raw_bdf(self.edf_path, preload=True, verbose=False)
+            elif ext == ".gdf":
+                self.raw = mne.io.read_raw_gdf(self.edf_path, preload=True, verbose=False)
+            else:
+                raise ValueError(f"Unsupported file format: {ext}. Only .edf, .bdf, .gdf are supported.")
+        except (AssertionError, IndexError) as gdf_err:
+            # MNE's GDF reader can fail on certain GDF files (e.g., BCI Competition IV)
+            raise ValueError(
+                f"Unable to read GDF file: the file may be corrupted, truncated, "
+                f"or uses an unsupported GDF version. "
+                f"Original error: {type(gdf_err).__name__}. "
+                f"Try converting to EDF/BDF format or use a different file."
+            ) from gdf_err
+        except Exception as read_err:
+            raise ValueError(f"Failed to read {ext.upper()} file: {read_err}") from read_err
 
         # 预处理流水线 (按顺序, 每步提升频段/伪影分析准确率):
         # 1. 0.5-40 Hz 带通 — 去除 DC 漂移、肌电、工频谐波
@@ -597,6 +617,6 @@ class EEGAnalyzer:
 
 
 def analyze_edf(edf_path: str, lang: str = "zh") -> Dict[str, Any]:
-    """便捷函数：分析单个 EDF 文件"""
+    """便捷函数：分析单个 EEG 文件（支持 .edf/.bdf/.gdf）"""
     analyzer = EEGAnalyzer(edf_path, lang=lang)
     return analyzer.run_full_analysis()
