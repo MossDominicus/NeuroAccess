@@ -282,11 +282,22 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
         # 读取 EEG 文件
         ext = os.path.splitext(file_name)[1].lower()
         raw = None
+        read_errors = []
         try:
             if ext == ".edf":
                 raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
             elif ext == ".bdf":
-                raw = mne.io.read_raw_bdf(file_path, preload=True, verbose=False)
+                try:
+                    raw = mne.io.read_raw_bdf(file_path, preload=True, verbose=False)
+                except Exception as bdf_err:
+                    # Fallback: some BDF files (e.g. non-BIOSEMI format) can be read as EDF
+                    try:
+                        raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
+                    except Exception as edf_err:
+                        raise Exception(
+                            f"BDF read failed (MNE: {bdf_err}; EDF fallback: {edf_err}). "
+                            f"Ensure file is a valid 24-bit BIOSEMI format."
+                        ) from bdf_err
             elif ext == ".gdf":
                 raw = mne.io.read_raw_gdf(file_path, preload=True, verbose=False)
             elif ext == ".csv":
@@ -333,12 +344,20 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
         info = raw.info
         ch_names = info["ch_names"]
 
-        # 只选择 EEG 类型通道，排除刺激/状态/EOG等非EEG通道
+        # 选择 EEG 类型通道，排除刺激/状态/EOG等非EEG通道
+        # BDF/EDF 文件的通道类型可能标注为 eeg/misc/seeg/ecog 等
         try:
             import mne
-            eeg_picks = mne.pick_types(info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=False)
+            # 1st try: strict EEG-only pick
+            eeg_picks = mne.pick_types(info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=False, seeg=False, ecog=False, bio=False)
             if len(eeg_picks) == 0:
-                # 回退到全部通道
+                # 2nd try: include misc (BDF files often tag channels as misc)
+                eeg_picks = mne.pick_types(info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=True, seeg=False, ecog=False, bio=False)
+            if len(eeg_picks) == 0:
+                # 3rd try: exclude only stim and bad channels
+                eeg_picks = mne.pick_types(info, meg=False, stim=False, eog=False, ecg=False, exclude="bads")
+            if len(eeg_picks) == 0:
+                # Final fallback: all channels
                 eeg_picks = list(range(len(ch_names)))
         except Exception:
             eeg_picks = list(range(len(ch_names)))

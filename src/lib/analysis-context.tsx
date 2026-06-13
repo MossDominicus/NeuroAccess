@@ -250,8 +250,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                 body: viewerFormData,
               });
               if (viewerResult.success) eegData = viewerResult;
-            } catch {
-              // 波形获取失败不影响分析结果
+            } catch (viewerErr: any) {
+              // 波形获取失败不影响分析结果，但记录日志便于调试
+              console.warn(`[EEG Viewer] Failed to get waveform for ${item.name}:`, viewerErr?.message || String(viewerErr));
             }
 
             // 再次检查本轮次是否已失效

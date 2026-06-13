@@ -289,8 +289,8 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                         <span className="text-xs text-[var(--color-text-secondary)]/70" title={info.reasons.join(", ")}>
                           {info.reasons.map(r => {
                             const reasonMap: Record<string, string> = {
-                              high_variance: lang === "zh" ? "高方差" : "High Var",
-                              high_gradient: lang === "zh" ? "高梯度" : "High Grad",
+                              high_variance: t("highVariance"),
+                              high_gradient: t("highGradient"),
                             };
                             return reasonMap[r] || r.replace("kurt=", "k=");
                           }).join(", ")}
@@ -324,8 +324,8 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           const computedScore = Math.max(0, Math.min(100, 100 - totalDeduct));
 
           const rows = [
-            { label: t("noisyChannels"), deduct: noisyPen, detail: `${noisyCount} ${lang === "zh" ? "个" : ""}` },
-            { label: t("blinkArtifacts"), deduct: artifactPen, detail: `${artifactCount} ${lang === "zh" ? "个" : ""}` },
+            { label: t("noisyChannels"), deduct: noisyPen, detail: `${noisyCount} ${lang.startsWith("zh") ? "个" : ""}` },
+            { label: t("blinkArtifacts"), deduct: artifactPen, detail: `${artifactCount} ${lang.startsWith("zh") ? "个" : ""}` },
             { label: t("outlierPercentage"), deduct: Math.round(outlierPen), detail: `${outlierPct.toFixed(1)}%` },
             { label: t("missingData"), deduct: missingPen, detail: missing ? t("yes") : t("no") },
             { label: t("clipping"), deduct: clippingPen, detail: clipping ? t("yes") : t("no") },
@@ -337,12 +337,12 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           return (
             <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)]/50 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--color-text)]">{t("scoreBreakdown") || (lang === "zh" ? "评分明细" : "Score Breakdown")}</h3>
+                <h3 className="text-sm font-semibold text-[var(--color-text)]">{t("scoreBreakdown") || "Score Breakdown"}</h3>
                 <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">= {computedScore}/100</span>
               </div>
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
-                  <span>{lang === "zh" ? "基础分" : "Base"}</span>
+                  <span>{t("baseScore") || "Base"}</span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400">100</span>
                 </div>
                 {rows.map(r => (
@@ -354,7 +354,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                   </div>
                 ))}
                 <div className="border-t border-[var(--color-border)] pt-1.5 flex justify-between text-xs font-semibold">
-                  <span className="text-[var(--color-text)]">{lang === "zh" ? "最终得分" : "Final Score"}</span>
+                  <span className="text-[var(--color-text)]">{t("finalScore") || "Final Score"}</span>
                   <span className="font-mono text-[var(--color-text)]">{computedScore}</span>
                 </div>
               </div>
