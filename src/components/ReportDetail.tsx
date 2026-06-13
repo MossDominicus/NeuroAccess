@@ -204,35 +204,22 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <QualityItem
+            icon={Activity}
+            label={t("signalQuality")}
+            value={`${sq}/100`}
+            color={sq >= 70 ? "text-green-600 dark:text-green-400" : sq >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}
+          />
+          <QualityItem
             icon={AlertTriangle}
-            label={t("missingData")}
-            value={(() => {
-              const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
-              const md = (signalQuality as any)?.missing_data || (analysis as any).missing_data;
-              return md ? `${Number(qd.missing_data_percentage || 0).toFixed(1)}%` : t("no");
-            })()}
-            color={(signalQuality as any)?.missing_data ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
-            comment={t("missingDataDesc")}
-          />
-          <QualityItem
-            icon={Zap}
-            label={t("outlierPercentage")}
-            value={(() => {
-              const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
-              return `${Number(qd.outlier_percentage || 0).toFixed(2)}%`;
-            })()}
+            label={t("noisyChannels")}
+            value={(signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0}
             color="text-amber-600 dark:text-amber-400"
-            comment={t("outlierPercentageDesc")}
           />
           <QualityItem
-            icon={TrendingUp}
-            label={t("avgVariance")}
-            value={(() => {
-              const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
-              return Number(qd.average_variance || 0).toFixed(4);
-            })()}
-            color="text-blue-600 dark:text-blue-400"
-            comment={t("avgVarianceDesc")}
+            icon={XCircle}
+            label={t("clipping")}
+            value={(signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected ? t("yes") : t("no")}
+            color={(signalQuality as any)?.clipping_detected ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
           />
         </div>
 
@@ -478,16 +465,13 @@ function OverviewItem({ label, value }: { label: string; value: any }) {
   );
 }
 
-function QualityItem({ icon: Icon, label, value, color, comment }: { icon: any; label: string; value: any; color: string; comment?: string }) {
+function QualityItem({ icon: Icon, label, value, color }: { icon: any; label: string; value: any; color: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
       <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
       <div>
         <div className="text-[11px] font-medium text-[var(--color-text-secondary)]">{label}</div>
         <div className="text-sm font-bold text-[var(--color-text)]">{String(value)}</div>
-        {comment && (
-          <div className="mt-0.5 text-[10px] leading-tight text-[var(--color-text-secondary)]/60">{comment}</div>
-        )}
       </div>
     </div>
   );

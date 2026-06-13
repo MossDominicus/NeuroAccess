@@ -239,20 +239,37 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
               return;
             }
 
-            // ── 同时获取 EEG 波形数据 ──
+            // ── 使用分析结果中的波形预览（优先，支持所有格式）──
             let eegData: any = null;
-            try {
-              const viewerFormData = new FormData();
-              viewerFormData.append("file", item.file);
-              viewerFormData.append("duration", "10");
-              const viewerResult = await safeJsonFetch(`${API_BASE}/api/eeg/viewer`, {
-                method: "POST",
-                body: viewerFormData,
-              });
-              if (viewerResult.success) eegData = viewerResult;
-            } catch (viewerErr: any) {
-              // 波形获取失败不影响分析结果，但记录日志便于调试
-              console.warn(`[EEG Viewer] Failed to get waveform for ${item.name}:`, viewerErr?.message || String(viewerErr));
+            const waveformPreview = (data.analysis as any)?.waveform_preview;
+            if (waveformPreview && waveformPreview.times && waveformPreview.channels) {
+              // 分析结果已含波形预览（EDF/BDF/GDF 均支持，避免二次请求失败）
+              const chNames = Object.keys(waveformPreview.channels || {});
+              eegData = {
+                success: true,
+                file_name: item.name,
+                channel_names: chNames,
+                sampling_rate: waveformPreview.sampling_rate,
+                duration_seconds: waveformPreview.duration_seconds,
+                times: waveformPreview.times,
+                channels: waveformPreview.channels,
+                total_channels: chNames.length,
+                total_samples: waveformPreview.times?.length || 0,
+              };
+            } else {
+              // 回退：单独请求 /api/eeg/viewer
+              try {
+                const viewerFormData = new FormData();
+                viewerFormData.append("file", item.file);
+                viewerFormData.append("duration", "10");
+                const viewerResult = await safeJsonFetch(`${API_BASE}/api/eeg/viewer`, {
+                  method: "POST",
+                  body: viewerFormData,
+                });
+                if (viewerResult.success) eegData = viewerResult;
+              } catch (viewerErr: any) {
+                console.warn(`[EEG Viewer] Fallback failed for ${item.name}:`, viewerErr?.message || String(viewerErr));
+              }
             }
 
             // 再次检查本轮次是否已失效
