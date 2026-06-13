@@ -20,7 +20,7 @@ export interface FileJob {
 
 // ── safeJsonFetch ───────────────────────────────────────────────────
 const API_BASE = ""; // 使用相对路径，由nginx代理到后端
-const FETCH_TIMEOUT = 90_000; // 90秒：覆盖 MNE(30s) + Ollama 并行(60s)，防止后端重启/卡住时前端无限等待
+const FETCH_TIMEOUT = 300_000; // 5分钟：MNE分析(120s) + enhance + AI解释(60s)，防止大文件/多通道文件超时
 
 async function safeJsonFetch(url: string, options: RequestInit = {}): Promise<any> {
   // Attach JWT token if available
