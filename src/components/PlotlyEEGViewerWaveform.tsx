@@ -23,12 +23,26 @@ export default function PlotlyEEGViewerWaveform({
       const { times, channels, channel_names } = eegData;
       const plotData: any[] = [];
 
+      // 计算自适应垂直偏移
+      let maxAbs = 1;
+      channel_names.forEach((chName: string) => {
+        if (!selectedChannels.has(chName)) return;
+        const d = channels[chName];
+        if (!d) return;
+        const mx = Math.max(...d.map((v: number) => Math.abs(v)));
+        if (mx > maxAbs) maxAbs = mx;
+      });
+      const CHANNEL_GAP = 1.5;
+      const offsetStep = maxAbs * 2 * CHANNEL_GAP;
+
+      let selIdx = 0;
       channel_names.forEach((chName: string, idx: number) => {
         if (!selectedChannels.has(chName)) return;
         const chData = channels[chName];
         if (!chData) return;
-        const offset = -idx * 100;
+        const offset = -selIdx * offsetStep;
         const yData = chData.map((v: number) => v + offset);
+        selIdx++;
         plotData.push({
           x: times,
           y: yData,
@@ -42,10 +56,12 @@ export default function PlotlyEEGViewerWaveform({
 
       const yTicks: number[] = [];
       const yTickLabels: string[] = [];
+      selIdx = 0;
       channel_names.forEach((chName: string, idx: number) => {
         if (selectedChannels.has(chName)) {
-          yTicks.push(-idx * 100);
+          yTicks.push(-selIdx * offsetStep);
           yTickLabels.push(chName);
+          selIdx++;
         }
       });
 

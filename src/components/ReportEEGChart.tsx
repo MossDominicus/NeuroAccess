@@ -89,11 +89,23 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
       const { times, channels, channel_names } = savedEegData;
       const plotData: any[] = [];
 
+      // 计算自适应垂直偏移：基于实际数据范围
+      let maxAbs = 1;
+      channel_names.forEach((chName: string) => {
+        if (!selectedChannels.has(chName)) return;
+        const d = channels[chName];
+        if (!d) return;
+        const mx = Math.max(...d.map((v: number) => Math.abs(v)));
+        if (mx > maxAbs) maxAbs = mx;
+      });
+      const CHANNEL_GAP = 1.5; // 通道间间隙倍率
+      const offsetStep = maxAbs * 2 * CHANNEL_GAP;
+
       channel_names.forEach((chName: string, idx: number) => {
         if (!selectedChannels.has(chName)) return;
         const chData = channels[chName];
         if (!chData) return;
-        const offset = -idx * 100;
+        const offset = -idx * offsetStep;
         const yData = chData.map((v: number) => v + offset);
         plotData.push({
           x: times,
@@ -108,10 +120,12 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
 
       const yTicks: number[] = [];
       const yTickLabels: string[] = [];
+      let selIdx = 0;
       channel_names.forEach((chName: string, idx: number) => {
         if (selectedChannels.has(chName)) {
-          yTicks.push(-idx * 100);
+          yTicks.push(-selIdx * offsetStep);
           yTickLabels.push(chName);
+          selIdx++;
         }
       });
 
