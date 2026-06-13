@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { AnalysisProvider, useAnalysis } from "@/lib/analysis-context";
+import { useAnalysis } from "@/lib/analysis-context";
 const EEGWaveform = nextDynamic(() => import("@/components/PlotlyEEGWaveform"), { ssr: false, loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64 mt-4" /> });
 import {
   UploadCloud,
@@ -227,7 +227,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DASHBOARD INNER (consumes context from AnalysisProvider)
+//  DASHBOARD INNER (consumes context from root layout AnalysisProvider)
 // ═══════════════════════════════════════════════════════════════
 
 function DashboardInner() {
@@ -411,13 +411,9 @@ function DashboardInner() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  MAIN DASHBOARD PAGE
+//  MAIN DASHBOARD PAGE (AnalysisProvider is in root layout)
 // ═══════════════════════════════════════════════════════════════
 
 export default function DashboardPage() {
-  return (
-    <AnalysisProvider>
-      <DashboardInner />
-    </AnalysisProvider>
-  );
+  return <DashboardInner />;
 }

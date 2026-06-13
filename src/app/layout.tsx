@@ -9,6 +9,7 @@ import type { Lang } from "@/lib/translations";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth-context";
+import { AnalysisProvider } from "@/lib/analysis-context";
 import IntroProvider from "@/components/IntroProvider";
 
 // Metadata 使用默认中文，语言切换由客户端 LanguageProvider 处理
@@ -103,6 +104,7 @@ export default async function RootLayout({
           <ThemeProvider>
             <LanguageProvider initialLang={initialLang}>
               <IntroProvider>
+              <AnalysisProvider>
               <DisclaimerModal />
               <PostLoginModals />
               <div className="flex h-screen overflow-hidden">
@@ -115,6 +117,7 @@ export default async function RootLayout({
                   <PublicPreviewFooter />
                 </div>
               </div>
+              </AnalysisProvider>
               </IntroProvider>
             </LanguageProvider>
           </ThemeProvider>
