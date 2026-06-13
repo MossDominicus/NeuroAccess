@@ -1,5 +1,5 @@
 """
-NeuroAccess Backend v1.5.0
+NeuroAccess Backend v1.6
 - /analyze 唯一接口：上传 → MNE 分析 → Ollama 三层解释 → 完整 JSON
 - v1.5.0: 修复 GDF 文件支持、分析超时、仪表盘清空bug
 """
@@ -23,7 +23,7 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # FastAPI init
-app = FastAPI(title="NeuroAccess Backend", version="1.5.0")
+app = FastAPI(title="NeuroAccess Backend", version="1.6.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # Import analysis engine
@@ -178,7 +178,7 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
 
 @app.get("/")
 def root():
-    return {"success": True, "service": "NeuroAccess Backend", "version": "1.5.0", "model": "qwen2.5:7b"}
+    return {"success": True, "service": "NeuroAccess Backend", "version": "1.6.0", "model": "qwen2.5:7b"}
 
 @app.get("/api/health")
 def health():
@@ -306,20 +306,27 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
                     # GDF 1.99 fallback: MNE/biosig/neo cannot read this format
                     try:
                         from gdf_reader import read_gdf_199
-                        data_arr, times, ch_names, sfreq = read_gdf_199(file_path)
+                        raw_gdf = read_gdf_199(file_path)
+                        sfreq = raw_gdf.info['sfreq']
+                        ch_names = raw_gdf.ch_names
                         max_samples = int(sfreq * duration)
-                        if data_arr.shape[1] > max_samples:
-                            data_arr = data_arr[:, :max_samples]
-                            times = times[:max_samples]
+                        if raw_gdf.n_times > max_samples:
+                            data_arr, times_arr = raw_gdf[:, :max_samples]
+                        else:
+                            data_arr, times_arr = raw_gdf[:, :]
+                        # GDF 1.99 custom reader data is in μV (int16), no conversion needed
                         t_arr = np.arange(data_arr.shape[1]) / sfreq
+                        # 降采样
+                        max_points = 8000
+                        step = max(1, len(t_arr) // max_points)
                         return to_jsonable({
                             "success": True,
                             "file_name": file_name,
                             "channel_names": ch_names,
                             "sampling_rate": round(sfreq, 2),
                             "duration_seconds": round(len(t_arr) / sfreq, 2),
-                            "times": t_arr.tolist()[:min(len(t_arr), 10000)],
-                            "channels": {ch: data_arr[i][:min(data_arr.shape[1], 10000)].tolist() for i, ch in enumerate(ch_names)},
+                            "times": t_arr[::step].tolist(),
+                            "channels": {ch: data_arr[i][::step].tolist() for i, ch in enumerate(ch_names)},
                             "total_channels": len(ch_names),
                             "total_samples": data_arr.shape[1],
                         })

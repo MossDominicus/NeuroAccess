@@ -133,10 +133,11 @@ class EEGAnalyzer:
         try:
             raw_data_copy = self.raw.get_data().copy()  # (n_channels, n_times)
             raw_times_copy = self.raw.times.copy()
-            # 获取原始数据的单位信息
-            is_gdf_custom = ext == ".gdf" and 'gdf_reader' in sys.modules and hasattr(self.raw, '_data')
-            if is_gdf_custom:
-                # GDF 1.99: 数据已经是 μV，直接使用
+            # GDF 1.99 自定义读取器：raw 对象是 RawArray，数据是 int16 μV
+            # 判断依据：数据 dtype 是整数类型（MNE 读取的 EDF/BDF 会转 float64）
+            import numpy as np
+            if ext == ".gdf" and raw_data_copy.dtype.kind in ('i', 'u'):
+                # GDF 1.99 int16: 数据已经是 μV，直接使用
                 self._raw_data_uv = raw_data_copy
             else:
                 # MNE 读取（EDF/BDF/标准GDF）：数据单位是 V，转换为 μV
