@@ -1,13 +1,47 @@
 """
-EEG Simulator Module
-生成合成 EEG 信号，用于教育演示
+EEG Simulator Module — Realistic EEG Synthesis
+Generates education-grade synthetic EEG that visually resembles real recordings.
 """
 
 import numpy as np
 from typing import Dict, List, Any, Optional
+from scipy import signal as sig
+import warnings
+
+# ── Standard 10-20 channel names (8/16/32 ch) ───────────────────────────
+CHANNEL_NAMES = {
+    8:  ["Fp1", "Fp2", "C3", "C4", "P3", "P4", "O1", "O2"],
+    16: ["Fp1", "Fp2", "F7", "F3", "Fz", "F4", "F8",
+         "T3", "C3", "Cz", "C4", "T4", "T5", "P3", "Pz", "P4", "T6", "O1", "O2"][:16],
+    32: None,  # auto-generate
+}
 
 
-def generate_synthetic_eeg(
+def _pink_noise(n_samples: int, sampling_rate: int) -> np.ndarray:
+    """Generate 1/f (pink) noise via spectral shaping of white noise."""
+    # White noise
+    white = np.random.randn(n_samples)
+    # FFT
+    X = np.fft.rfft(white)
+    freqs = np.fft.rfftfreq(n_samples, 1.0 / sampling_rate)
+    # Shape: 1/sqrt(f) for pink noise (power ~ 1/f)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        X[1:] *= (1.0 / np.sqrt(freqs[1:]))
+    # Inverse FFT
+    pink = np.fft.irfft(X, n=n_samples)
+    return pink / np.std(pink)  # normalize
+
+
+def _bandpass_filter(data: np.ndarray, low: float, high: float,
+                     sampling_rate: int) -> np.ndarray:
+    """Zero-phase bandpass filter."""
+    nyq = sampling_rate / 2.0
+    b, a = sig.butter(4, [low / nyq, high / nyq], btype="band")
+    return sig.filtfilt(b, a, data)
+
+
+def _generate_eeg_realistic(
     duration_sec: float = 10.0,
     sampling_rate: int = 250,
     n_channels: int = 8,
@@ -25,95 +59,131 @@ def generate_synthetic_eeg(
     artifact_powerline: bool = False,
 ) -> Dict[str, Any]:
     """
-    生成合成 EEG 信号
-    
-    参数:
-        duration_sec: 信号时长（秒）
-        sampling_rate: 采样率（Hz）
-        n_channels: 通道数
-        alpha_power: Alpha 波功率 (0-2)
-        beta_power: Beta 波功率 (0-2)
-        theta_power: Theta 波功率 (0-2)
-        delta_power: Delta 波功率 (0-2)
-        alpha_freq: Alpha 波频率 (Hz)
-        beta_freq: Beta 波频率 (Hz)
-        theta_freq: Theta 波频率 (Hz)
-        delta_freq: Delta 波频率 (Hz)
-        noise_level: 噪声水平 (0-1)
-        artifact_blink: 是否添加眨眼伪影
-        artifact_muscle: 是否添加肌电伪影
-        artifact_powerline: 是否添加工频干扰（50Hz）
-    
-    返回:
-        Dict 包含 times, channels, psd 等
+    Generate realistic synthetic EEG.
+
+    Key improvements over v1:
+    - Band-limited noise (not pure sine waves)
+    - 1/f background noise (pink noise)
+    - Non-stationarity (amplitude modulation, drift)
+    - Spatial correlation between channels (nearby = more similar)
+    - Realistic eye blink artifacts (large, sharp, frontal-only)
+    - Realistic muscle artifacts (high-freq bursty noise)
+    - Line noise (50/60 Hz sinusoid)
     """
-    np.random.seed(42)  # 可重现的结果
-    
+    np.random.seed(np.random.randint(0, 2**32 - 1))  # non-deterministic
+
     n_samples = int(duration_sec * sampling_rate)
     times = np.arange(n_samples) / sampling_rate
-    
-    # 初始化信号 (n_channels, n_samples)
-    eeg_data = np.zeros((n_channels, n_samples))
-    
-    # 生成各频段的正弦波
+
+    # ── 1. Channel names ────────────────────────────────────────────────
+    if n_channels in CHANNEL_NAMES and CHANNEL_NAMES[n_channels]:
+        ch_names = CHANNEL_NAMES[n_channels].copy()
+    else:
+        ch_names = [f"EEG CH{i+1}" for i in range(n_channels)]
+
+    # ── 2. Base pink noise (1/f spectrum = realistic EEG background) ───
+    eeg = np.zeros((n_channels, n_samples))
     for ch in range(n_channels):
-        # Delta 波 (0.5-4 Hz)
-        delta = delta_power * np.sin(2 * np.pi * delta_freq * times + np.random.randn() * 0.5)
-        eeg_data[ch] += delta
-        
-        # Theta 波 (4-8 Hz)
-        theta = theta_power * np.sin(2 * np.pi * theta_freq * times + np.random.randn() * 0.5)
-        eeg_data[ch] += theta
-        
-        # Alpha 波 (8-13 Hz) - 后枕区更强
-        alpha_weight = 1.5 if ch in [0, 1, 2, 3] else 0.8  # 假设通道 0-3 是后枕区
-        alpha = alpha_power * alpha_weight * np.sin(2 * np.pi * alpha_freq * times + np.random.randn() * 0.5)
-        eeg_data[ch] += alpha
-        
-        # Beta 波 (13-30 Hz)
-        beta = beta_power * np.sin(2 * np.pi * beta_freq * times + np.random.randn() * 0.5)
-        eeg_data[ch] += beta
-        
-        # 添加噪声
-        noise = noise_level * np.random.randn(n_samples)
-        eeg_data[ch] += noise
-    
-    # 添加伪影
+        eeg[ch] = _pink_noise(n_samples, sampling_rate) * noise_level * 20
+
+    # ── 3. Band-limited activity (filtered noise, NOT pure sine) ───────
+    bands = [
+        ("delta", delta_power, 0.5, 4.0, delta_freq),
+        ("theta", theta_power, 4.0, 8.0, theta_freq),
+        ("alpha", alpha_power, 8.0, 13.0, alpha_freq),
+        ("beta",  beta_power, 13.0, 30.0, beta_freq),
+    ]
+
+    for name, power, lo, hi, peak_freq in bands:
+        if power <= 0:
+            continue
+        # Filtered noise in band
+        band_noise = np.random.randn(n_channels, n_samples)
+        for ch in range(n_channels):
+            band_noise[ch] = _bandpass_filter(
+                band_noise[ch], lo, hi, sampling_rate
+            )
+        # Amplitude modulation (non-stationarity: envelope varies slowly)
+        modulator = 0.5 + 0.5 * np.sin(
+            2 * np.pi * 0.1 * times + np.random.rand() * 2 * np.pi
+        )
+        modulator = np.convolve(modulator, np.ones(50) / 50, mode="same")  # smooth
+        # Add to EEG (alpha stronger in posterior channels)
+        for ch in range(n_channels):
+            if name == "alpha":
+                # Alpha stronger in occipital (O1, O2 = last 2 ch)
+                weight = 1.8 if ch >= n_channels - 2 else 0.6
+            elif name == "delta":
+                weight = 1.2 if ch < 2 else 0.8  # delta stronger frontal
+            else:
+                weight = 1.0
+            eeg[ch] += power * weight * band_noise[ch] * modulator
+
+    # ── 4. Spatial correlation (nearby channels more similar) ──────────
+    # Simple approach: mix each channel with neighbors
+    eeg_smooth = eeg.copy()
+    for ch in range(n_channels):
+        neighbors = [ch]
+        if ch > 0: neighbors.append(ch - 1)
+        if ch < n_channels - 1: neighbors.append(ch + 1)
+        eeg[ch] = 0.6 * eeg[ch] + 0.2 * sum(eeg_smooth[n] for n in neighbors if n != ch) / len(neighbors)
+
+    # ── 5. Non-stationarity: slow drift (baseline wander) ────────────
+    drift = 2.0 * np.sin(2 * np.pi * 0.05 * times)
+    eeg += drift
+
+    # ── 6. Eye blink artifacts ─────────────────────────────────────────
     if artifact_blink:
-        # 眨眼伪影：前额通道出现大幅正向偏转
-        blink_times = np.arange(0, n_samples, sampling_rate * 3)  # 每3秒一次眨眼
-        for bt in blink_times:
-            if bt + sampling_rate < n_samples:
-                eeg_data[:2, bt:bt+sampling_rate] += 50 * np.exp(-np.arange(sampling_rate) / (sampling_rate * 0.1))
-    
+        blink_interval = int(sampling_rate * 3)  # ~1 blink per 3s
+        n_blinks = max(1, n_samples // blink_interval)
+        for _ in range(n_blinks):
+            blink_start = np.random.randint(0, max(1, n_samples - sampling_rate))
+            blink_len = int(sampling_rate * 0.3)  # 300ms blink
+            blink_end = min(n_samples, blink_start + blink_len)
+            # Gaussian bump (large, positive = voltage drop = blink)
+            t_blink = np.arange(blink_len)
+            blink_wave = -80.0 * np.exp(-0.5 * ((t_blink - blink_len//2) / (blink_len*0.15))**2)
+            # Only frontal channels (Fp1, Fp2, F7, F3, Fz, F4, F8)
+            frontal_idx = [i for i, n in enumerate(ch_names) if any(
+                x in n.upper() for x in ["FP", "F", "AF"]
+            )]
+            for ch in frontal_idx[:3]:  # only first 3 frontal
+                if ch < n_channels:
+                    eeg[ch, blink_start:blink_end] += blink_wave
+
+    # ── 7. Muscle artifacts (high-freq bursty noise) ──────────────────
     if artifact_muscle:
-        # 肌电伪影：高频噪声
-        muscle_noise = 2 * np.random.randn(n_channels, n_samples) * np.sin(2 * np.pi * 50 * times)
-        eeg_data += muscle_noise
-    
+        muscle_mask = np.random.rand(n_samples) < 0.05  # 5% of time
+        muscle_bursts = np.where(muscle_mask)[0]
+        for mb_start in muscle_bursts[:10]:  # max 10 bursts
+            mb_end = min(n_samples, mb_start + int(sampling_rate * 0.2))
+            high_freq = 5.0 * np.random.randn(n_channels, mb_end - mb_start) * \
+                       np.sin(2 * np.pi * 40 * times[:mb_end - mb_start])
+            eeg[:, mb_start:mb_end] += high_freq
+
+    # ── 8. Power line interference (50 or 60 Hz) ─────────────────────
     if artifact_powerline:
-        # 工频干扰：50Hz 正弦波
-        powerline = 5 * np.sin(2 * np.pi * 50 * times)
-        eeg_data += powerline
-    
-    # 计算 PSD (Power Spectral Density)
-    from scipy import signal as sig
+        line_freq = 50.0  # Hz (China/Asia/Europe)
+        line_amp = 5.0
+        line_wave = line_amp * np.sin(2 * np.pi * line_freq * times)
+        eeg += line_wave
+
+    # ── 9. Scale to microvolts (realistic EEG range: ±100 µV) ───────
+    eeg = eeg * 10.0  # final scale: roughly ±50-100 µV
+
+    # ── 10. Compute PSD ────────────────────────────────────────────────
     psd_list = []
     freqs_list = None
-    
     for ch in range(n_channels):
-        freqs, psd = sig.welch(eeg_data[ch], fs=sampling_rate, nperseg=min(256, n_samples))
+        freqs, psd = sig.welch(eeg[ch], fs=sampling_rate, nperseg=min(256, n_samples))
         if freqs_list is None:
             freqs_list = freqs.tolist()
         psd_list.append(psd.tolist())
-    
-    # 通道名称
-    ch_names = [f"EEG CH{ch+1}" for ch in range(n_channels)]
-    
+
     return {
         "success": True,
         "times": times.tolist(),
-        "channels": {ch_names[i]: eeg_data[i].tolist() for i in range(n_channels)},
+        "channels": {ch_names[i]: eeg[i].tolist() for i in range(n_channels)},
         "channel_names": ch_names,
         "sampling_rate": sampling_rate,
         "duration_seconds": duration_sec,
@@ -138,9 +208,49 @@ def generate_synthetic_eeg(
     }
 
 
+def generate_synthetic_eeg(
+    duration_sec: float = 10.0,
+    sampling_rate: int = 250,
+    n_channels: int = 8,
+    alpha_power: float = 1.0,
+    beta_power: float = 0.5,
+    theta_power: float = 0.3,
+    delta_power: float = 0.8,
+    alpha_freq: float = 10.0,
+    beta_freq: float = 20.0,
+    theta_freq: float = 6.0,
+    delta_freq: float = 3.0,
+    noise_level: float = 0.1,
+    artifact_blink: bool = False,
+    artifact_muscle: bool = False,
+    artifact_powerline: bool = False,
+) -> Dict[str, Any]:
+    """
+    Main entry point: generate synthetic EEG signal.
+    Delegates to _generate_eeg_realistic (v2, realistic output).
+    """
+    return _generate_eeg_realistic(
+        duration_sec=duration_sec,
+        sampling_rate=sampling_rate,
+        n_channels=n_channels,
+        alpha_power=alpha_power,
+        beta_power=beta_power,
+        theta_power=theta_power,
+        delta_power=delta_power,
+        alpha_freq=alpha_freq,
+        beta_freq=beta_freq,
+        theta_freq=theta_freq,
+        delta_freq=delta_freq,
+        noise_level=noise_level,
+        artifact_blink=artifact_blink,
+        artifact_muscle=artifact_muscle,
+        artifact_powerline=artifact_powerline,
+    )
+
+
 def get_preset_states() -> List[Dict[str, Any]]:
     """
-    返回预设的脑电状态（用于"猜猜这是什么状态？"游戏）
+    Preset brain states for the "Guess the State" game.
     """
     return [
         {
@@ -166,7 +276,7 @@ def get_preset_states() -> List[Dict[str, Any]]:
             "description": "受试者睁眼，注意力集中",
             "description_en": "Subject with eyes open, paying attention",
             "params": {
-                "alpha_power": 0.3,  # Alpha 阻断
+                "alpha_power": 0.3,  # Alpha blocking
                 "beta_power": 1.2,
                 "theta_power": 0.2,
                 "delta_power": 0.3,
@@ -221,7 +331,7 @@ def get_preset_states() -> List[Dict[str, Any]]:
                 "beta_power": 0.5,
                 "theta_power": 0.5,
                 "delta_power": 0.5,
-                "alpha_freq": 3.0,  # 发作期频率变慢
+                "alpha_freq": 3.0,
                 "beta_freq": 5.0,
                 "noise_level": 0.3,
                 "artifact_blink": False,
