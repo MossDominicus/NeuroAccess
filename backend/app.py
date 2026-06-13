@@ -161,6 +161,7 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
         "confidence": confidence,
         "limitations": _get_limitations(language),
         "what_this_data_cannot_tell": cannot_tell,
+        "waveform_preview": to_jsonable(data.get("waveform_preview", {})),
         "signal_quality": to_jsonable({
             "signal_quality_score": safe_float(sq),
             "noisy_channels": quality.get("noisy_channels") or data.get("noisy_channels") or [],

@@ -439,14 +439,32 @@ class EEGAnalyzer:
 
         sfreq = self.raw.info['sfreq']
         n_samples = min(int(duration_seconds * sfreq), self.raw.n_times)
+        
+        # 确保只选 EEG 通道（排除 STIM/STATUS 等非EEG通道）
+        try:
+            import mne
+            eeg_picks = mne.pick_types(self.raw.info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=False)
+            if len(eeg_picks) == 0:
+                # BDF/某些设备用 misc 标签
+                eeg_picks = mne.pick_types(self.raw.info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=True)
+            if len(eeg_picks) == 0:
+                # 最后回退：排除 stim
+                eeg_picks = mne.pick_types(self.raw.info, meg=False, stim=False, eog=False, ecg=False, exclude="bads")
+            if len(eeg_picks) == 0:
+                eeg_picks = list(range(min(len(self.raw.ch_names), 16)))
+        except Exception:
+            eeg_picks = list(range(min(len(self.raw.ch_names), 16)))
+        
         data = self.raw.get_data()[:, :n_samples]
+        ch_names = [self.raw.ch_names[i] for i in eeg_picks[:8]]
 
         times = np.linspace(0, n_samples / sfreq, n_samples).tolist()
 
         channels = {}
-        # 只取前 8 个通道（用于预览）
-        for i, ch_name in enumerate(self.raw.ch_names[:8]):
-            channels[ch_name] = data[i].tolist()
+        # 只取前 8 个 EEG 通道（用于预览）
+        for i, ch_idx in enumerate(eeg_picks[:8]):
+            ch_name = self.raw.ch_names[ch_idx]
+            channels[ch_name] = data[ch_idx].tolist()
 
         self.waveform = WaveformPreview(
             times=times,
