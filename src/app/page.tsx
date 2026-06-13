@@ -7,7 +7,6 @@ import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { AnalysisProvider, useAnalysis } from "@/lib/analysis-context";
-const IntroAnimation = nextDynamic(() => import("@/components/IntroAnimation"), { ssr: false, loading: () => null });
 const EEGWaveform = nextDynamic(() => import("@/components/PlotlyEEGWaveform"), { ssr: false, loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64 mt-4" /> });
 import {
   UploadCloud,
@@ -240,28 +239,6 @@ function DashboardInner() {
     handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis,
   } = useAnalysis();
 
-  // ── 启动动画状态 ─────────────────────────────────────
-  const [showIntro, setShowIntro] = useState(false);
-  useEffect(() => {
-    const forced = new URLSearchParams(window.location.search).get("intro");
-    if (forced === "1") {
-      window.sessionStorage.removeItem("neuroaccess-intro-played");
-      setShowIntro(true);
-    } else {
-      const played = window.sessionStorage.getItem("neuroaccess-intro-played");
-      if (played !== "true") setShowIntro(true);
-    }
-  }, []);
-  const handleIntroComplete = useCallback(() => {
-    window.sessionStorage.setItem("neuroaccess-intro-played", "true");
-    setShowIntro(false);
-  }, []);
-  const replayIntro = useCallback(() => {
-    window.sessionStorage.removeItem("neuroaccess-intro-played");
-    setShowIntro(true);
-  }, []);
-  useEffect(() => { (window as any).__replayIntro = replayIntro; return () => { delete (window as any).__replayIntro; }; }, [replayIntro]);
-
   // ── AI 状态 ─────────────────────────────────────────
   const [aiStatus, setAiStatus] = useState<{ online: boolean; model: string; mode: string } | null>(null);
   useEffect(() => {
@@ -282,8 +259,6 @@ function DashboardInner() {
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
   }, [t]);
-
-  if (showIntro) return <IntroAnimation onComplete={handleIntroComplete} />;
 
   const stats = {
     total:      files.length,

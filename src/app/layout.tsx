@@ -9,7 +9,7 @@ import type { Lang } from "@/lib/translations";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth-context";
-import { AnalysisProvider } from "@/lib/analysis-context";
+import IntroProvider from "@/components/IntroProvider";
 
 // Metadata 使用默认中文，语言切换由客户端 LanguageProvider 处理
 export const dynamic = "force-dynamic";
@@ -100,6 +100,7 @@ export default async function RootLayout({
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
         <AuthProvider>
+          <IntroProvider>
           <ThemeProvider>
             <LanguageProvider initialLang={initialLang}>
               <DisclaimerModal />
@@ -108,7 +109,7 @@ export default async function RootLayout({
                 <Sidebar />
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <TopNav />
-                  <main className="flex-1 overflow-y-auto overflow-x-hidden contain-[paint_layout] scroll-smooth transition-all duration-200">
+                  <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth transition-all duration-200">
                     {children}
                   </main>
                   <PublicPreviewFooter />
@@ -116,6 +117,7 @@ export default async function RootLayout({
               </div>
             </LanguageProvider>
           </ThemeProvider>
+          </IntroProvider>
         </AuthProvider>
       </body>
     </html>
