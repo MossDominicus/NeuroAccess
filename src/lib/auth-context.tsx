@@ -9,6 +9,7 @@ interface User {
   email: string;
   phone?: string;
   avatar_url?: string;
+  avatar_color?: string;
 }
 
 interface AuthContextType {
@@ -19,7 +20,7 @@ interface AuthContextType {
   logout: () => void;
   loading: boolean;
   updateUser: (user: User) => void;
-  updateProfile: (data: { username?: string; avatar_url?: string }) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (data: { username?: string; avatar_color?: string }) => Promise<{ success: boolean; error?: string }>;
   changePassword: (data: { verification_code: string; new_password: string }) => Promise<{ success: boolean; error?: string }>;
   sendVerificationCode: (data: { email?: string }) => Promise<{ success: boolean; error?: string }>;
   updateEmail: (data: { new_email: string; verification_code: string }) => Promise<{ success: boolean; error?: string }>;
@@ -145,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateProfile = async (data: { username?: string; avatar_url?: string }): Promise<{ success: boolean; error?: string }> => {
+  const updateProfile = async (data: { username?: string; avatar_color?: string }): Promise<{ success: boolean; error?: string }> => {
     if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/profile`, {

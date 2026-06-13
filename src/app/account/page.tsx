@@ -30,7 +30,7 @@ export default function AccountPage() {
   // ---------- 编辑资料 ----------
   const [editUsername, setEditUsername] = useState(user?.username || "");
   const [editAvatarUrl, setEditAvatarUrl] = useState(
-    user?.avatar_url && AVATAR_COLORS.includes(user.avatar_url) ? user.avatar_url : AVATAR_COLORS[0]
+    user?.avatar_color && AVATAR_COLORS.includes(user.avatar_color) ? user.avatar_color : AVATAR_COLORS[0]
   );
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
@@ -71,7 +71,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (user) {
       setEditUsername(user.username || "");
-      setEditAvatarUrl(user.avatar_url || AVATAR_COLORS[0]);
+      setEditAvatarUrl(user?.avatar_color || "blue");
     }
   }, [user]);
 
@@ -86,12 +86,12 @@ export default function AccountPage() {
     }
     setEditLoading(true);
     try {
-      const result = await updateProfile({ username: editUsername, avatar_url: editAvatarUrl });
+      const result = await updateProfile({ username: editUsername, avatar_color: editAvatarUrl });
       if (result.success) {
         setEditSuccess(t(lang, "profileUpdated") || "资料更新成功");
         // 更新本地用户状态
         if (user) {
-          const updated = { ...user, username: editUsername, avatar_url: editAvatarUrl };
+          const updated = { ...user, username: editUsername, avatar_color: editAvatarUrl };
           updateUser(updated);
         }
       } else {

@@ -433,7 +433,7 @@ def auth_register(username: str = Form(...), email: str = Form(...), password: s
             return {"success": False, "error": "验证码无效或已过期"}
         user = create_user(username, email, password)
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
-        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", "")}}
+        return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", ""), "avatar_color": user.get("avatar_color", "blue")}}
     except ValueError as e:
         return {"success": False, "error": str(e)}
 
@@ -447,7 +447,7 @@ def auth_login(username_or_email: str = Form(...), password: str = Form(...)):
     token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
     terms_accepted = user.get("terms_accepted", 0)
     needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
-    return {"success": True, "token": token, "terms_accepted": bool(terms_accepted), "needs_username_setup": needs_username_setup, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", "")}}
+    return {"success": True, "token": token, "terms_accepted": bool(terms_accepted), "needs_username_setup": needs_username_setup, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", ""), "avatar_color": user.get("avatar_color", "blue")}}
 
 @app.get("/api/auth/me")
 def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -460,7 +460,7 @@ def auth_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     user = get_user_by_id(int(payload["sub"]))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", ""), "terms_accepted": user.get("terms_accepted", 0)}}
+    return {"success": True, "user": {"id": user["id"], "username": user["username"], "email": user["email"], "phone": user.get("phone", ""), "avatar_url": user.get("avatar_url", ""), "avatar_color": user.get("avatar_color", "blue"), "terms_accepted": user.get("terms_accepted", 0)}}
 
 @app.post("/api/auth/logout")
 def auth_logout():
@@ -872,7 +872,7 @@ def auth_confirm_email_change(
     updated = update_email(user_id, new_email)
     if updated:
         updated_user = get_user_by_id(user_id)
-        return {"success": True, "message": "Email updated successfully", "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "avatar_url": updated_user.get("avatar_url", "")}}
+        return {"success": True, "message": "Email updated successfully", "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "avatar_url": updated_user.get("avatar_url", ""), "avatar_color": updated_user.get("avatar_color", "blue")}}
     return {"success": False, "error": "邮箱更新失败（可能已被注册）"}
 
 
@@ -994,6 +994,7 @@ async def auth_update_profile(
         body = {}
     username = body.get("username", "").strip()
     avatar_url = body.get("avatar_url", "").strip()
+    avatar_color = body.get("avatar_color", "").strip()
 
     # 名字校验：必须以文字开头（CJK/拉丁/希腊/西里尔/阿拉伯/泰/天城文等）
     if username is not None and username != "":
@@ -1020,8 +1021,8 @@ async def auth_update_profile(
                 conn.close()
                 return {"success": False, "error": "Username already taken"}
             conn.execute("UPDATE users SET username = ? WHERE id = ?", (username, user_id))
-        # Always update avatar_url (even if empty string = remove avatar)
-        conn.execute("UPDATE users SET avatar_url = ? WHERE id = ?", (avatar_url, user_id))
+        # Always update avatar_url and avatar_color (even if empty string)
+        conn.execute("UPDATE users SET avatar_url = ?, avatar_color = ? WHERE id = ?", (avatar_url, avatar_color, user_id))
         conn.commit()
     except Exception as e:
         conn.close()
@@ -1029,7 +1030,7 @@ async def auth_update_profile(
     conn.close()
     
     updated_user = get_user_by_id(user_id)
-    return {"success": True, "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "phone": updated_user.get("phone", ""), "avatar_url": updated_user.get("avatar_url", "")}}
+    return {"success": True, "user": {"id": updated_user["id"], "username": updated_user["username"], "email": updated_user["email"], "phone": updated_user.get("phone", ""), "avatar_url": updated_user.get("avatar_url", ""), "avatar_color": updated_user.get("avatar_color", "blue")}}
 
 # =================================================================
 # Feedback API

@@ -32,7 +32,7 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
   // SSR 期间 serverLang 正确，客户端水合后 clientLang 正确
   const lang = serverLang || clientLang;
 
-  const avatarColor = user?.avatar_url || "#3B82F6";
+  const avatarColor = user?.avatar_color || "#3B82F6";
 
   return (
     <header className="h-14 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-[var(--color-border)] flex items-center justify-between px-6 sticky top-0 z-40">

@@ -67,6 +67,11 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''")
     except Exception:
         pass  # column already exists
+    # Add avatar_color column if not exists
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN avatar_color TEXT DEFAULT 'blue'")
+    except Exception:
+        pass  # column already exists
     # Add terms_accepted column if not exists
     try:
         conn.execute("ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 0")
@@ -208,6 +213,7 @@ def create_user(username: str, email: str, password: str) -> Dict[str, Any]:
             "username": username,
             "email": email,
             "avatar_url": "",
+            "avatar_color": "blue",
             "created_at": datetime.utcnow().isoformat(),
         }
     except sqlite3.IntegrityError as e:
@@ -224,14 +230,14 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
     try:
         # Try username first
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, password_hash, created_at, terms_accepted FROM users WHERE username = ?",
+            "SELECT id, username, email, avatar_url, avatar_color, password_hash, created_at, terms_accepted FROM users WHERE username = ?",
             (username_or_email,),
         ).fetchone()
 
         # If not found, try email
         if row is None:
             row = conn.execute(
-                "SELECT id, username, email, avatar_url, password_hash, created_at, terms_accepted FROM users WHERE email = ?",
+                "SELECT id, username, email, avatar_url, avatar_color, password_hash, created_at, terms_accepted FROM users WHERE email = ?",
                 (username_or_email,),
             ).fetchone()
 
@@ -246,6 +252,7 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
             "username": row["username"],
             "email": row["email"],
             "avatar_url": row["avatar_url"] or "",
+            "avatar_color": row["avatar_color"] or "blue",
             "created_at": row["created_at"],
             "terms_accepted": row["terms_accepted"],
         }
@@ -258,7 +265,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, created_at, terms_accepted FROM users WHERE id = ?",
+            "SELECT id, username, email, avatar_url, avatar_color, created_at, terms_accepted FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
         if row:
@@ -455,7 +462,7 @@ def get_user_by_phone(phone: str) -> Optional[Dict[str, Any]]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, phone, avatar_url, created_at, terms_accepted FROM users WHERE phone = ?",
+            "SELECT id, username, email, phone, avatar_url, avatar_color, created_at, terms_accepted FROM users WHERE phone = ?",
             (phone.strip(),),
         ).fetchone()
         if row:
@@ -488,6 +495,7 @@ def create_user_with_phone(username: str, phone: str, password: str) -> Dict[str
             "email": "",
             "phone": phone.strip(),
             "avatar_url": "",
+            "avatar_color": "blue",
             "created_at": datetime.utcnow().isoformat(),
         }
     except sqlite3.IntegrityError:
@@ -501,7 +509,7 @@ def authenticate_by_phone(phone: str, password: str) -> Optional[Dict[str, Any]]
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, phone, avatar_url, password_hash, created_at, terms_accepted FROM users WHERE phone = ?",
+            "SELECT id, username, email, phone, avatar_url, avatar_color, password_hash, created_at, terms_accepted FROM users WHERE phone = ?",
             (phone.strip(),),
         ).fetchone()
         if row is None:
@@ -514,6 +522,7 @@ def authenticate_by_phone(phone: str, password: str) -> Optional[Dict[str, Any]]
             "email": row["email"],
             "phone": row["phone"],
             "avatar_url": row["avatar_url"] or "",
+            "avatar_color": row["avatar_color"] or "blue",
             "created_at": row["created_at"],
             "terms_accepted": row["terms_accepted"],
         }
