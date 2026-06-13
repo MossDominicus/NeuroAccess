@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // 公开路径：无需登录即可访问
 const publicPaths = [
-  "/", "/login", "/register",
+  "/login", "/register",
   "/guide", "/cases", "/privacy", "/terms", "/disclaimer",
   "/eeg-simulator", "/eeg-viewer",
   "/reports",

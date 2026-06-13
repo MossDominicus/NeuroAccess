@@ -2,14 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 
 export default function DisclaimerModal() {
   const { t } = useLang();
+  const { user } = useAuth();
   const [visible, setVisible] = useState(false);
   const hasOpenedRef = useRef(false);
 
   useEffect(() => {
+    // 只有已登录用户才可能看到免责声明
+    if (!user) return;
+
     try {
       const accepted = localStorage.getItem("neuroaccess-disclaimer-accepted");
       if (!accepted) {

@@ -708,10 +708,9 @@ def auth_register_verification_code(email: str = Form(...), request: Request = N
     if email_sent:
         result["message"] = "Verification code sent to your email"
     else:
-        result["message"] = "Verification code sent (email not configured)"
-        # Only return dev_code in DEBUG mode
-        if os.getenv("DEBUG") == "1":
-            result["dev_code"] = code
+        result["message"] = "Verification code (email not configured, see below)"
+        # 当 SMTP 未配置时，直接返回验证码给前端（开发/自托管模式）
+        result["dev_code"] = code
     return result
 
 def verify_registration_code(email: str, code: str) -> bool:
