@@ -204,36 +204,6 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <QualityItem
-            icon={Activity}
-            label={t("signalQuality")}
-            value={`${sq}/100`}
-            color={sq >= 70 ? "text-green-600 dark:text-green-400" : sq >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}
-          />
-          <QualityItem
-            icon={AlertTriangle}
-            label={t("noisyChannels")}
-            value={(signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0}
-            color="text-amber-600 dark:text-amber-400"
-          />
-          <QualityItem
-            icon={XCircle}
-            label={t("clipping")}
-            value={(signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected ? t("yes") : t("no")}
-            color={(signalQuality as any)?.clipping_detected ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
-          />
-          <QualityItem
-            icon={Eye}
-            label={t("blinkArtifacts")}
-            value={((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0}
-            color="text-amber-600 dark:text-amber-400"
-          />
-          <QualityItem
-            icon={Radio}
-            label={t("highFreqNoise")}
-            value={(signalQuality as any)?.high_frequency_noise || (analysis as any).high_frequency_noise ? t("yes") : t("no")}
-            color={(signalQuality as any)?.high_frequency_noise ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
-          />
-          <QualityItem
             icon={AlertTriangle}
             label={t("missingData")}
             value={(() => {
@@ -242,6 +212,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
               return md ? `${Number(qd.missing_data_percentage || 0).toFixed(1)}%` : t("no");
             })()}
             color={(signalQuality as any)?.missing_data ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
+            comment={t("missingDataDesc")}
           />
           <QualityItem
             icon={Zap}
@@ -251,6 +222,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
               return `${Number(qd.outlier_percentage || 0).toFixed(2)}%`;
             })()}
             color="text-amber-600 dark:text-amber-400"
+            comment={t("outlierPercentageDesc")}
           />
           <QualityItem
             icon={TrendingUp}
@@ -260,6 +232,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
               return Number(qd.average_variance || 0).toFixed(4);
             })()}
             color="text-blue-600 dark:text-blue-400"
+            comment={t("avgVarianceDesc")}
           />
         </div>
 
@@ -505,13 +478,16 @@ function OverviewItem({ label, value }: { label: string; value: any }) {
   );
 }
 
-function QualityItem({ icon: Icon, label, value, color }: { icon: any; label: string; value: any; color: string }) {
+function QualityItem({ icon: Icon, label, value, color, comment }: { icon: any; label: string; value: any; color: string; comment?: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
       <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
       <div>
         <div className="text-[11px] font-medium text-[var(--color-text-secondary)]">{label}</div>
         <div className="text-sm font-bold text-[var(--color-text)]">{String(value)}</div>
+        {comment && (
+          <div className="mt-0.5 text-[10px] leading-tight text-[var(--color-text-secondary)]/60">{comment}</div>
+        )}
       </div>
     </div>
   );

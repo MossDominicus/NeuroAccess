@@ -299,7 +299,33 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
                             f"Ensure file is a valid 24-bit BIOSEMI format."
                         ) from bdf_err
             elif ext == ".gdf":
-                raw = mne.io.read_raw_gdf(file_path, preload=True, verbose=False)
+                try:
+                    raw = mne.io.read_raw_gdf(file_path, preload=True, verbose=False)
+                except Exception as gdf_err:
+                    # GDF 1.99 fallback: MNE/biosig/neo cannot read this format
+                    try:
+                        from gdf_reader import read_gdf_199
+                        data_arr, times, ch_names, sfreq = read_gdf_199(file_path)
+                        max_samples = int(sfreq * duration)
+                        if data_arr.shape[1] > max_samples:
+                            data_arr = data_arr[:, :max_samples]
+                            times = times[:max_samples]
+                        t_arr = np.arange(data_arr.shape[1]) / sfreq
+                        return to_jsonable({
+                            "success": True,
+                            "file_name": file_name,
+                            "channel_names": ch_names,
+                            "sampling_rate": round(sfreq, 2),
+                            "duration_seconds": round(len(t_arr) / sfreq, 2),
+                            "times": t_arr.tolist()[:min(len(t_arr), 10000)],
+                            "channels": {ch: data_arr[i][:min(data_arr.shape[1], 10000)].tolist() for i, ch in enumerate(ch_names)},
+                            "total_channels": len(ch_names),
+                            "total_samples": data_arr.shape[1],
+                        })
+                    except Exception as fallback_err:
+                        raise Exception(
+                            f"GDF read failed (MNE: {gdf_err}; custom fallback: {fallback_err})"
+                        ) from gdf_err
             elif ext == ".csv":
                 # CSV: 假设第一列是时间，其余列是通道
                 import pandas as pd
@@ -354,7 +380,7 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
                 # 2nd try: include misc (BDF files often tag channels as misc)
                 eeg_picks = mne.pick_types(info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=True, seeg=False, ecog=False, bio=False)
             if len(eeg_picks) == 0:
-                # 3rd try: exclude only stim and bad channels
+                # 3rd try: exclude stim, eog, ecg (BDF stim channels show as fake EEG)
                 eeg_picks = mne.pick_types(info, meg=False, stim=False, eog=False, ecg=False, exclude="bads")
             if len(eeg_picks) == 0:
                 # Final fallback: all channels

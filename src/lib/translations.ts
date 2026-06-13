@@ -168,6 +168,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: '缺失数据',
     outlierPercentage: '异常值比例',
     avgVariance: '平均方差',
+    missingDataDesc: 'EEG记录中数据中断或丢失的比例',
+    outlierPercentageDesc: '信号中极端值所占比例',
+    avgVarianceDesc: '全体通道信号变化的平均程度',
     channelNames: "通道名称",
 
     // 评分项
@@ -794,6 +797,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: 'Missing Data',
     outlierPercentage: 'Outlier %',
     avgVariance: 'Avg Variance',
+    missingDataDesc: 'Percentage of gaps or signal dropout in the recording',
+    outlierPercentageDesc: 'Proportion of extreme abnormal values in the signal',
+    avgVarianceDesc: 'Average signal variability across all channels',
 
     // Score items
     learningReadability: "Readability",
@@ -1455,6 +1461,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: 'Datos Faltantes',
     outlierPercentage: '% Atípicos',
     avgVariance: 'Varianza Media',
+    missingDataDesc: 'Porcentaje de interrupciones o pérdida de señal en la grabación',
+    outlierPercentageDesc: 'Proporción de valores extremos anormales en la señal',
+    avgVarianceDesc: 'Variabilidad promedio de la señal en todos los canales',
 
     learningReadability: "Legibilidad",
     signalClarity: "Claridad de Señal",
@@ -2101,6 +2110,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: 'Données Manquantes',
     outlierPercentage: '% Aberrants',
     avgVariance: 'Variance Moy.',
+    missingDataDesc: 'Pourcentage de coupures ou perte de signal dans l\'enregistrement',
+    outlierPercentageDesc: 'Proportion de valeurs anormales extrêmes dans le signal',
+    avgVarianceDesc: 'Variabilité moyenne du signal sur tous les canaux',
 
     learningReadability: "Lisibilité",
     signalClarity: "Clarté du Signal",
@@ -2747,6 +2759,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: 'Fehlende Daten',
     outlierPercentage: 'Ausreißer %',
     avgVariance: 'Mittl. Varianz',
+    missingDataDesc: 'Prozentsatz der Signalausfälle oder -lücken in der Aufnahme',
+    outlierPercentageDesc: 'Anteil extremer abnormer Werte im Signal',
+    avgVarianceDesc: 'Durchschnittliche Signalvariabilität über alle Kanäle',
 
     learningReadability: "Lesbarkeit",
     signalClarity: "Signal klarheit",
@@ -3393,6 +3408,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: '欠損データ',
     outlierPercentage: '外れ値率',
     avgVariance: '平均分散',
+    missingDataDesc: '記録における信号欠落または途切れの割合',
+    outlierPercentageDesc: '信号内の異常な極端値の割合',
+    avgVarianceDesc: '全チャンネルにおける信号変動の平均値',
 
     learningReadability: "読みやすさ評価",
     signalClarity: "信号鮮明度",
@@ -4040,6 +4058,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     missingData: '누락 데이터',
     outlierPercentage: '이상치 비율',
     avgVariance: '평균 분산',
+    missingDataDesc: '기록에서 신호 끊김이나 손실의 비율',
+    outlierPercentageDesc: '신호 내 극단적 이상값의 비율',
+    avgVarianceDesc: '모든 채널의 평균 신호 변동성',
 
     learningReadability: "가독성",
     signalClarity: "신호 명확도",
