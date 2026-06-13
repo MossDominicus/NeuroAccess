@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
@@ -11,8 +12,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { AnalysisProvider } from "@/lib/analysis-context";
 
 // Metadata 使用默认中文，语言切换由客户端 LanguageProvider 处理
-// 保持 layout 可静态化以启用页面级 SSG（静态页面加载速度更快）
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = "https://neuroaccess.cloud";
@@ -70,13 +70,26 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // 从 cookie 读取用户语言偏好（SSR）
+  let initialLang: Lang | undefined;
+  try {
+    const cookieStore = await cookies();
+    const langCookie = cookieStore.get("lang");
+    const LANGUAGES: Lang[] = ["zh", "en", "es", "fr", "de", "ja", "ko"];
+    if (langCookie && LANGUAGES.includes(langCookie.value as Lang)) {
+      initialLang = langCookie.value as Lang;
+    }
+  } catch {}
+  // 默认英文
+  initialLang = initialLang || "en";
+
   return (
-    <html lang="zh" suppressHydrationWarning>
+    <html lang={initialLang} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{
           __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}})()`
@@ -88,21 +101,19 @@ export default function RootLayout({
       <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
         <AuthProvider>
           <ThemeProvider>
-            <LanguageProvider initialLang={"zh" as Lang}>
-              <AnalysisProvider>
-                <DisclaimerModal />
-                <PostLoginModals />
-                <div className="flex h-screen overflow-hidden">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <TopNav />
-                    <main className="flex-1 overflow-y-auto">
-                      {children}
-                    </main>
-                    <PublicPreviewFooter />
-                  </div>
+            <LanguageProvider initialLang={initialLang}>
+              <DisclaimerModal />
+              <PostLoginModals />
+              <div className="flex h-screen overflow-hidden">
+                <Sidebar />
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <TopNav />
+                  <main className="flex-1 overflow-y-auto overflow-x-hidden contain-[paint_layout] scroll-smooth transition-all duration-200">
+                    {children}
+                  </main>
+                  <PublicPreviewFooter />
                 </div>
-              </AnalysisProvider>
+              </div>
             </LanguageProvider>
           </ThemeProvider>
         </AuthProvider>

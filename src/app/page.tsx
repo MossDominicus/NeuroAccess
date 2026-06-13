@@ -436,9 +436,13 @@ function DashboardInner() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  MAIN DASHBOARD PAGE (AnalysisProvider is in root layout)
+//  MAIN DASHBOARD PAGE
 // ═══════════════════════════════════════════════════════════════
 
 export default function DashboardPage() {
-  return <DashboardInner />;
+  return (
+    <AnalysisProvider>
+      <DashboardInner />
+    </AnalysisProvider>
+  );
 }

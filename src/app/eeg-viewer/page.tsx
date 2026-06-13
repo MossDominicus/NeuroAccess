@@ -198,7 +198,7 @@ export default function EEGViewerPage() {
               </div>
               <div>
                 <span className="text-[var(--color-text-secondary)]">{t("totalDurationEeg")}</span>
-                <p className="font-medium text-[var(--color-text)]">{eegData.duration_seconds} 秒</p>
+                <p className="font-medium text-[var(--color-text)]">{eegData.duration_seconds} {t("timeUnitSec")}</p>
               </div>
             </div>
           </div>

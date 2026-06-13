@@ -29,10 +29,12 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [devCode, setDevCode] = useState("");
 
   const handleSendCode = async () => {
     if (!email || countdown > 0) return;
     setError("");
+    setDevCode("");
     try {
       const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/register-verification-code`, {
         method: "POST",
@@ -54,7 +56,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
           });
         }, 1000);
         if (data.dev_code) {
-          alert(`开发模式：验证码是 ${data.dev_code}`);
+          setDevCode(data.dev_code);
         }
       } else {
         setError(data.detail || data.error || tf("sendCodeFailed", "验证码发送失败"));
@@ -194,6 +196,11 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
               required
               maxLength={6}
             />
+            {devCode && (
+              <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
+                {tf("emailNotConfigured", "邮件暂未配置，验证码")}: <code className="font-mono font-bold text-base">{devCode}</code>
+              </p>
+            )}
           </div>
 
           <div>

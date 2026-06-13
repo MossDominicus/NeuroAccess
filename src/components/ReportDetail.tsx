@@ -208,22 +208,24 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             label={t("signalQuality")}
             value={`${sq}/100`}
             color={sq >= 70 ? "text-green-600 dark:text-green-400" : sq >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}
+            comment="Overall score based on noise, artifacts, and data integrity"
           />
           <QualityItem
             icon={AlertTriangle}
             label={t("noisyChannels")}
             value={(signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0}
             color="text-amber-600 dark:text-amber-400"
+            comment="Channels with excessive noise that may affect accuracy"
           />
           <QualityItem
-            icon={XCircle}
-            label={t("clipping")}
-            value={(signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected ? t("yes") : t("no")}
-            color={(signalQuality as any)?.clipping_detected ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
+            icon={Eye}
+            label={t("blinkArtifacts")}
+            value={((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0}
+            color="text-amber-600 dark:text-amber-400"
+            comment="Detected eye blinks or movement artifacts"
           />
         </div>
 
-        {/* 通道级质量评分 */}
         {(() => {
           const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
           const cs = qd.channel_scores || {};
@@ -264,63 +266,6 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           );
         })()}
 
-        {/* 评分明细 */}
-        {(() => {
-          const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
-          const noisyCount = (signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0;
-          const artifactCount = ((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0;
-          const outlierPct = Number(qd.outlier_percentage || 0);
-          const missing = (signalQuality as any)?.missing_data || (analysis as any).missing_data;
-          const clipping = (signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected;
-          const hfNoise = (signalQuality as any)?.high_frequency_noise || (analysis as any).high_frequency_noise;
-
-          const noisyPen = Math.min(noisyCount * 3, 30);
-          const artifactPen = Math.min(artifactCount * 6, 20);
-          const outlierPen = Math.min(outlierPct * 5, 15);
-          const missingPen = missing ? 20 : 0;
-          const clippingPen = clipping ? 15 : 0;
-          const hfPen = hfNoise ? 10 : 0;
-          const totalDeduct = noisyPen + artifactPen + outlierPen + missingPen + clippingPen + hfPen;
-          const computedScore = Math.max(0, Math.min(100, 100 - totalDeduct));
-
-          const rows = [
-            { label: t("noisyChannels"), deduct: noisyPen, detail: `${noisyCount} ${lang.startsWith("zh") ? "个" : ""}` },
-            { label: t("blinkArtifacts"), deduct: artifactPen, detail: `${artifactCount} ${lang.startsWith("zh") ? "个" : ""}` },
-            { label: t("outlierPercentage"), deduct: Math.round(outlierPen), detail: `${outlierPct.toFixed(1)}%` },
-            { label: t("missingData"), deduct: missingPen, detail: missing ? t("yes") : t("no") },
-            { label: t("clipping"), deduct: clippingPen, detail: clipping ? t("yes") : t("no") },
-            { label: t("highFreqNoise"), deduct: hfPen, detail: hfNoise ? t("yes") : t("no") },
-          ].filter(r => r.deduct > 0);
-
-          if (rows.length === 0) return null;
-
-          return (
-            <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)]/50 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--color-text)]">{t("scoreBreakdown") || "Score Breakdown"}</h3>
-                <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">= {computedScore}/100</span>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
-                  <span>{t("baseScore") || "Base"}</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400">100</span>
-                </div>
-                {rows.map(r => (
-                  <div key={r.label} className="flex justify-between text-xs">
-                    <span className="text-[var(--color-text-secondary)]">
-                      {r.label} <span className="opacity-60">({r.detail})</span>
-                    </span>
-                    <span className="font-mono text-red-500 dark:text-red-400">-{r.deduct}</span>
-                  </div>
-                ))}
-                <div className="border-t border-[var(--color-border)] pt-1.5 flex justify-between text-xs font-semibold">
-                  <span className="text-[var(--color-text)]">{t("finalScore") || "Final Score"}</span>
-                  <span className="font-mono text-[var(--color-text)]">{computedScore}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
       </section>
 
       {/* ── Section 3: Frequency Analysis ───────────── */}
@@ -465,13 +410,16 @@ function OverviewItem({ label, value }: { label: string; value: any }) {
   );
 }
 
-function QualityItem({ icon: Icon, label, value, color }: { icon: any; label: string; value: any; color: string }) {
+function QualityItem({ icon: Icon, label, value, color, comment }: { icon: any; label: string; value: any; color: string; comment?: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
       <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
       <div>
         <div className="text-[11px] font-medium text-[var(--color-text-secondary)]">{label}</div>
         <div className="text-sm font-bold text-[var(--color-text)]">{String(value)}</div>
+        {comment && (
+          <div className="mt-0.5 text-[10px] leading-tight text-[var(--color-text-secondary)]/60">{comment}</div>
+        )}
       </div>
     </div>
   );

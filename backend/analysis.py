@@ -8,6 +8,7 @@ import numpy as np
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 import json
+import sys
 import i18n
 
 
@@ -124,6 +125,30 @@ class EEGAnalyzer:
                 raise ValueError(f"Unsupported file format: {ext}. Only .edf, .bdf, .gdf are supported.")
         except Exception as read_err:
             raise ValueError(f"Failed to read {ext.upper()} file: {read_err}") from read_err
+
+        # ── 保存原始数据（预处理前），用于波形显示 ────────────────────
+        # 注意：对于 MNE 读取的 EDF/BDF，原始数据单位是伏特(V)
+        # 对于 GDF 1.99 自定义读取器，原始数据单位是微伏(μV)
+        # 统一转换到 μV 以使前端显示一致
+        try:
+            raw_data_copy = self.raw.get_data().copy()  # (n_channels, n_times)
+            raw_times_copy = self.raw.times.copy()
+            # 获取原始数据的单位信息
+            is_gdf_custom = ext == ".gdf" and 'gdf_reader' in sys.modules and hasattr(self.raw, '_data')
+            if is_gdf_custom:
+                # GDF 1.99: 数据已经是 μV，直接使用
+                self._raw_data_uv = raw_data_copy
+            else:
+                # MNE 读取（EDF/BDF/标准GDF）：数据单位是 V，转换为 μV
+                self._raw_data_uv = raw_data_copy * 1e6
+            self._raw_times = raw_times_copy
+            self._raw_sfreq = self.raw.info['sfreq']
+        except Exception as _raw_save_err:
+            # 无法保存原始数据不会影响主要分析功能，仅波形预览会退化
+            print(f"[Warning] Failed to save raw data copy: {_raw_save_err}")
+            self._raw_data_uv = None
+            self._raw_times = None
+            self._raw_sfreq = self.raw.info['sfreq'] if hasattr(self.raw, 'info') else 0
 
         # 预处理流水线 (按顺序, 每步提升频段/伪影分析准确率):
         # 1. 0.5-40 Hz 带通 — 去除 DC 漂移、肌电、工频谐波
@@ -433,17 +458,36 @@ class EEGAnalyzer:
         return self.frequency
 
     def extract_waveform_preview(self, duration_seconds: float = 10.0) -> WaveformPreview:
-        """提取波形预览数据（前 N 秒，基于滤波后数据）"""
+        """提取波形预览数据（前 N 秒，基于原始未滤波数据）
+        
+        使用 load_data() 中保存的原始数据副本（单位 μV），
+        避免预处理流水线（滤波/ICA等）对波形显示的影响。
+        """
         if self.raw is None:
             raise ValueError("请先调用 load_data()")
 
         sfreq = self.raw.info['sfreq']
         n_samples = min(int(duration_seconds * sfreq), self.raw.n_times)
 
+        # ── 使用原始未滤波数据 ────────────────────────────────────────
+        use_raw = (hasattr(self, '_raw_data_uv') and self._raw_data_uv is not None
+                   and self._raw_times is not None)
+        if use_raw:
+            raw_data_uv = self._raw_data_uv  # (n_channels, n_times), 单位 μV
+            raw_times_full = self._raw_times
+            ch_names_all = self.raw.ch_names
+        else:
+            # 回退：使用当前（可能已滤波）数据
+            raw_data_uv = self.raw.get_data()  # (n_channels, n_times)
+            raw_times_full = self.raw.times
+            ch_names_all = self.raw.ch_names
+            # 如果是 MNE V 单位且没有原始数据，此时数据可能已滤波，尝试转换为 μV
+            if not hasattr(self, '_raw_data_uv'):
+                raw_data_uv = raw_data_uv * 1e6
+
         # 选择用于预览的通道：优先 EEG 通道，排除 STIM/STATUS 通道
         try:
             import mne
-            ch_names_all = self.raw.ch_names
             # 排除名称含 TRIGGER/STIM/STATUS/DC/ACCEL 的通道
             exclude_names = {"trigger", "stim", "status", "sti", "dc", "accel", "gyro", "magnet"}
             clean_indices = [i for i, ch in enumerate(ch_names_all)
@@ -460,24 +504,25 @@ class EEGAnalyzer:
                 # 最终回退：前 8 个通道（原始行为）
                 picks = list(range(min(8, len(ch_names_all))))
         except Exception:
-            picks = list(range(min(8, len(self.raw.ch_names))))
+            picks = list(range(min(8, len(ch_names_all))))
 
-        data = self.raw.get_data()[:, :n_samples]
-        # 取最多 8 个通道
+        # 取最多 8 个通道，用原始数据
         chosen = picks[:8]
+        n_points = min(n_samples, raw_data_uv.shape[1])
+        data_slice = raw_data_uv[:, :n_points]
 
-        times = np.linspace(0, n_samples / sfreq, n_samples).tolist()
+        times = raw_times_full[:n_points].tolist()
 
         channels = {}
         for ch_idx in chosen:
-            ch_name = self.raw.ch_names[ch_idx]
-            channels[ch_name] = data[ch_idx].tolist()
+            ch_name = ch_names_all[ch_idx]
+            channels[ch_name] = data_slice[ch_idx].tolist()
 
         self.waveform = WaveformPreview(
             times=times,
             channels=channels,
             sampling_rate=sfreq,
-            duration_seconds=n_samples / sfreq
+            duration_seconds=n_points / sfreq
         )
 
         return self.waveform
