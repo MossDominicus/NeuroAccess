@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
+import { useLang } from "@/lib/language-context";
 import Link from "next/link";
 import { translations } from "@/lib/translations";
 
@@ -14,9 +15,13 @@ interface RegisterFormProps {
 export default function RegisterForm({ lang }: RegisterFormProps) {
   const router = useRouter();
   const { register } = useAuth();
+  const { lang: ctxLang } = useLang();
+
+  // 使用全站统一语言上下文（与 settings 面板一致）
+  const effectiveLang = ctxLang || lang;
 
   const tf = (key: string, fallback: string) => {
-    const val = translations[lang as keyof typeof translations]?.[key];
+    const val = translations[effectiveLang as keyof typeof translations]?.[key];
     return val || fallback;
   };
 
