@@ -176,6 +176,9 @@ class GDF199Reader:
         # Create RawArray
         raw = RawArray(self._data, info)
 
+        # Mark as custom GDF 1.99 reader (data is native μV, NOT volts)
+        raw._gdf_custom_reader = True
+
         return raw
 
 

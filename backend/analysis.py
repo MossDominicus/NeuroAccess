@@ -133,11 +133,11 @@ class EEGAnalyzer:
         try:
             raw_data_copy = self.raw.get_data().copy()  # (n_channels, n_times)
             raw_times_copy = self.raw.times.copy()
-            # GDF 1.99 自定义读取器：raw 对象是 RawArray，数据是 int16 μV
-            # 判断依据：数据 dtype 是整数类型（MNE 读取的 EDF/BDF 会转 float64）
-            import numpy as np
-            if ext == ".gdf" and raw_data_copy.dtype.kind in ('i', 'u'):
-                # GDF 1.99 int16: 数据已经是 μV，直接使用
+            # GDF 1.99 自定义读取器：raw 对象有 _gdf_custom_reader=true 标记
+            # MNE RawArray 在内部将 int16 转为了 float64，无法通过 dtype 区分
+            is_gdf_custom = ext == ".gdf" and getattr(self.raw, '_gdf_custom_reader', False)
+            if is_gdf_custom:
+                # GDF 1.99: 数据已经是 μV，直接使用（int16 原始值）
                 self._raw_data_uv = raw_data_copy
             else:
                 # MNE 读取（EDF/BDF/标准GDF）：数据单位是 V，转换为 μV

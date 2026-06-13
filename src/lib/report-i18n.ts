@@ -130,8 +130,8 @@ export function getConfidenceReasons(data: AnalysisData, lang: Lang): string[] {
 export function getLimitations(lang: Lang): string[] {
   const map: Record<Lang, string[]> = {
     zh: [
-      "基本的 artifact 处理，结果仅供参考",
-      "Montage 元数据可能不完整",
+      "基本的伪影处理，结果仅供参考",
+      "导联数据可能不完整",
       "无任务标签假设",
       "若用于研究，应由专业人员检查原始波形",
     ],
