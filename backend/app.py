@@ -598,6 +598,7 @@ def send_verification_email(to_email: str, code: str, purpose: str = "password_c
             </body></html>"""
 
     # Try SMTP first
+    print(f"[Email] SMTP config: host={smtp_host!r} port={smtp_port} user={smtp_username!r} pass={'***' if smtp_password else '(empty)'} from={smtp_from!r}")
     if smtp_host and smtp_username and smtp_password:
         try:
             msg = MIMEMultipart()
