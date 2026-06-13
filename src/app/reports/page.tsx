@@ -46,7 +46,7 @@ function OverviewCard({ analysis }: { analysis: any }) {
     { label: t("channelCount"), value: analysis.channel_count ?? "-" },
     { label: t("samplingRate"), value: analysis.sampling_rate ?? "-" },
     { label: t("duration"),     value: analysis.duration ?? "-" },
-    { label: t("signalQuality"), value: analysis.signal_quality_score ?? "-" },
+    { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(2) : "-" },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -521,9 +521,9 @@ export default function ReportsPage() {
                     {report.date}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className={`h-2 w-2 rounded-full ${report.quality >= 80 ? "bg-green-500" : report.quality >= 60 ? "bg-yellow-500" : "bg-red-500"}`} />
-                    <span className={`text-sm font-medium ${report.quality >= 80 ? "text-green-600 dark:text-green-400" : report.quality >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                      {report.quality}
+                    <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
+                    <span className={`text-sm font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                      {Number(report.quality).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-end gap-1">

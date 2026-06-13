@@ -93,17 +93,35 @@ class EEGAnalyzer:
             elif ext == ".bdf":
                 self.raw = mne.io.read_raw_bdf(self.edf_path, preload=True, verbose=False)
             elif ext == ".gdf":
-                self.raw = mne.io.read_raw_gdf(self.edf_path, preload=True, verbose=False)
+                # GDF 文件读取 — 三层回退策略:
+                #   1) gdf_reader (自研) → GDF 1.99 / BCI Competition IV
+                #   2) MNE read_raw_gdf  → 标准 GDF 2.x
+                #   3) 报错, 建议转换格式
+                try:
+                    from gdf_reader import read_gdf_199
+                    self.raw = read_gdf_199(self.edf_path)
+                except ValueError:
+                    # 不是 GDF 1.99 格式, 回退到 MNE (标准 GDF 2.x)
+                    try:
+                        self.raw = mne.io.read_raw_gdf(self.edf_path, preload=True, verbose=False)
+                    except Exception as mne_err:
+                        raise ValueError(
+                            f"无法读取 GDF 文件: {type(mne_err).__name__}: {mne_err}。"
+                            f"当前支持: GDF 1.99 (BCI Competition IV) 和标准 GDF 2.x。"
+                            f"请尝试将 GDF 文件转换为 EDF/BDF 格式后重新上传。"
+                        ) from mne_err
+                except Exception as gdf_err:
+                    # 自研 reader 的其他异常, 尝试 MNE 回退
+                    try:
+                        self.raw = mne.io.read_raw_gdf(self.edf_path, preload=True, verbose=False)
+                    except Exception as mne_err:
+                        raise ValueError(
+                            f"无法读取 GDF 文件: {type(gdf_err).__name__}: {gdf_err}。"
+                            f"MNE 回退也失败了: {type(mne_err).__name__}: {mne_err}。"
+                            f"请尝试将 GDF 文件转换为 EDF/BDF 格式后重新上传。"
+                        ) from gdf_err
             else:
                 raise ValueError(f"Unsupported file format: {ext}. Only .edf, .bdf, .gdf are supported.")
-        except (AssertionError, IndexError) as gdf_err:
-            # MNE's GDF reader can fail on certain GDF files (e.g., BCI Competition IV)
-            raise ValueError(
-                f"Unable to read GDF file: the file may be corrupted, truncated, "
-                f"or uses an unsupported GDF version. "
-                f"Original error: {type(gdf_err).__name__}. "
-                f"Try converting to EDF/BDF format or use a different file."
-            ) from gdf_err
         except Exception as read_err:
             raise ValueError(f"Failed to read {ext.upper()} file: {read_err}") from read_err
 

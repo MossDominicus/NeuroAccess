@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
@@ -202,12 +203,12 @@ function FileCard({
       {expanded && item.status === "completed" && !item.error && (
         <div className="border-t border-[var(--color-border)] px-5 py-4">
           <div className="text-center mb-4">
-            <a
+            <Link
               href="/reports"
               className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
             >
               {t("viewInReports") || "View report →"}
-            </a>
+            </Link>
           </div>
           {/* EEG Waveform */}
           {item.eegData && <EEGWaveform eegData={item.eegData} />}

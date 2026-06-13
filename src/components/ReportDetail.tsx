@@ -167,8 +167,8 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         </div>
         <div className="flex items-center gap-3">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-            Number(sq) >= 70 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" :
-            Number(sq) >= 40 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" :
+            Number(sq) >= 70 ? "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400" :
+            Number(sq) >= 50 ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400" :
             "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
           }`}>
             <Activity className="h-3.5 w-3.5" />
@@ -207,33 +207,160 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             icon={Activity}
             label={t("signalQuality")}
             value={`${sq}/100`}
-            color={sq >= 70 ? "text-emerald-600" : sq >= 40 ? "text-amber-600" : "text-red-600"}
+            color={sq >= 70 ? "text-green-600 dark:text-green-400" : sq >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}
           />
           <QualityItem
             icon={AlertTriangle}
             label={t("noisyChannels")}
             value={(signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0}
-            color="text-amber-600"
+            color="text-amber-600 dark:text-amber-400"
           />
           <QualityItem
             icon={XCircle}
             label={t("clipping")}
             value={(signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected ? t("yes") : t("no")}
-            color={(signalQuality as any)?.clipping_detected ? "text-red-600" : "text-emerald-600"}
+            color={(signalQuality as any)?.clipping_detected ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
           />
           <QualityItem
             icon={Eye}
             label={t("blinkArtifacts")}
             value={((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0}
-            color="text-amber-600"
+            color="text-amber-600 dark:text-amber-400"
           />
           <QualityItem
             icon={Radio}
             label={t("highFreqNoise")}
             value={(signalQuality as any)?.high_frequency_noise || (analysis as any).high_frequency_noise ? t("yes") : t("no")}
-            color={(signalQuality as any)?.high_frequency_noise ? "text-red-600" : "text-emerald-600"}
+            color={(signalQuality as any)?.high_frequency_noise ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
+          />
+          <QualityItem
+            icon={AlertTriangle}
+            label={t("missingData")}
+            value={(() => {
+              const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
+              const md = (signalQuality as any)?.missing_data || (analysis as any).missing_data;
+              return md ? `${Number(qd.missing_data_percentage || 0).toFixed(1)}%` : t("no");
+            })()}
+            color={(signalQuality as any)?.missing_data ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
+          />
+          <QualityItem
+            icon={Zap}
+            label={t("outlierPercentage")}
+            value={(() => {
+              const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
+              return `${Number(qd.outlier_percentage || 0).toFixed(2)}%`;
+            })()}
+            color="text-amber-600 dark:text-amber-400"
+          />
+          <QualityItem
+            icon={TrendingUp}
+            label={t("avgVariance")}
+            value={(() => {
+              const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
+              return Number(qd.average_variance || 0).toFixed(4);
+            })()}
+            color="text-blue-600 dark:text-blue-400"
           />
         </div>
+
+        {/* 通道级质量评分 */}
+        {(() => {
+          const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
+          const cs = qd.channel_scores || {};
+          const entries = Object.entries(cs) as [string, { score: number; reasons: string[] }][];
+          if (entries.length === 0) return null;
+          const sorted = entries.sort((a, b) => b[1].score - a[1].score);
+          const maxScore = Math.max(...sorted.map(([, s]) => s.score), 1);
+          return (
+            <div className="mt-6">
+              <h3 className="mb-3 text-sm font-semibold text-[var(--color-text)]">{t("channelQualityTitle")}</h3>
+              <div className="space-y-2">
+                {sorted.map(([ch, info]) => {
+                  const pct = Math.round((info.score / maxScore) * 100);
+                  const barColor = info.score >= 2 ? "bg-red-500" : info.score === 1 ? "bg-amber-500" : "bg-emerald-500";
+                  return (
+                    <div key={ch} className="flex items-center gap-3">
+                      <span className="w-28 truncate text-xs font-mono text-[var(--color-text-secondary)]" title={ch}>{ch}</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-border)]">
+                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-6 text-right text-xs font-medium text-[var(--color-text)]">{info.score}/3</span>
+                      {info.reasons.length > 0 && (
+                        <span className="text-xs text-[var(--color-text-secondary)]/70" title={info.reasons.join(", ")}>
+                          {info.reasons.map(r => {
+                            const reasonMap: Record<string, string> = {
+                              high_variance: lang === "zh" ? "高方差" : "High Var",
+                              high_gradient: lang === "zh" ? "高梯度" : "High Grad",
+                            };
+                            return reasonMap[r] || r.replace("kurt=", "k=");
+                          }).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 评分明细 */}
+        {(() => {
+          const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
+          const noisyCount = (signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0;
+          const artifactCount = ((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0;
+          const outlierPct = Number(qd.outlier_percentage || 0);
+          const missing = (signalQuality as any)?.missing_data || (analysis as any).missing_data;
+          const clipping = (signalQuality as any)?.clipping_detected || (analysis as any).clipping_detected;
+          const hfNoise = (signalQuality as any)?.high_frequency_noise || (analysis as any).high_frequency_noise;
+
+          const noisyPen = Math.min(noisyCount * 3, 30);
+          const artifactPen = Math.min(artifactCount * 6, 20);
+          const outlierPen = Math.min(outlierPct * 5, 15);
+          const missingPen = missing ? 20 : 0;
+          const clippingPen = clipping ? 15 : 0;
+          const hfPen = hfNoise ? 10 : 0;
+          const totalDeduct = noisyPen + artifactPen + outlierPen + missingPen + clippingPen + hfPen;
+          const computedScore = Math.max(0, Math.min(100, 100 - totalDeduct));
+
+          const rows = [
+            { label: t("noisyChannels"), deduct: noisyPen, detail: `${noisyCount} ${lang === "zh" ? "个" : ""}` },
+            { label: t("blinkArtifacts"), deduct: artifactPen, detail: `${artifactCount} ${lang === "zh" ? "个" : ""}` },
+            { label: t("outlierPercentage"), deduct: Math.round(outlierPen), detail: `${outlierPct.toFixed(1)}%` },
+            { label: t("missingData"), deduct: missingPen, detail: missing ? t("yes") : t("no") },
+            { label: t("clipping"), deduct: clippingPen, detail: clipping ? t("yes") : t("no") },
+            { label: t("highFreqNoise"), deduct: hfPen, detail: hfNoise ? t("yes") : t("no") },
+          ].filter(r => r.deduct > 0);
+
+          if (rows.length === 0) return null;
+
+          return (
+            <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)]/50 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[var(--color-text)]">{t("scoreBreakdown") || (lang === "zh" ? "评分明细" : "Score Breakdown")}</h3>
+                <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">= {computedScore}/100</span>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
+                  <span>{lang === "zh" ? "基础分" : "Base"}</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400">100</span>
+                </div>
+                {rows.map(r => (
+                  <div key={r.label} className="flex justify-between text-xs">
+                    <span className="text-[var(--color-text-secondary)]">
+                      {r.label} <span className="opacity-60">({r.detail})</span>
+                    </span>
+                    <span className="font-mono text-red-500 dark:text-red-400">-{r.deduct}</span>
+                  </div>
+                ))}
+                <div className="border-t border-[var(--color-border)] pt-1.5 flex justify-between text-xs font-semibold">
+                  <span className="text-[var(--color-text)]">{lang === "zh" ? "最终得分" : "Final Score"}</span>
+                  <span className="font-mono text-[var(--color-text)]">{computedScore}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </section>
 
       {/* ── Section 3: Frequency Analysis ───────────── */}

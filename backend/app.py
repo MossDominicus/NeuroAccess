@@ -332,6 +332,18 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
         # 获取基本信息
         info = raw.info
         ch_names = info["ch_names"]
+
+        # 只选择 EEG 类型通道，排除刺激/状态/EOG等非EEG通道
+        try:
+            import mne
+            eeg_picks = mne.pick_types(info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=False)
+            if len(eeg_picks) == 0:
+                # 回退到全部通道
+                eeg_picks = list(range(len(ch_names)))
+        except Exception:
+            eeg_picks = list(range(len(ch_names)))
+
+        ch_names = [ch_names[i] for i in eeg_picks]
         sfreq = info["sfreq"]
         total_duration = raw.times[-1] if len(raw.times) > 0 else 0
 
@@ -339,12 +351,11 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
         n_samples = min(int(sfreq * duration), raw.n_times)
         start_sample = 0
 
-        # 获取数据 (n_channels, n_times)
-        data, times = raw[:]  # (n_channels, n_times) — MNE 返回单位是伏特(V)
-        data = data[:, start_sample:n_samples]
+        # 获取数据 (n_eeg_channels, n_times) — MNE 返回单位是伏特(V)
+        data = raw[eeg_picks, start_sample:n_samples][0]
         # 转换为微伏(μV)，前端以 μV 为单位显示波形
         data = data * 1e6
-        times = times[start_sample:n_samples]
+        times = raw.times[start_sample:n_samples]
 
         # 降采样：如果数据点太多，前端绘图会卡
         max_points = 8000  # 前端绘图最多8000个点

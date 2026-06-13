@@ -190,7 +190,7 @@ export default function EegSimulatorPage() {
               onClick={() => toggleHelp(key)}
               className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors ${
                 isOpen
-                  ? "bg-[var(--color-primary)] text-white"
+                  ? "bg-[var(--color-primary)] text-[var(--color-bg)]"
                   : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
               }`}
               title="查看注释"
@@ -245,7 +245,7 @@ export default function EegSimulatorPage() {
               onClick={() => toggleHelp(key)}
               className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors shrink-0 ${
                 isOpen
-                  ? "bg-[var(--color-primary)] text-white"
+                  ? "bg-[var(--color-primary)] text-[var(--color-bg)]"
                   : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
               }`}
               title="查看注释"

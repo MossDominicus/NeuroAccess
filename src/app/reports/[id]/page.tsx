@@ -65,7 +65,7 @@ export default function ReportDetailPage() {
         </p>
         <Link
           href="/reports"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-bg)] transition-opacity hover:opacity-90"
         >
           <ArrowLeft className="h-4 w-4" />
           {t("reports")}

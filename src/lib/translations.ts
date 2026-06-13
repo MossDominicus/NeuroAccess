@@ -104,6 +104,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "开始分析",
     pleaseLogin: "请先登录以进行分析",
     analyzing: "分析中...",
+
     generating: "生成中...",
     processing: "处理中...",
 
@@ -158,6 +159,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "削波",
     blinkArtifacts: "眨眼伪影",
     highFreqNoise: "高频噪声",
+    channelQualityTitle: '通道质量评分',
+    scoreBreakdown: '评分明细',
+    missingData: '缺失数据',
+    outlierPercentage: '异常值比例',
+    avgVariance: '平均方差',
     channelNames: "通道名称",
 
     // 评分项
@@ -411,6 +417,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "用户名不能包含特殊符号（仅允许字母、数字、空格）",
     noConsecutiveSpaces: "用户名中不能有连续空格",
     email: "邮箱",
+    emailPlaceholder: 'name@example.com',
     password: "密码",
     register: "注册",
     registerButton: "注册",
@@ -716,6 +723,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "Start Analysis",
     pleaseLogin: "Please login to analyze",
     analyzing: "Analyzing...",
+    generating: 'Generating...',
 
     processing: "Processing...",
 
@@ -773,6 +781,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "Clipping",
     blinkArtifacts: "Blink Artifacts",
     highFreqNoise: "High Freq Noise",
+    channelQualityTitle: 'Per-Channel Quality',
+    scoreBreakdown: 'Score Breakdown',
+    missingData: 'Missing Data',
+    outlierPercentage: 'Outlier %',
+    avgVariance: 'Avg Variance',
 
     // Score items
     learningReadability: "Readability",
@@ -967,9 +980,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     mobileNotOptimized: "This website is not optimized for mobile devices. For the best experience, please use a desktop browser.",
     about: "About NeuroAccess",
     version: "Version",
-    projectPositioning: "Positionnement du Projet",
-    projectDescription: "Plateforme Éducative d'EEG",
-    projectDescLong: "NeuroAccess est un outil éducatif pour les débutants en EEG, aidant à comprendre les bases des données d'électroencéphalogramme. Cette plateforme ne fournit pas de conseils de diagnostic médical.",
+    projectPositioning: "Project Positioning",
+    projectDescription: 'EEG Education Platform',
+    projectDescLong: "NeuroAccess is an educational tool for EEG beginners, helping to understand the basics of electroencephalogram data. This platform does not provide medical diagnostic advice.",
     replayIntro: "Replay Intro",
     clearAllData: "Clear All Data",
     clearDataConfirm: "Are you sure you want to delete all reports and data? This action cannot be undone.",
@@ -1025,6 +1038,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "Username must not contain special characters (only letters, digits, spaces allowed)",
     noConsecutiveSpaces: "Username must not contain consecutive spaces",
     email: "Email",
+    emailPlaceholder: 'name@example.com',
     password: "Password",
     register: "Register",
     registerButton: "Register",
@@ -1371,6 +1385,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "Iniciar Análisis",
     pleaseLogin: "Inicie sesión para analizar",
     analyzing: "Analizando...",
+    generating: 'Generando...',
 
     processing: "Procesando...",
 
@@ -1423,6 +1438,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "Recorte",
     blinkArtifacts: "Artefactos de Parpadeo",
     highFreqNoise: "Ruido de Alta Frecuencia",
+    channelQualityTitle: 'Calidad por Canal',
+    scoreBreakdown: 'Desglose',
+    missingData: 'Datos Faltantes',
+    outlierPercentage: '% Atípicos',
+    avgVariance: 'Varianza Media',
 
     learningReadability: "Legibilidad",
     signalClarity: "Claridad de Señal",
@@ -1660,6 +1680,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "El nombre de usuario no debe contener caracteres especiales (solo letras, números y espacios)",
     noConsecutiveSpaces: "El nombre de usuario no debe contener espacios consecutivos",
     email: "Correo electrónico",
+    emailPlaceholder: 'nombre@ejemplo.com',
     password: "Contraseña",
     register: "Registrarse",
     registerButton: "Registrarse",
@@ -2006,6 +2027,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "Commencer l'Analyse",
     pleaseLogin: "Veuillez vous connecter pour analyser",
     analyzing: "Analyse en cours...",
+    generating: 'En cours...',
 
     processing: "Traitement en cours...",
 
@@ -2058,6 +2080,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "Écrêtage",
     blinkArtifacts: "Artefacts de Clignement",
     highFreqNoise: "Bruit Haute Fréquence",
+    channelQualityTitle: 'Qualité par Canal',
+    scoreBreakdown: 'Détail du Score',
+    missingData: 'Données Manquantes',
+    outlierPercentage: '% Aberrants',
+    avgVariance: 'Variance Moy.',
 
     learningReadability: "Lisibilité",
     signalClarity: "Clarté du Signal",
@@ -2237,9 +2264,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     mobileNotOptimized: "Ce site n'est pas optimisé pour les appareils mobiles. Pour une meilleure expérience, veuillez utiliser un navigateur de bureau.",
     about: "À Propos de NeuroAccess",
     version: "Version",
-    projectPositioning: "Projektpositionierung",
-    projectDescription: "EEG-Bildungsplattform",
-    projectDescLong: "NeuroAccess ist ein Bildungswerkzeug für EEG-Anfänger, das hilft, die Grundlagen von Elektroenzephalogramm-Daten zu verstehen. Diese Plattform bietet keine medizinische Diagnoseberatung.",
+    projectPositioning: "Positionnement du Projet",
+    projectDescription: "Plateforme Éducative d'EEG",
+    projectDescLong: "NeuroAccess est un outil éducatif pour les débutants en EEG, aidant à comprendre les bases des données d'électroencéphalogramme. Cette plateforme ne fournit pas de conseils de diagnostic médical.",
     replayIntro: "Rejouer l'Introduction",
     clearAllData: "Effacer Toutes les Données",
     clearDataConfirm: "Êtes-vous sûr de vouloir supprimer tous les rapports et données? Cette action ne peut pas être annulée.",
@@ -2295,6 +2322,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "Le nom d'utilisateur ne doit pas contenir de caractères spéciaux (seulement lettres, chiffres, espaces)",
     noConsecutiveSpaces: "Le nom d'utilisateur ne doit pas contenir d'espaces consécutifs",
     email: "Email",
+    emailPlaceholder: 'nom@exemple.com',
     password: "Mot de passe",
     register: "S'inscrire",
     registerButton: "S'inscrire",
@@ -2641,6 +2669,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "Analyse Starten",
     pleaseLogin: "Bitte einloggen zum Analysieren",
     analyzing: "Analysiere...",
+    generating: 'Erstelle...',
 
     processing: "Verarbeite...",
 
@@ -2693,6 +2722,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "Clipping",
     blinkArtifacts: "Blink-Artefakte",
     highFreqNoise: "Hochfrequenzrauschen",
+    channelQualityTitle: 'Kanalqualität',
+    scoreBreakdown: 'Bewertungsdetails',
+    missingData: 'Fehlende Daten',
+    outlierPercentage: 'Ausreißer %',
+    avgVariance: 'Mittl. Varianz',
 
     learningReadability: "Lesbarkeit",
     signalClarity: "Signal klarheit",
@@ -2872,9 +2906,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     mobileNotOptimized: "Diese Webseite ist nicht für mobile Geräte optimiert. Für das beste Erlebnis bitten wir um die Nutzung eines Desktop-Browsers.",
     about: "Über NeuroAccess",
     version: "Version",
-    projectPositioning: "Project Positioning",
-    projectDescription: "EEG Literacy Platform",
-    projectDescLong: "NeuroAccess is an educational tool for EEG beginners, helping to understand the basics of electroencephalogram data. This platform does not provide medical diagnostic advice.",
+    projectPositioning: "Projektpositionierung",
+    projectDescription: "EEG-Bildungsplattform",
+    projectDescLong: "NeuroAccess ist ein Bildungswerkzeug für EEG-Anfänger, das hilft, die Grundlagen von Elektroenzephalogramm-Daten zu verstehen. Diese Plattform bietet keine medizinische Diagnoseberatung.",
     replayIntro: "Intro Wiederholen",
     clearAllData: "Alle Daten Löschen",
     clearDataConfirm: "Sind Sie sicher, dass Sie alle Berichte und Daten löschen wollen? Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -2930,6 +2964,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "Benutzername darf keine Sonderzeichen enthalten (nur Buchstaben, Zahlen, Leerzeichen)",
     noConsecutiveSpaces: "Benutzername darf keine aufeinanderfolgenden Leerzeichen enthalten",
     email: "E-Mail",
+    emailPlaceholder: 'name@beispiel.de',
     password: "Passwort",
     register: "Registrieren",
     registerButton: "Registrieren",
@@ -3276,6 +3311,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "分析開始",
     pleaseLogin: "分析するにはログインしてください",
     analyzing: "分析中...",
+    generating: '生成中...',
 
     processing: "処理中...",
 
@@ -3328,6 +3364,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "クリッピング",
     blinkArtifacts: "まばたきアーティファクト",
     highFreqNoise: "高周波ノイズ",
+    channelQualityTitle: 'チャンネル品質',
+    scoreBreakdown: 'スコア内訳',
+    missingData: '欠損データ',
+    outlierPercentage: '外れ値率',
+    avgVariance: '平均分散',
 
     learningReadability: "読みやすさ評価",
     signalClarity: "信号鮮明度",
@@ -3565,6 +3606,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "ユーザー名に特殊記号を含めることはできません（英数字とスペースのみ）",
     noConsecutiveSpaces: "ユーザー名に連続するスペースを含めることはできません",
     email: "メールアドレス",
+    emailPlaceholder: 'name@example.com',
     password: "パスワード",
     register: "登録",
     registerButton: "登録",
@@ -3911,6 +3953,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     startAnalysis: "분석 시작",
     pleaseLogin: "분석하려면 로그인하세요",
     analyzing: "분석 중...",
+    generating: '생성 중...',
 
     processing: "처리 중...",
 
@@ -3964,6 +4007,11 @@ export const translations: Record<Lang, Record<string, string>> = {
     clipping: "클리핑",
     blinkArtifacts: "눈깜빡임 아티팩트",
     highFreqNoise: "고주파 노이즈",
+    channelQualityTitle: '채널 품질',
+    scoreBreakdown: '점수 분석',
+    missingData: '누락 데이터',
+    outlierPercentage: '이상치 비율',
+    avgVariance: '평균 분산',
 
     learningReadability: "가독성",
     signalClarity: "신호 명확도",
@@ -4200,6 +4248,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     usernameNoSpecialChars: "사용자 이름에 특수 기호를 포함할 수 없습니다 (문자, 숫자, 공백만 허용)",
     noConsecutiveSpaces: "사용자 이름에 연속된 공백을 포함할 수 없습니다",
     email: "이메일",
+    emailPlaceholder: 'name@example.com',
     password: "비밀번호",
     register: "회원가입",
     registerButton: "회원가입",

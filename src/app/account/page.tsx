@@ -7,6 +7,7 @@ import { useLang } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getDisplayInitial } from "@/lib/display-initial";
 import { ArrowLeft, User, Key, Mail, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { motion } from "framer-motion";
 
 
 const AVATAR_COLORS = [
@@ -296,7 +297,12 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] overflow-y-auto">
+    <motion.div
+      className="min-h-screen bg-[var(--color-bg)] overflow-y-auto"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.05 }}
+    >
       {/* Header */}
       <header className="h-14 border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center px-4">
         <button
@@ -593,6 +599,6 @@ export default function AccountPage() {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

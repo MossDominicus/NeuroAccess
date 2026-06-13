@@ -125,7 +125,7 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
           <ul className="space-y-2">
             {data.limitations.map((item, index) => (
               <li key={index} className="flex items-start gap-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-yellow-500 dark:text-yellow-400 dark:text-yellow-400" />
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-yellow-500 dark:text-yellow-400" />
                 <span>{item}</span>
               </li>
             ))}

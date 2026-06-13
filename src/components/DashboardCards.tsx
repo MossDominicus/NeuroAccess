@@ -2,7 +2,7 @@
 
 import { useLang } from "@/lib/language-context";
 import { useMemo } from "react";
-import { Activity, Brain, TrendingUp, ShieldCheck } from "lucide-react";
+import { Brain, TrendingUp, ShieldCheck } from "lucide-react";
 
 interface DashboardCardsProps {
   analysisResult: any;
@@ -11,19 +11,10 @@ interface DashboardCardsProps {
 export default function DashboardCards({ analysisResult }: DashboardCardsProps) {
   const { t } = useLang();
   // 兼容新旧数据格式：优先使用嵌套结构，fallback 到扁平字段
-  const quality = analysisResult?.signal_quality || analysisResult;
   const literacy = analysisResult?.eeg_literacy_scores || analysisResult?.literacy_scores;
   const confidence = analysisResult?.confidence || analysisResult?.interpretation_confidence;
 
   const cards = useMemo(() => [
-    {
-      title: t("signalQualityCard"),
-      value: quality ? `${quality.signal_quality_score}/100` : "-",
-      icon: Activity,
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-50 dark:bg-green-950/30",
-      description: quality ? `${t("noisyChannelsDesc")}: ${quality.noisy_channels?.length || 0}` : "-",
-    },
     {
       title: t("readabilityScoreCard"),
       value: literacy ? `${literacy.learning_readability_score}/100` : "-",
@@ -48,10 +39,10 @@ export default function DashboardCards({ analysisResult }: DashboardCardsProps) 
       bgColor: "bg-orange-50 dark:bg-orange-950/30",
       description: t("eegCannotTellDesc"),
     },
-  ], [t, quality, literacy, confidence, analysisResult]);
+  ], [t, literacy, confidence, analysisResult]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {cards.map((card, i) => {
         const Icon = card.icon;
         return (

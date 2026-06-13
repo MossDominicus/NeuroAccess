@@ -234,7 +234,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
     def _call_level(level: str) -> str:
         try:
             prompt = _build_prompt(a, level, lang)
-            ollama = call_ollama(prompt, timeout=90)
+            ollama = call_ollama(prompt, timeout=30)
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
@@ -248,7 +248,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
         future_research = executor.submit(_call_level, "research")
         for key, future in [("beginner", future_beginner), ("student", future_student), ("research", future_research)]:
             try:
-                results[key] = future.result(timeout=120)
+                results[key] = future.result(timeout=45)
             except Exception:
                 results[key] = fallbacks[key]
 
@@ -262,7 +262,7 @@ def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str,
         future_primary = executor.submit(_generate_explanations_for_lang, analysis, primary_lang)
         future_en = executor.submit(_generate_explanations_for_lang, analysis, "en")
         try:
-            results[primary_lang] = future_primary.result(timeout=60)
+            results[primary_lang] = future_primary.result(timeout=30)
         except Exception:
             results[primary_lang] = {
                 "beginner": template_beginner(analysis, primary_lang),
@@ -270,7 +270,7 @@ def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str,
                 "research": template_research(analysis, primary_lang),
             }
         try:
-            results["en"] = future_en.result(timeout=60)
+            results["en"] = future_en.result(timeout=30)
         except Exception:
             results["en"] = {
                 "beginner": template_beginner(analysis, "en"),

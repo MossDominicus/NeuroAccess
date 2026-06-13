@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { getDisplayInitial } from "@/lib/display-initial";
@@ -36,10 +37,10 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
   return (
     <header className="h-14 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-[var(--color-border)] flex items-center justify-between px-6 sticky top-0 z-40">
       {/* Left: logo */}
-      <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
         <span className="text-sm font-semibold text-[var(--color-text)]">NeuroAccess</span>
         <span className="text-xs text-[var(--color-text-secondary)]">v1.5</span>
-      </a>
+      </Link>
 
       {/* Right: user avatar */}
       <div>
@@ -56,12 +57,12 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
             </div>
           </button>
         ) : (
-          <a
+          <Link
             href="/login"
             className="text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity"
           >
             {getLoginText(lang)}
-          </a>
+          </Link>
         )}
       </div>
     </header>
