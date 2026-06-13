@@ -100,9 +100,9 @@ export default async function RootLayout({
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
         <AuthProvider>
-          <IntroProvider>
           <ThemeProvider>
             <LanguageProvider initialLang={initialLang}>
+              <IntroProvider>
               <DisclaimerModal />
               <PostLoginModals />
               <div className="flex h-screen overflow-hidden">
@@ -115,9 +115,9 @@ export default async function RootLayout({
                   <PublicPreviewFooter />
                 </div>
               </div>
+              </IntroProvider>
             </LanguageProvider>
           </ThemeProvider>
-          </IntroProvider>
         </AuthProvider>
       </body>
     </html>
