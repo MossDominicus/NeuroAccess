@@ -309,7 +309,7 @@ function DashboardInner() {
       {/* EEG Analysis Panel */}
       <div className="space-y-6">
         {/* Upload area */}
-        {!hasActiveAnalysis && (
+        {!hasActiveAnalysis ? (
           <div
             className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] cursor-pointer"
             onDragOver={(e) => { e.preventDefault(); }}
@@ -327,6 +327,13 @@ function DashboardInner() {
               className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
             />
+          </div>
+        ) : (
+          <div
+            className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 p-10 text-center opacity-60"
+          >
+            <Activity className="mx-auto mb-4 h-10 w-10 text-amber-500 animate-pulse" />
+            <p className="text-sm font-medium text-[var(--color-text)]">{t("uploadDisabledDuringAnalysis")}</p>
           </div>
         )}
 
