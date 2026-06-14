@@ -41,6 +41,40 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
   const [exporting, setExporting] = useState(false);
   const analysis = report.analysis || {};
 
+  // 质量卡片的注释文本（7 语言）
+  const qualityDesc = (key: string): string => {
+    const map: Record<string, Record<string, string>> = {
+      overallScore: {
+        zh: "基于噪声、伪影和数据完整性的综合评分",
+        en: "Overall score based on noise, artifacts, and data integrity",
+        es: "Puntuación general basada en ruido, artefactos e integridad de datos",
+        fr: "Score global basé sur le bruit, les artefacts et l'intégrité des données",
+        de: "Gesamtbewertung basierend auf Rauschen, Artefakten und Datenintegrität",
+        ja: "ノイズ、アーティファクト、データ整合性に基づく総合スコア",
+        ko: "노이즈, 아티팩트, 데이터 무결성을 기반으로 한 종합 점수",
+      },
+      noisyChannels: {
+        zh: "噪声过多的通道可能影响分析准确性",
+        en: "Channels with excessive noise that may affect accuracy",
+        es: "Canales con ruido excesivo que pueden afectar la precisión",
+        fr: "Canaux avec bruit excessif pouvant affecter la précision",
+        de: "Kanäle mit übermäßigem Rauschen, die die Genauigkeit beeinträchtigen können",
+        ja: "ノイズが多いチャンネルは精度に影響する可能性があります",
+        ko: "노이즈가 많은 채널은 정확도에 영향을 줄 수 있습니다",
+      },
+      blinks: {
+        zh: "检测到眨眼或运动伪影",
+        en: "Detected eye blinks or movement artifacts",
+        es: "Parpadeos o artefactos de movimiento detectados",
+        fr: "Clignements d'yeux ou artefacts de mouvement détectés",
+        de: "Augenblinzeln oder Bewegungsartefakte erkannt",
+        ja: "まばたきまたは動きアーティファクトが検出されました",
+        ko: "눈 깜빡임 또는 움직임 아티팩트 감지됨",
+      },
+    };
+    return map[key]?.[lang] || map[key]?.en || key;
+  };
+
   const handleExportHTML = useCallback(async () => {
     setExporting(true);
     try {
@@ -208,21 +242,21 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             label={t("signalQuality")}
             value={`${sq}/100`}
             color={sq >= 70 ? "text-green-600 dark:text-green-400" : sq >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}
-            comment="Overall score based on noise, artifacts, and data integrity"
+            comment={qualityDesc("overallScore")}
           />
           <QualityItem
             icon={AlertTriangle}
             label={t("noisyChannels")}
             value={(signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0}
             color="text-amber-600 dark:text-amber-400"
-            comment="Channels with excessive noise that may affect accuracy"
+            comment={qualityDesc("noisyChannels")}
           />
           <QualityItem
             icon={Eye}
             label={t("blinkArtifacts")}
             value={((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0}
             color="text-amber-600 dark:text-amber-400"
-            comment="Detected eye blinks or movement artifacts"
+            comment={qualityDesc("blinks")}
           />
         </div>
 

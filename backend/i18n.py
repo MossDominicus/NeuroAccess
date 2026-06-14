@@ -129,30 +129,37 @@ _ARTIFACT_TEXTS: Dict[str, Dict[str, str]] = {
     "zh": {
         "many_noisy_channels": "过多噪声通道，可能存在肌电伪影",
         "large_values": "检测到异常大值，可能存在工频干扰",
+        "many_outliers": "检测到过多异常值，可能存在运动伪影",
     },
     "en": {
         "many_noisy_channels": "Excessive noisy channels; possible EMG artifact",
         "large_values": "Abnormally large values detected; possible power-line interference",
+        "many_outliers": "Excessive outliers detected; possible movement artifact",
     },
     "es": {
         "many_noisy_channels": "Canales ruidosos excesivos; posible artefacto EMG",
         "large_values": "Valores anormalmente grandes detectados; posible interferencia de línea eléctrica",
+        "many_outliers": "Valores atípicos excesivos detectados; posible artefacto de movimiento",
     },
     "fr": {
         "many_noisy_channels": "Canaux bruyants excessifs; possible artefact EMG",
         "large_values": "Valeurs anormalement élevées détectées; possible interférence de ligne électrique",
+        "many_outliers": "Valeurs aberrantes excessives détectées; possible artefact de mouvement",
     },
     "de": {
         "many_noisy_channels": "Übermäßig verrauschte Kanäle; mögliches EMG-Artefakt",
         "large_values": "Abnorm große Werte erkannt; mögliche Netzfrequenzstörung",
+        "many_outliers": "Übermäßige Ausreißer erkannt; mögliches Bewegungsartefakt",
     },
     "ja": {
         "many_noisy_channels": "ノイズチャネルが多すぎます; EMGアーティファクトの可能性があります",
         "large_values": "異常に大きな値が検出されました; 電源線干渉の可能性があります",
+        "many_outliers": "異常値が多すぎます; 動きアーティファクトの可能性があります",
     },
     "ko": {
         "many_noisy_channels": "과도한 잡음 채널; EMG 아티팩트 가능성",
         "large_values": "비정상적으로 큰 값이 감지되었습니다; 전원선 간섭 가능성",
+        "many_outliers": "과도한 이상값 감지; 움직임 아티팩트 가능성",
     },
 }
 
