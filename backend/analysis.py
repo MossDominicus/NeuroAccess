@@ -677,8 +677,8 @@ class EEGAnalyzer:
                 "relative_bandpower": convert_value(frequency.relative_bandpower or {}),
             },
             "waveform_preview": {
-                "times": waveform.times[:500],  # 只取前 500 个时间点
-                "channels": {k: [float(v) for v in v[:500]] for k, v in waveform.channels.items()},
+                "times": waveform.times[:1500],  # 取前 1500 个时间点 (~6s @250Hz, 更充分展示波形)
+                "channels": {k: [float(v) for v in v[:1500]] for k, v in waveform.channels.items()},
                 "sampling_rate": waveform.sampling_rate,
                 "duration_seconds": waveform.duration_seconds,
             },
