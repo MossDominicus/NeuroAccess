@@ -128,8 +128,8 @@ class EEGAnalyzer:
 
         # ── 保存原始数据（预处理前），用于波形显示 ────────────────────
         # 注意：对于 MNE 读取的 EDF/BDF，原始数据单位是伏特(V)
-        # 对于 GDF 1.99 自定义读取器，原始数据单位是微伏(μV)
-        # 统一转换到 μV 以使前端显示一致
+        # 对于 GDF 1.99 自定义读取器，数据是 ADC int16 原始值（含 DC 偏移）
+        # 统一转换到 μV 并去除 DC 偏移，使前端显示真实 EEG 变化波形
         try:
             raw_data_copy = self.raw.get_data().copy()  # (n_channels, n_times)
             raw_times_copy = self.raw.times.copy()
@@ -137,8 +137,11 @@ class EEGAnalyzer:
             # MNE RawArray 在内部将 int16 转为了 float64，无法通过 dtype 区分
             is_gdf_custom = ext == ".gdf" and getattr(self.raw, '_gdf_custom_reader', False)
             if is_gdf_custom:
-                # GDF 1.99: 数据已经是 μV，直接使用（int16 原始值）
-                self._raw_data_uv = raw_data_copy
+                # GDF 1.99: 数据是原始 ADC int16 值（如 ±32768），不是 μV
+                # 去除每通道 DC 偏移（减去均值），使波形显示真实的信号变化
+                # 注意：去 DC 偏移后的值缩放因子未知，但相对变化是真实的 EEG 信号
+                ch_means = np.mean(raw_data_copy, axis=1, keepdims=True)
+                self._raw_data_uv = raw_data_copy - ch_means
             else:
                 # MNE 读取（EDF/BDF/标准GDF）：数据单位是 V，转换为 μV
                 self._raw_data_uv = raw_data_copy * 1e6
