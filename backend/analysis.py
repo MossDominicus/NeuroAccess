@@ -515,10 +515,13 @@ class EEGAnalyzer:
 
         # 取最多 8 个通道，用原始数据
         chosen = picks[:8]
-        n_points = min(n_samples, raw_data_uv.shape[1])
-        data_slice = raw_data_uv[:, :n_points]
+        # 跳过前 0.2 秒（避免放大器初始偏移/文件头伪影）
+        skip_samples = int(0.2 * sfreq)
+        start = min(skip_samples, raw_data_uv.shape[1] - 10)
+        n_points = min(n_samples, raw_data_uv.shape[1] - start)
+        data_slice = raw_data_uv[:, start:start + n_points]
 
-        times = raw_times_full[:n_points].tolist()
+        times = raw_times_full[start:start + n_points].tolist()
 
         channels = {}
         for ch_idx in chosen:
