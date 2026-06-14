@@ -82,8 +82,8 @@ _SIGNAL_QUALITY_TEXTS: Dict[str, Dict[str, str]] = {
 
 _LIMITATION_TEXTS: Dict[str, List[str]] = {
     "zh": [
-        "基本的 artifact 处理",
-        "Montage 元数据可能不完整",
+        "基本的伪影处理",
+        "导联数据可能不完整",
         "无任务标签假设",
         "若用于研究，应由专业人员检查原始波形",
     ],
