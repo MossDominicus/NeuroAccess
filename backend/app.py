@@ -314,7 +314,12 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
                             data_arr, times_arr = raw_gdf[:, :max_samples]
                         else:
                             data_arr, times_arr = raw_gdf[:, :]
-                        # GDF 1.99 custom reader data is in μV (int16), no conversion needed
+                        # GDF 1.99: int16 ADC counts, scale to μV
+                        # ADC ±32768 → physiological ±100 μV (BCI Competition IV standard)
+                        data_arr = data_arr * (100.0 / 32768.0)
+                        # Remove DC offset per channel
+                        ch_means = np.mean(data_arr, axis=1, keepdims=True)
+                        data_arr = data_arr - ch_means
                         t_arr = np.arange(data_arr.shape[1]) / sfreq
                         # 降采样
                         max_points = 8000
