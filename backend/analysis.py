@@ -129,22 +129,26 @@ class EEGAnalyzer:
         # ── 保存原始数据（预处理前），用于波形显示 ────────────────────
         # 注意：对于 MNE 读取的 EDF/BDF，原始数据单位是伏特(V)
         # 对于 GDF 1.99 自定义读取器，数据是 ADC int16 原始值（含 DC 偏移）
-        # 统一转换到 μV 并去除 DC 偏移，使前端显示真实 EEG 变化波形
+        # 统一处理：V → μV，然后去除每通道 DC 偏移，使前端显示真实 EEG 变化
         try:
             raw_data_copy = self.raw.get_data().copy()  # (n_channels, n_times)
             raw_times_copy = self.raw.times.copy()
-            # GDF 1.99 自定义读取器：raw 对象有 _gdf_custom_reader=true 标记
-            # MNE RawArray 在内部将 int16 转为了 float64，无法通过 dtype 区分
             is_gdf_custom = ext == ".gdf" and getattr(self.raw, '_gdf_custom_reader', False)
             if is_gdf_custom:
-                # GDF 1.99: 数据是原始 ADC int16 值（如 ±32768），不是 μV
-                # 去除每通道 DC 偏移（减去均值），使波形显示真实的信号变化
-                # 注意：去 DC 偏移后的值缩放因子未知，但相对变化是真实的 EEG 信号
+                # GDF 1.99: 数据是原始 ADC int16 值（如 ±32768），并非 μV
+                # 去除每通道 DC 偏移（减去均值），然后归一化到合理 EEG 范围
                 ch_means = np.mean(raw_data_copy, axis=1, keepdims=True)
-                self._raw_data_uv = raw_data_copy - ch_means
+                ac_data = raw_data_copy - ch_means  # 去 DC 偏移
+                # 归一化到 ~±80 μV（EEG 的典型范围）
+                ch_std = np.std(ac_data, axis=1, keepdims=True)
+                ch_std[ch_std < 1] = 1
+                self._raw_data_uv = (ac_data / ch_std) * 80.0
             else:
                 # MNE 读取（EDF/BDF/标准GDF）：数据单位是 V，转换为 μV
-                self._raw_data_uv = raw_data_copy * 1e6
+                uv_data = raw_data_copy * 1e6
+                # EDF/BDF 也可能有 DC 偏移（如 BDF 24-bit 原始值），也去除之
+                ch_means = np.mean(uv_data, axis=1, keepdims=True)
+                self._raw_data_uv = uv_data - ch_means
             self._raw_times = raw_times_copy
             self._raw_sfreq = self.raw.info['sfreq']
         except Exception as _raw_save_err:
