@@ -139,10 +139,10 @@ class EEGAnalyzer:
                 # 去除每通道 DC 偏移（减去均值），然后归一化到合理 EEG 范围
                 ch_means = np.mean(raw_data_copy, axis=1, keepdims=True)
                 ac_data = raw_data_copy - ch_means  # 去 DC 偏移
-                # 归一化到 ~±80 μV（EEG 的典型范围）
-                ch_std = np.std(ac_data, axis=1, keepdims=True)
-                ch_std[ch_std < 1] = 1
-                self._raw_data_uv = (ac_data / ch_std) * 80.0
+                # 使用 95% 分位值估算典型振幅，归一化到 ~±100 μV
+                ch_scale = np.percentile(np.abs(ac_data), 95, axis=1, keepdims=True)
+                ch_scale[ch_scale < 1] = 1
+                self._raw_data_uv = (ac_data / ch_scale) * 100.0
             else:
                 # MNE 读取（EDF/BDF/标准GDF）：数据单位是 V，转换为 μV
                 uv_data = raw_data_copy * 1e6
