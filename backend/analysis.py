@@ -1,720 +1,578 @@
 """
-EEG 分析引擎 - NeuroAccess v0.9.0
+EEG 分析引擎 - NeuroAccess v2.0 (Fast Analyze)
 支持完整的 EEG 分析：Overview + Quality + Frequency + Waveform + Literacy
-v0.9.0 改进：加载时自动带通滤波（0.5-40Hz），修复评分逻辑
+
+v2.0 性能优化：
+  - EDF only（不支持 BDF/GDF）
+  - preload=False 避免全内存加载
+  - 采样式分析（只读前 60s 数据做 bandpower/signal_quality）
+  - 波形预览只读 8s 窗口
+  - 通道限制：分析 16ch，预览 8ch
+  - 文件大小上限 200MB
+  - 不在分析时滤波全文件（用 scipy 对小段数据滤波）
+  - 不生成 PNG waveform image（前端 Canvas 自绘）
 """
 import mne
 import numpy as np
+import os
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
-import json
+from dataclasses import dataclass
 import sys
-import i18n
+from scipy.signal import butter, filtfilt, welch
+
+# ── 通道限制 ──────────────────────────────────────────────
+MAX_ANALYSIS_CHANNELS = 16   # 分析最多16个EEG通道
+MAX_PREVIEW_CHANNELS = 8     # 波形预览最多8个EEG通道
+MAX_FILE_SIZE_MB = 200       # 文件大小上限
+
+# ── 频段定义 ──────────────────────────────────────────────
+BANDS = {
+    'delta': (0.5, 4),
+    'theta': (4, 8),
+    'alpha': (8, 13),
+    'beta':  (13, 30),
+}
+
+# ── EEG 通道关键字 ─────────────────────────────────────────
+EEG_KEYWORDS = [
+    "fp", "af", "f", "fc", "cp", "p", "po", "o",
+    "cz", "c3", "c4", "p3", "p4", "o1", "o2", "fz", "pz"
+]
+EXCLUDE_KEYWORDS = {"eog", "ecg", "emg", "status", "stim", "trigger", "marker"}
 
 
-@dataclass
-class EEGOverview:
-    """EEG 文件概览"""
-    filename: str
-    channel_count: int
-    sampling_rate: float
-    duration: str
-    channel_names: List[str]
-    recording_duration_seconds: float
+def _is_eeg_channel(name: str) -> bool:
+    """判断通道名是否为 EEG"""
+    low = name.lower()
+    for ex in EXCLUDE_KEYWORDS:
+        if ex in low:
+            return False
+    clean = low.replace("eeg:", "").replace("eeg ", "").replace(".", "").strip()
+    return any(k == clean or clean.startswith(k) for k in EEG_KEYWORDS)
 
 
-@dataclass
-class SignalQuality:
-    """信号质量分析"""
-    signal_quality_score: float
-    noisy_channels: List[str]
-    possible_artifacts: List[str]
-    missing_data: bool
-    clipping_detected: bool
-    high_frequency_noise: bool
-    quality_details: Dict[str, Any]
-
-
-@dataclass
-class FrequencyAnalysis:
-    """频段分析"""
-    bandpower: Dict[str, List[float]]   # delta, theta, alpha, beta, gamma（每通道）
-    dominant_frequency: float
-    frequency_distribution: List[Dict[str, float]]  # 用于图表
-    average_bandpower: Dict[str, float]      # 跨通道平均
-    relative_bandpower: Dict[str, float] = None  # 相对功率 (%), 跨研究比较用
-
-
-@dataclass
-class WaveformPreview:
-    """波形预览数据"""
-    times: List[float]
-    channels: Dict[str, List[float]]  # channel_name -> data array
-    sampling_rate: float
-    duration_seconds: float
-
-
-@dataclass
-class LiteracyScores:
-    """EEG 可读性评分（0-100，高分=好）"""
-    learning_readability_score: float
-    signal_clarity_score: float
-    beginner_friendliness_score: float
-    research_usefulness_score: float
-    noise_complexity_score: float   # 高分=难理解
-
-
-@dataclass
-class InterpretationConfidence:
-    """解释可信度"""
-    level: str   # High / Moderate / Low
-    confidence_reason: str
-    limitations: List[str]
-
-
-class EEGAnalyzer:
-    """EEG 分析主引擎"""
-
-    def __init__(self, edf_path: str, lang: str = "zh"):
-        self.edf_path = edf_path
-        self.lang = lang
-        self.raw = None
-        self.overview = None
-        self.quality = None
-        self.frequency = None
-        self.waveform = None
-
-    def load_data(self) -> EEGOverview:
-        """加载 EEG 文件并生成概览（支持 .edf/.bdf/.gdf，含预处理滤波）"""
-        import os
-        ext = os.path.splitext(self.edf_path)[1].lower()
+def _pick_eeg_channels(raw) -> List[int]:
+    """选出 EEG 通道索引，最多 MAX_ANALYSIS_CHANNELS 个"""
+    ch_names = raw.ch_names
+    picks = [i for i, ch in enumerate(ch_names) if _is_eeg_channel(ch)]
+    
+    if len(picks) < 2:
+        # 回退：MNE pick_types
         try:
-            if ext == ".edf":
-                self.raw = mne.io.read_raw_edf(self.edf_path, preload=True, verbose=False)
-            elif ext == ".bdf":
-                self.raw = mne.io.read_raw_bdf(self.edf_path, preload=True, verbose=False)
-            elif ext == ".gdf":
-                # GDF 文件读取 — 三层回退策略:
-                #   1) gdf_reader (自研) → GDF 1.99 / BCI Competition IV
-                #   2) MNE read_raw_gdf  → 标准 GDF 2.x
-                #   3) 报错, 建议转换格式
-                try:
-                    from gdf_reader import read_gdf_199
-                    self.raw = read_gdf_199(self.edf_path)
-                except ValueError:
-                    # 不是 GDF 1.99 格式, 回退到 MNE (标准 GDF 2.x)
-                    try:
-                        self.raw = mne.io.read_raw_gdf(self.edf_path, preload=True, verbose=False)
-                    except Exception as mne_err:
-                        raise ValueError(
-                            f"无法读取 GDF 文件: {type(mne_err).__name__}: {mne_err}。"
-                            f"当前支持: GDF 1.99 (BCI Competition IV) 和标准 GDF 2.x。"
-                            f"请尝试将 GDF 文件转换为 EDF/BDF 格式后重新上传。"
-                        ) from mne_err
-                except Exception as gdf_err:
-                    # 自研 reader 的其他异常, 尝试 MNE 回退
-                    try:
-                        self.raw = mne.io.read_raw_gdf(self.edf_path, preload=True, verbose=False)
-                    except Exception as mne_err:
-                        raise ValueError(
-                            f"无法读取 GDF 文件: {type(gdf_err).__name__}: {gdf_err}。"
-                            f"MNE 回退也失败了: {type(mne_err).__name__}: {mne_err}。"
-                            f"请尝试将 GDF 文件转换为 EDF/BDF 格式后重新上传。"
-                        ) from gdf_err
-            else:
-                raise ValueError(f"Unsupported file format: {ext}. Only .edf, .bdf, .gdf are supported.")
-        except Exception as read_err:
-            raise ValueError(f"Failed to read {ext.upper()} file: {read_err}") from read_err
-
-        # ── 保存原始数据（预处理前），用于波形显示 ────────────────────
-        # 三种格式统一流程：
-        #   1. 读取原始数值（GDF=int16 ADC, EDF/BDF=float64 V）
-        #   2. 统一转 μV
-        #   3. 去除每通道 DC 偏移
-        try:
-            raw_data_copy = self.raw.get_data().copy()  # (n_channels, n_times)
-            raw_times_copy = self.raw.times.copy()
-            
-            if ext == ".gdf" and getattr(self.raw, '_gdf_custom_reader', False):
-                # GDF 1.99: int16 ADC raw values, NOT microvolts
-                # ADC range ±32768 maps to physiological ±100 μV for BCI datasets
-                # Step 1: Convert ADC counts to μV (known scale for BCI Competition IV)
-                adc_to_uv = 100.0 / 32768.0  # ±32768 ADC → ±100 μV
-                uv_data = raw_data_copy * adc_to_uv
-            else:
-                # EDF/BDF: MNE returns data in Volts → convert to μV
-                uv_data = raw_data_copy * 1e6
-            
-            # Remove DC offset per channel (mean-center)
-            ch_means = np.mean(uv_data, axis=1, keepdims=True)
-            self._raw_data_uv = uv_data - ch_means
-            self._raw_times = raw_times_copy
-            self._raw_sfreq = self.raw.info['sfreq']
-        except Exception as _raw_save_err:
-            # 无法保存原始数据不会影响主要分析功能，仅波形预览会退化
-            print(f"[Warning] Failed to save raw data copy: {_raw_save_err}")
-            self._raw_data_uv = None
-            self._raw_times = None
-            self._raw_sfreq = self.raw.info['sfreq'] if hasattr(self.raw, 'info') else 0
-
-        # 预处理流水线 (按顺序, 每步提升频段/伪影分析准确率):
-        # 1. 0.5-40 Hz 带通 — 去除 DC 漂移、肌电、工频谐波
-        # 2. 50 Hz / 60 Hz notch — 去除工频干扰 (各国电网频率不同, 用 PSD 峰值自动检测)
-        # 3. 重参考 (REST 平均参考近似) — 提升通道间一致性
-        try:
-            self.raw.filter(l_freq=0.5, h_freq=40.0, picks="eeg", verbose=False)
-        except Exception:
-            pass  # 滤波失败则继续使用原始数据
-
-        # notch 滤波: 自动检测是 50Hz 还是 60Hz 工频干扰
-        try:
-            line_freq = self._detect_line_freq()
-            if line_freq in (50, 60):
-                # notch + 2 个谐波 (100/150Hz 或 120/180Hz)
-                self.raw.notch_filter(freqs=[line_freq, line_freq * 2, line_freq * 3],
-                                       picks="eeg", verbose=False)
+            picks = list(mne.pick_types(raw.info, eeg=True, eog=False, ecg=False,
+                                        emg=False, stim=False, misc=False))
         except Exception:
             pass
+    
+    if len(picks) < 2:
+        # 最终回退：排除刺激通道，取前 N 个
+        picks = [i for i, ch in enumerate(ch_names)
+                 if not any(k in ch.lower() for k in EXCLUDE_KEYWORDS)]
+        picks = picks[:max(4, len(picks))]
+    
+    return picks[:MAX_ANALYSIS_CHANNELS]
 
-        # 重参考到平均参考 (EEG 行业标准做法, 提升空间分辨率)
-        try:
-            if len(self.raw.ch_names) > 1:
-                self.raw.set_eeg_reference('average', projection=False, verbose=False)
-        except Exception:
-            pass
 
-        # ICA 去伪影: 仅在数据足够长时启用 (>= 20s, 需 n_samples > 20×sfreq)
-        # 短文件 ICA 不稳定, 跳过以避免误去成分
-        try:
-            if self.raw.n_times >= 20 * self.raw.info['sfreq'] and len(self.raw.ch_names) >= 8:
-                from mne.preprocessing import ICA
-                ica = ICA(n_components=min(0.95, len(self.raw.ch_names) - 1),
-                          method='fastica', random_state=42, max_iter='auto')
-                ica.fit(self.raw)
-                # 自动检测 EOG/ECG 伪影成分
-                try:
-                    eog_idx, _ = ica.find_bads_eog(self.raw, threshold=2.5, verbose=False)
-                    ica.exclude = list(set(eog_idx))
-                    if ica.exclude:
-                        ica.apply(self.raw)
-                except Exception:
-                    pass  # 找不到 EOG 通道或检测失败, 保留 ICA 结果
-        except Exception:
-            pass
+# =====================================================================
+# Fast-load 替代 preload=True
+# =====================================================================
 
-        info = self.raw.info
-        duration_sec = self.raw.n_times / info['sfreq']
-        minutes = int(duration_sec // 60)
-        seconds = int(duration_sec % 60)
+def fast_load_metadata(file_path: str) -> Dict[str, Any]:
+    """只读元数据（通道名、采样率、时长），不加载信号数据
+    
+    Returns: {channel_count, sampling_rate, duration_seconds, channel_names, n_times}
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext != ".edf":
+        raise ValueError(f"Unsupported format: {ext}. Only .edf files are supported in this version.")
+    
+    raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
+    info = raw.info
+    duration = raw.n_times / info['sfreq'] if info['sfreq'] > 0 else 0
+    
+    return {
+        "channel_count": len(info['ch_names']),
+        "sampling_rate": float(info['sfreq']),
+        "duration_seconds": float(duration),
+        "channel_names": info['ch_names'],
+        "n_times": raw.n_times,
+    }
 
-        self.overview = EEGOverview(
-            filename=self.edf_path.split("/")[-1],
-            channel_count=len(info['ch_names']),
-            sampling_rate=info['sfreq'],
-            duration=f"{minutes}分{seconds}秒",
-            channel_names=info['ch_names'],
-            recording_duration_seconds=duration_sec
-        )
 
-        return self.overview
+def fast_load_segment(file_path: str, duration_sec: float = 60.0, 
+                      eeg_only: bool = True) -> tuple:
+    """快速加载前 N 秒的 EEG 数据
+    
+    Args:
+        file_path: EDF 文件路径
+        duration_sec: 要加载的秒数（默认60s用于分析）
+        eeg_only: 是否只保留 EEG 通道
+        
+    Returns:
+        (data_uv, ch_names, sfreq, times)
+        data_uv: (n_ch, n_samples) in microvolts
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext != ".edf":
+        raise ValueError(f"Unsupported format: {ext}. Only .edf files are supported.")
+    
+    raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
+    sfreq = float(raw.info['sfreq'])
+    
+    # 只读前 duration_sec 的数据
+    n_samples = min(int(duration_sec * sfreq), raw.n_times)
+    
+    if eeg_only:
+        picks = _pick_eeg_channels(raw)
+    else:
+        picks = list(range(min(len(raw.ch_names), MAX_ANALYSIS_CHANNELS)))
+    
+    raw.pick(picks)
+    ch_names = [raw.ch_names[i] for i in range(len(raw.ch_names))]
+    
+    # 加载数据
+    data = raw.get_data(start=0, stop=n_samples)  # (n_ch, n_times), V
+    data_uv = data * 1e6  # V → μV
+    times = raw.times[:n_samples]
+    
+    return data_uv, ch_names, sfreq, times
 
-    def _detect_line_freq(self) -> int:
-        """自动检测工频干扰频率 (50Hz 欧/亚/非, 60Hz 美/日部分地区)
-        通过 PSD 在 45-65Hz 范围的最大值判断.
-        """
-        try:
-            from scipy.signal import welch
-            # 用 1 个通道 (CH0) 快速检测
-            ch0 = self.raw.get_data(picks=[self.raw.ch_names[0]])[0]
-            sfreq = self.raw.info['sfreq']
-            nperseg = min(1024, len(ch0))
-            freqs, psd = welch(ch0, fs=sfreq, nperseg=nperseg)
 
-            # 50Hz vs 60Hz 范围对比
-            p_50 = float(np.sum(psd[(freqs >= 49) & (freqs <= 51)]))
-            p_60 = float(np.sum(psd[(freqs >= 59) & (freqs <= 61)]))
+def fast_preview_window(file_path: str, duration_sec: float = 8.0,
+                         max_channels: int = MAX_PREVIEW_CHANNELS) -> Dict[str, Any]:
+    """快速提取波形预览窗口（只读前8秒，最多8通道）
+    
+    Returns dict suitable for frontend canvas rendering:
+        {times, channels, sampling_rate, duration_seconds, channel_names}
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext != ".edf":
+        raise ValueError(f"Unsupported format: {ext}. Only .edf files are supported.")
+    
+    raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
+    sfreq = float(raw.info['sfreq'])
+    
+    picks = _pick_eeg_channels(raw)[:max_channels]
+    raw.pick(picks)
+    ch_names = [raw.ch_names[i] for i in range(len(raw.ch_names))]
+    
+    n_ch = len(ch_names)
+    
+    # 智能窗口选择：找前 8s 中变异最大的窗口
+    total_n = min(int(duration_sec * sfreq), raw.n_times)
+    data_v = raw.get_data(start=0, stop=total_n)  # V
+    data_uv = data_v * 1e6  # μV
+    times = raw.times[:total_n]
+    
+    # 每通道 robust normalize + 垂直偏移
+    target_points = 1200
+    step = max(1, len(times) // target_points)
+    if len(times) // step < 500:
+        step = max(1, len(times) // 500)
+    
+    times_plot = times[::step]
+    channels_data = {}
+    
+    for i in range(n_ch):
+        x = data_uv[i].copy().astype(np.float64)
+        x = x - np.nanmedian(x)
+        scale = float(np.nanpercentile(np.abs(x), 95))
+        if not np.isfinite(scale) or scale <= 1e-9:
+            scale = float(np.nanstd(x))
+        if not np.isfinite(scale) or scale <= 1e-9:
+            scale = 1.0
+        x_norm = x / scale
+        x_norm = np.clip(x_norm, -3, 3)
+        offset = (n_ch - 1 - i) * 6
+        y = x_norm + offset
+        channels_data[ch_names[i]] = y[::step].astype(float).tolist()
+    
+    return {
+        "times": times_plot.astype(float).tolist(),
+        "channels": channels_data,
+        "sampling_rate": sfreq,
+        "duration_seconds": float(times_plot[-1]) if len(times_plot) > 0 else 0.0,
+        "channel_names": ch_names,
+    }
 
-            return 50 if p_50 >= p_60 else 60
-        except Exception:
-            return 50  # 默认 50Hz (中国/欧洲标准)
 
-    def analyze_signal_quality(self) -> SignalQuality:
-        """分析信号质量（多指标融合, 替代单一方差阈值）"""
-        if self.raw is None:
-            raise ValueError("请先调用 load_data()")
+def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
+    """快速计算频段功率（只取前30s数据，快速Welch）
+    
+    Args:
+        data_uv: (n_ch, n_times) in microvolts
+        sfreq: 采样率
+        
+    Returns:
+        {bandpower, average_bandpower, bandpower_percent, dominant_frequency,
+         frequency_distribution, relative_bandpower}
+    """
+    # 限制数据长度：最多用60s，最少用10s
+    max_samples = min(int(60 * sfreq), data_uv.shape[1])
+    min_samples = int(10 * sfreq)
+    if data_uv.shape[1] < min_samples:
+        data = data_uv  # 使用全部数据
+    else:
+        data = data_uv[:, :max_samples]
+    
+    n_ch, n_samples = data.shape
+    
+    # Welch 参数：4s窗口，50%重叠
+    nperseg = min(int(4.0 * sfreq), 1024, n_samples)
+    if nperseg < 16:
+        nperseg = max(16, n_samples // 4)
+    noverlap = nperseg // 2
+    
+    all_psds = []
+    all_freqs = None
+    for ch_data in data:
+        freqs, psd = welch(ch_data, fs=sfreq, nperseg=nperseg,
+                           noverlap=noverlap, window='hann',
+                           detrend='constant', scaling='density')
+        if all_freqs is None:
+            all_freqs = freqs
+        all_psds.append(psd)
+    all_psds = np.array(all_psds)  # (n_ch, n_freq)
+    
+    df = all_freqs[1] - all_freqs[0] if len(all_freqs) > 1 else 1.0
+    
+    bandpower = {}
+    average_bandpower = {}
+    relative_bandpower = {}
+    
+    total_power_per_ch = np.sum(all_psds, axis=1) * df
+    
+    for band_name, (fmin, fmax) in BANDS.items():
+        band_mask = (all_freqs >= fmin) & (all_freqs <= fmax)
+        band_power = np.array([
+            float(np.trapz(psd[band_mask], dx=df)) for psd in all_psds
+        ])
+        bandpower[band_name] = band_power.tolist()
+        avg = float(np.mean(band_power))
+        average_bandpower[band_name] = avg
+        rel = float(avg / (np.mean(total_power_per_ch) + 1e-20) * 100)
+        relative_bandpower[band_name] = rel
+    
+    # 主频率
+    avg_psd = np.mean(all_psds, axis=0)
+    peak_mask = (all_freqs >= 1.5) & (all_freqs <= 40.0)
+    masked = avg_psd[peak_mask]
+    if len(masked) > 0:
+        peak_idx = np.argmax(masked)
+        dominant_frequency = float(all_freqs[peak_mask][peak_idx])
+    else:
+        dominant_frequency = 10.0
+    
+    # 频率分布（用于图表，降采样至<=100点）
+    freq_dist = []
+    display_mask = (all_freqs >= 1.5) & (all_freqs <= 40.0)
+    display_freqs = all_freqs[display_mask]
+    display_psd = avg_psd[display_mask]
+    step = max(1, len(display_freqs) // 100)
+    for i in range(0, len(display_freqs), step):
+        freq_dist.append({
+            "frequency": float(display_freqs[i]),
+            "power": float(display_psd[i])
+        })
+    
+    # bandpower_percent for enhanced output
+    bp_total = sum(average_bandpower.values())
+    bandpower_percent = {k: f"{v/bp_total*100:.1f}%" for k, v in average_bandpower.items()} if bp_total > 0 else {k: "0%" for k in average_bandpower}
+    
+    return {
+        "bandpower": average_bandpower,
+        "average_bandpower": average_bandpower,
+        "bandpower_percent": bandpower_percent,
+        "dominant_frequency": dominant_frequency,
+        "frequency_distribution": freq_dist,
+        "frequency_distribution_array": freq_dist,
+        "relative_bandpower": relative_bandpower,
+    }
 
-        data = self.raw.get_data()
-        ch_names = self.raw.ch_names
 
-        # 1. 噪声通道检测: 综合 方差 + 峰度 + 梯度 (3 指标, 避免单一指标误判)
-        noisy_channels = []
-        channel_scores = {}
-
-        variances = np.var(data, axis=1)
-        var_threshold = np.mean(variances) + 2 * np.std(variances)
-
-        for i, ch_data in enumerate(data):
-            score = 0
-            reasons = []
-
-            # 指标 1: 方差过高 (漂移/接触不良)
-            if variances[i] > var_threshold:
-                score += 1
-                reasons.append("high_variance")
-
-            # 指标 2: 峰度 (kurtosis) — 眨眼/EMG 产生尖峰, 正态分布 kurt=3
-            kurt = float(self._kurtosis(ch_data))
-            if kurt > 10 or kurt < 1:
-                score += 1
-                reasons.append(f"kurt={kurt:.1f}")
-
-            # 指标 3: 梯度异常 — 电极瞬断产生巨大 step
-            grad_std = float(np.std(np.diff(ch_data)))
-            grad_threshold = np.mean(np.var(data, axis=1)) * 10
-            if grad_std > grad_threshold:
-                score += 1
-                reasons.append("high_gradient")
-
-            channel_scores[ch_names[i]] = {"score": score, "reasons": reasons}
-            # 至少 2 个指标异常才标记为噪声通道 (提高准确率, 减少误判)
-            if score >= 2:
-                noisy_channels.append(ch_names[i])
-
-        # 2. 异常值检测: 极端值 (>5 × std) 占比
-        outlier_pct = 0.0
-        for ch_data in data:
-            std = np.std(ch_data)
-            if std > 0:
-                outlier_pct += float(np.sum(np.abs(ch_data - np.mean(ch_data)) > 5 * std)) / len(ch_data)
-        outlier_pct = outlier_pct / max(1, data.shape[0])
-
-        # 3. 伪影类型检测 (细化)
-        possible_artifacts = []
-        lang = self.lang
-        if len(noisy_channels) > len(ch_names) * 0.1:
-            possible_artifacts.append(i18n.get_artifact_text(lang, "many_noisy_channels"))
-        if np.any(np.abs(data) > 1e-3):  # 异常大值 (> 1000 μV)
-            possible_artifacts.append(i18n.get_artifact_text(lang, "large_values"))
-        if outlier_pct > 0.01:  # 超过 1% 的样本是 5σ 异常
-            possible_artifacts.append(i18n.get_artifact_text(lang, "many_outliers"))
-
-        # 4. 缺失数据 / 削波
-        missing_data = bool(np.any(np.isnan(data)) or np.any(np.isinf(data)))
-        clipping_detected = False
-        for ch_data in data:
-            if np.any(np.abs(ch_data) > 0.99 * np.max(np.abs(ch_data))):
-                clipping_detected = True
-                break
-
-        # 高频噪声: 滤波后（0.5-40Hz）不应有高频噪声, 标记为 False
-        high_frequency_noise = False
-
-        # 5. 质量评分 (0-100): 多指标加权
-        # noisy 通道权重按比例 (高密度 EEG 64 通道里偶尔有 1-2 个高方差通道是正常的)
-        # 用 min(通道数/4, 5) 限制 noisy 总扣分, 避免高密度 EEG 分数触底
-        quality_score = 100.0
-        noisy_penalty = min(len(noisy_channels) * 3, 30)
-        quality_score -= noisy_penalty
-        quality_score -= min(20, len(possible_artifacts) * 6)  # 伪影权重
-        quality_score -= min(15, outlier_pct * 500)             # 异常值惩罚
-        if missing_data:
-            quality_score -= 20
-        if clipping_detected:
-            quality_score -= 15
-        if high_frequency_noise:
-            quality_score -= 10
-        quality_score = max(0, min(100, quality_score))
-
-        quality_details = {
+def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "zh") -> Dict[str, Any]:
+    """快速信号质量评估（只检查前30s数据）
+    
+    综合指标：方差 + 峰度 + 梯度异常
+    """
+    import i18n
+    
+    n_ch, n_samples = data_uv.shape
+    
+    if n_samples < 100:
+        return {
+            "signal_quality_score": 50.0,
+            "noisy_channels": [],
+            "possible_artifacts": ["数据过短"],
+            "missing_data": False,
+            "clipping_detected": False,
+            "high_frequency_noise": False,
+            "quality_details": {"average_variance": 0, "max_variance": 0, "outlier_percentage": 0},
+        }
+    
+    # 1. 方差检测
+    variances = np.var(data_uv, axis=1)
+    var_threshold = np.mean(variances) + 2 * np.std(variances)
+    
+    noisy_channels = []
+    
+    for i in range(n_ch):
+        x = data_uv[i].astype(np.float64)
+        
+        # 检查 NaN / inf
+        if not np.all(np.isfinite(x)):
+            noisy_channels.append(ch_names[i])
+            continue
+        
+        score = 0
+        
+        # 指标1：方差过高
+        if variances[i] > var_threshold:
+            score += 1
+        
+        # 指标2：峰度异常
+        x_centered = x - np.mean(x)
+        m2 = np.mean(x_centered ** 2)
+        m4 = np.mean(x_centered ** 4)
+        if m2 > 0:
+            kurt = float(m4 / (m2 ** 2) - 3)
+        else:
+            kurt = 0
+        if kurt > 10 or kurt < 1:
+            score += 1
+        
+        # 指标3：梯度异常
+        grad_std = float(np.std(np.diff(x)))
+        grad_threshold = float(np.mean(variances)) * 10
+        if grad_std > grad_threshold:
+            score += 1
+        
+        if score >= 2:
+            noisy_channels.append(ch_names[i])
+    
+    # 2. 异常值检测
+    outlier_total = 0
+    for i in range(n_ch):
+        x = data_uv[i]
+        std = float(np.std(x))
+        if std > 0:
+            outlier_total += np.sum(np.abs(x - np.mean(x)) > 5 * std)
+    outlier_pct = outlier_total / max(1, n_ch * n_samples)
+    
+    # 3. 伪影检测
+    possible_artifacts = []
+    if len(noisy_channels) > n_ch * 0.1:
+        possible_artifacts.append(i18n.get_artifact_text(lang, "many_noisy_channels"))
+    if np.any(np.abs(data_uv) > 500):  # >500μV异常
+        possible_artifacts.append(i18n.get_artifact_text(lang, "large_values"))
+    if outlier_pct > 0.01:
+        possible_artifacts.append(i18n.get_artifact_text(lang, "many_outliers"))
+    
+    # 4. 缺失/削波
+    missing_data = bool(np.any(~np.isfinite(data_uv)))
+    clipping_detected = False
+    for i in range(n_ch):
+        max_val = np.max(np.abs(data_uv[i]))
+        if max_val > 0 and np.any(np.abs(data_uv[i]) > 0.99 * max_val):
+            clipping_detected = True
+            break
+    
+    # 5. 质量评分
+    quality_score = 100.0
+    quality_score -= min(len(noisy_channels) * 3, 30)
+    quality_score -= min(len(possible_artifacts) * 6, 20)
+    quality_score -= min(outlier_pct * 500, 15)
+    if missing_data:
+        quality_score -= 20
+    if clipping_detected:
+        quality_score -= 15
+    quality_score = max(0, min(100, quality_score))
+    
+    return {
+        "signal_quality_score": round(quality_score, 1),
+        "noisy_channels": noisy_channels,
+        "possible_artifacts": possible_artifacts,
+        "missing_data": missing_data,
+        "clipping_detected": clipping_detected,
+        "high_frequency_noise": False,
+        "quality_details": {
             "average_variance": float(np.mean(variances)),
             "max_variance": float(np.max(variances)),
-            "outlier_percentage": outlier_pct * 100,
-            "channel_scores": channel_scores,
-            "missing_data_percentage": float(np.sum(np.isnan(data)) / data.size * 100) if missing_data else 0.0
-        }
+            "outlier_percentage": round(outlier_pct * 100, 2),
+        },
+    }
 
-        self.quality = SignalQuality(
-            signal_quality_score=quality_score,
-            noisy_channels=noisy_channels,
-            possible_artifacts=possible_artifacts,
-            missing_data=missing_data,
-            clipping_detected=clipping_detected,
-            high_frequency_noise=high_frequency_noise,
-            quality_details=quality_details
+
+def quick_literacy_scores(quality: Dict, overview: Dict) -> Dict[str, float]:
+    """快速计算可读性评分"""
+    score = quality.get("signal_quality_score", 50.0)
+    noisy_count = len(quality.get("noisy_channels", []))
+    artifact_count = len(quality.get("possible_artifacts", []))
+    clipping = quality.get("clipping_detected", False)
+    ch_count = overview.get("channel_count", 0)
+    duration = overview.get("duration_seconds", 0)
+    
+    complexity = min(100, noisy_count * 3 + artifact_count * 10 + (15 if clipping else 0))
+    readability = min(100, max(0, float(score)))
+    clarity = min(100, max(0, float(score) - noisy_count * 4))
+    beginner = min(100, max(0, float(score) - complexity * 0.6))
+    if 8 <= ch_count <= 32:
+        beginner = min(100, beginner + 10)
+    research = min(100, max(0, float(score) - noisy_count * 2))
+    
+    return {
+        "learning_readability_score": round(readability, 1),
+        "signal_clarity_score": round(clarity, 1),
+        "beginner_friendliness_score": round(beginner, 1),
+        "research_usefulness_score": round(research, 1),
+        "noise_complexity_score": round(complexity, 1),
+    }
+
+
+def quick_band_waveforms(file_path: str, duration_seconds: float = 10.0) -> Dict[str, Any]:
+    """计算频段波形（Delta/Theta/Alpha/Beta）—— 只读前10s，scipy滤波
+    
+    返回 {times, delta, theta, alpha, beta}
+    """
+    try:
+        data_uv, ch_names, sfreq, times = fast_load_segment(
+            file_path, duration_sec=duration_seconds, eeg_only=True
         )
-
-        return self.quality
-
-    @staticmethod
-    def _kurtosis(x: np.ndarray) -> float:
-        """计算超额峰度 (excess kurtosis), 正态分布 = 0
-        眨眼/EMG 伪影会产生高 kurtosis (>3), 平直流产生低 kurtosis.
-        """
-        x = x - np.mean(x)
-        n = len(x)
-        if n < 4:
-            return 0.0
-        m2 = np.mean(x ** 2)
-        m4 = np.mean(x ** 4)
-        if m2 == 0:
-            return 0.0
-        return float(m4 / (m2 ** 2) - 3)
-
-    def analyze_frequency(self) -> FrequencyAnalysis:
-        """分析频段能量（基于 Welch, 参数优化以提高准确率）"""
-        if self.raw is None:
-            raise ValueError("请先调用 load_data()")
-
-        data = self.raw.get_data()
-        sfreq = self.raw.info['sfreq']
-
-        # 定义频段 (Hz) — 标准 EEG 频段
-        bands = {
-            'delta': (0.5, 4),
-            'theta': (4, 8),
-            'alpha': (8, 13),
-            'beta':  (13, 30),
-            'gamma': (30, 40)   # 上限收到 40Hz (被带通滤波截断)
-        }
-
-        bandpower = {}
-        average_bandpower = {}
-        relative_bandpower = {}
-
-        from scipy.signal import welch
-
-        # === Welch 参数优化 ===
-        # nperseg = min(4 秒, 1024): 4 秒窗 = 1Hz 频率分辨率 (EEG 标准)
-        # overlap = 50%: Welch 经典配置, 方差减小 1/2
-        # window = 'hann': 默认窗, 减少频谱泄漏
-        # detrend = 'constant': 去 DC 偏移
-        # scaling = 'density': 输出 PSD (μV²/Hz)
-        nperseg = min(int(4.0 * sfreq), 1024, data.shape[1])
-        noverlap = nperseg // 2
-
-        # 先计算所有通道的总功率 (用于相对功率归一化)
-        total_power_per_ch = []
-
-        for ch_data in data:
-            # Welch 估计 PSD
-            freqs, psd = welch(ch_data, fs=sfreq, nperseg=nperseg,
-                                noverlap=noverlap, window='hann',
-                                detrend='constant', scaling='density')
-            total_power_per_ch.append(float(np.sum(psd) * (freqs[1] - freqs[0])))
-        total_power_per_ch = np.array(total_power_per_ch)
-
-        # 计算每个频段的绝对功率和相对功率
-        for band_name, (fmin, fmax) in bands.items():
-            band_power_per_channel = []
-
-            for ch_idx, ch_data in enumerate(data):
-                freqs, psd = welch(ch_data, fs=sfreq, nperseg=nperseg,
-                                    noverlap=noverlap, window='hann',
-                                    detrend='constant', scaling='density')
-                # 频段积分 (梯形法, 比矩形积分更精确; 兼容 numpy 1.x/2.x)
-                band_mask = (freqs >= fmin) & (freqs <= fmax)
-                df = freqs[1] - freqs[0] if len(freqs) > 1 else 1.0
-                # 兼容 numpy 1.x (trapz) 和 2.x (trapezoid)
-                _trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
-                band_power = float(_trapz(psd[band_mask], dx=df))
-                band_power_per_channel.append(band_power)
-
-            bandpower[band_name] = band_power_per_channel
-            avg = float(np.mean(band_power_per_channel))
-            average_bandpower[band_name] = avg
-            # 相对功率: 该频段 / (1-40Hz 总功率) × 100%
-            rel = float(avg / (np.mean(total_power_per_ch) + 1e-20) * 100)
-            relative_bandpower[band_name] = rel
-
-        # 主频率 (基于平均 PSD, 限制在 1.5-40Hz 找峰值, 避开 0-1Hz 漂移和 DC)
-        avg_psd = np.mean([welch(ch, fs=sfreq, nperseg=nperseg,
-                                  noverlap=noverlap, window='hann',
-                                  detrend='constant', scaling='density')[1]
-                          for ch in data], axis=0)
-        freqs_avg = welch(data[0], fs=sfreq, nperseg=nperseg,
-                          noverlap=noverlap, window='hann',
-                          detrend='constant', scaling='density')[0]
-        # 限制在 1.5-40Hz 找峰值 (避开 0-1Hz 漂移带, 因为带通 0.5Hz 后低频可能有强边带)
-        peak_mask = (freqs_avg >= 1.5) & (freqs_avg <= 40.0)
-        peak_idx_in_mask = np.argmax(avg_psd[peak_mask])
-        dominant_frequency = float(freqs_avg[peak_mask][peak_idx_in_mask])
-
-        # 频率分布 (用于图表, 1.5-40Hz 范围, 限制点数)
-        frequency_distribution = []
-        display_mask = (freqs_avg >= 1.5) & (freqs_avg <= 40.0)
-        display_freqs = freqs_avg[display_mask]
-        display_psd = avg_psd[display_mask]
-        # 限制 100 个点 (避免前端过载)
-        step = max(1, len(display_freqs) // 100)
-        for i in range(0, len(display_freqs), step):
-            frequency_distribution.append({
-                "frequency": float(display_freqs[i]),
-                "power": float(display_psd[i])
-            })
-
-        self.frequency = FrequencyAnalysis(
-            bandpower=bandpower,
-            dominant_frequency=dominant_frequency,
-            frequency_distribution=frequency_distribution,
-            average_bandpower=average_bandpower,
-            relative_bandpower=relative_bandpower
-        )
-        # 同步存到 self, 方便其他方法访问
-        self.relative_bandpower = relative_bandpower
-
-        return self.frequency
-
-    def extract_waveform_preview(self, duration_seconds: float = 10.0) -> WaveformPreview:
-        """提取波形预览数据（前 N 秒，基于原始未滤波数据）
+    except Exception as e:
+        print(f"[WARN] quick_band_waveforms: {e}")
+        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": []}
+    
+    try:
+        n_samples = data_uv.shape[1]
+        times_list = times.tolist()
+        nyq = sfreq / 2
+        result: Dict[str, Any] = {"times": times_list}
         
-        使用 load_data() 中保存的原始数据副本（单位 μV），
-        避免预处理流水线（滤波/ICA等）对波形显示的影响。
-        """
-        if self.raw is None:
-            raise ValueError("请先调用 load_data()")
-
-        sfreq = self.raw.info['sfreq']
-        n_samples = min(int(duration_seconds * sfreq), self.raw.n_times)
-
-        # ── 使用原始未滤波数据 ────────────────────────────────────────
-        use_raw = (hasattr(self, '_raw_data_uv') and self._raw_data_uv is not None
-                   and self._raw_times is not None)
-        if use_raw:
-            raw_data_uv = self._raw_data_uv  # (n_channels, n_times), 单位 μV
-            raw_times_full = self._raw_times
-            ch_names_all = self.raw.ch_names
-        else:
-            # 回退：使用当前（可能已滤波）数据
-            raw_data_uv = self.raw.get_data()  # (n_channels, n_times)
-            raw_times_full = self.raw.times
-            ch_names_all = self.raw.ch_names
-            # 如果是 MNE V 单位且没有原始数据，此时数据可能已滤波，尝试转换为 μV
-            if not hasattr(self, '_raw_data_uv'):
-                raw_data_uv = raw_data_uv * 1e6
-
-        # 选择用于预览的通道：优先 EEG 通道，排除 STIM/STATUS 通道
-        try:
-            import mne
-            # 排除名称含 TRIGGER/STIM/STATUS/DC/ACCEL 的通道
-            exclude_names = {"trigger", "stim", "status", "sti", "dc", "accel", "gyro", "magnet"}
-            clean_indices = [i for i, ch in enumerate(ch_names_all)
-                           if not any(kw in ch.lower() for kw in exclude_names)]
-            # 用 MNE pick_types 做第二轮过滤
-            eeg_picks = mne.pick_types(self.raw.info, meg=False, eeg=True, stim=False, eog=False, ecg=False, misc=False)
-            if len(eeg_picks) >= 4:
-                # 优先使用 MNE 的 EEG picks，但排除 STIM 通道名
-                picks = [p for p in eeg_picks if p in clean_indices]
-            else:
-                # MNE EEG picks 太少，用名称过滤后的通道
-                picks = clean_indices
-            if len(picks) < 4:
-                # 最终回退：前 8 个通道（原始行为）
-                picks = list(range(min(8, len(ch_names_all))))
-        except Exception:
-            picks = list(range(min(8, len(ch_names_all))))
-
-        # 取最多 8 个通道，用原始数据
-        chosen = picks[:8]
-        # 跳过前 0.2 秒（避免放大器初始偏移/文件头伪影）
-        skip_samples = int(0.2 * sfreq)
-        start = min(skip_samples, raw_data_uv.shape[1] - 10)
-        n_points = min(n_samples, raw_data_uv.shape[1] - start)
-        data_slice = raw_data_uv[:, start:start + n_points]
-
-        times = raw_times_full[start:start + n_points].tolist()
-
-        channels = {}
-        for ch_idx in chosen:
-            ch_name = ch_names_all[ch_idx]
-            channels[ch_name] = data_slice[ch_idx].tolist()
-
-        self.waveform = WaveformPreview(
-            times=times,
-            channels=channels,
-            sampling_rate=sfreq,
-            duration_seconds=n_points / sfreq
-        )
-
-        return self.waveform
-
-    def calculate_literacy_scores(self) -> LiteracyScores:
-        """计算 EEG 可读性评分（0-100，高分=好）"""
-        if self.quality is None or self.frequency is None:
-            raise ValueError("请先完成信号质量和频段分析")
-
-        # 1. Noise Complexity Score（先算，后面 clarity/beginner 会引用）
-        #    高分 = 噪声多、难理解
-        complexity_score = len(self.quality.noisy_channels) * 3
-        complexity_score += len(self.quality.possible_artifacts) * 10
-        if self.quality.clipping_detected:
-            complexity_score += 15
-        complexity_score = min(100, complexity_score)
-
-        # 2. Learning Readability Score：信号质量直接映射
-        learning_score = max(0, min(100, self.quality.signal_quality_score))
-
-        # 3. Signal Clarity Score：清晰度 = 100 - 噪声复杂度
-        clarity_score = max(0, 100 - complexity_score)
-
-        # 4. Beginner Friendliness Score：高质量 + 少噪声 + 通道数适中
-        noise_penalty   = len(self.quality.noisy_channels) * 4
-        artifact_penalty = len(self.quality.possible_artifacts) * 12
-        quality_penalty  = 0 if self.quality.signal_quality_score >= 70 else 25
-        beginner_score  = max(0, 100 - noise_penalty - artifact_penalty - quality_penalty)
-        # 通道数 8-32 对初学者最友好（太多反而混乱）
-        if 8 <= self.overview.channel_count <= 32:
-            beginner_score = min(100, beginner_score + 10)
-
-        # 5. Research Usefulness Score：质量×40% + 通道数 + 时长
-        quality_component  = self.quality.signal_quality_score * 0.4
-        channel_component = min(40, self.overview.channel_count * 1.5)
-        dur_component     = min(40, self.overview.recording_duration_seconds / 60.0 * 2.0)
-        research_score    = min(100, quality_component + channel_component + dur_component)
-
-        return LiteracyScores(
-            learning_readability_score=learning_score,
-            signal_clarity_score=clarity_score,
-            beginner_friendliness_score=beginner_score,
-            research_usefulness_score=research_score,
-            noise_complexity_score=complexity_score
-        )
-
-    def assess_interpretation_confidence(self) -> InterpretationConfidence:
-        """评估解释可信度"""
-        if self.quality is None:
-            raise ValueError("请先完成信号质量分析")
-
-        reasons = []
-        limitations = []
-        lang = self.lang
-
-        # 判断可信度
-        if self.quality.signal_quality_score >= 80:
-            level = "High"
-            reasons.append(i18n.get_confidence_reason(lang, "high_quality"))
-        elif self.quality.signal_quality_score >= 50:
-            level = "Moderate"
-            reasons.append(i18n.get_confidence_reason(lang, "moderate_quality"))
-        else:
-            level = "Low"
-            reasons.append(i18n.get_confidence_reason(lang, "low_quality"))
-
-        if len(self.quality.noisy_channels) > 0:
-            limitations.append(i18n.get_confidence_limitation(lang, "noisy_channels", len(self.quality.noisy_channels)))
-
-        if self.overview.recording_duration_seconds < 60:
-            limitations.append(i18n.get_confidence_limitation(lang, "short_duration"))
-
-        if self.overview.channel_count < 8:
-            limitations.append(i18n.get_confidence_limitation(lang, "few_channels"))
-
-        limitations.append(i18n.get_confidence_limitation(lang, "not_for_diagnosis_1"))
-        limitations.append(i18n.get_confidence_limitation(lang, "not_for_diagnosis_2"))
-
-        confidence_reason = "; ".join(reasons)
-
-        return InterpretationConfidence(
-            level=level,
-            confidence_reason=confidence_reason,
-            limitations=limitations
-        )
-
-    def run_full_analysis(self) -> Dict[str, Any]:
-        """运行完整分析流水线"""
-        # 1. 加载数据 (含预处理: 带通 + notch + 平均参考)
-        overview = self.load_data()
-
-        # 2. 信号质量 (多指标融合: 方差 + 峰度 + 梯度)
-        quality = self.analyze_signal_quality()
-
-        # 3. 频段分析 (Welch 优化: 4s 窗 + 50% overlap + 梯形积分 + 相对功率)
-        frequency = self.analyze_frequency()
-
-        # 4. 波形预览
-        waveform = self.extract_waveform_preview(duration_seconds=10.0)
-
-        # 5. 可读性评分
-        literacy = self.calculate_literacy_scores()
-
-        # 6. 解释可信度
-        confidence = self.assess_interpretation_confidence()
-
-        # 组装结果（手动转换为 JSON 可序列化类型）
-        def convert_value(v):
-            """递归转换 NumPy 类型为 Python 原生类型"""
-            if isinstance(v, np.ndarray):
-                return v.tolist()
-            elif isinstance(v, (np.integer, np.int32, np.int64)):
-                return int(v)
-            elif isinstance(v, (np.floating, np.float32, np.float64)):
-                return float(v)
-            elif isinstance(v, np.bool_):
-                return bool(v)
-            elif isinstance(v, dict):
-                return {k: convert_value(v) for k, v in v.items()}
-            elif isinstance(v, list):
-                return [convert_value(item) for item in v]
-            else:
-                return v
-
-        result = {
-            "overview": {
-                "filename": overview.filename,
-                "channel_count": overview.channel_count,
-                "sampling_rate": overview.sampling_rate,
-                "duration": overview.duration,
-                "channel_names": overview.channel_names,
-                "recording_duration_seconds": overview.recording_duration_seconds,
-            },
-            "signal_quality": {
-                "signal_quality_score": quality.signal_quality_score,
-                "noisy_channels": quality.noisy_channels,
-                "possible_artifacts": quality.possible_artifacts,
-                "missing_data": bool(quality.missing_data),
-                "clipping_detected": bool(quality.clipping_detected),
-                "high_frequency_noise": bool(quality.high_frequency_noise),
-                "quality_details": convert_value(quality.quality_details),
-            },
-            "frequency_analysis": {
-                "bandpower": convert_value(frequency.average_bandpower),
-                "dominant_frequency": frequency.dominant_frequency,
-                "frequency_distribution": convert_value(frequency.frequency_distribution),
-                "average_bandpower": convert_value(frequency.average_bandpower),
-                "relative_bandpower": convert_value(frequency.relative_bandpower or {}),
-            },
-            "waveform_preview": {
-                "times": waveform.times[:1500],  # 取前 1500 个时间点 (~6s @250Hz, 更充分展示波形)
-                "channels": {k: [float(v) for v in v[:1500]] for k, v in waveform.channels.items()},
-                "sampling_rate": waveform.sampling_rate,
-                "duration_seconds": waveform.duration_seconds,
-            },
-            "literacy_scores": {
-                "learning_readability_score": literacy.learning_readability_score,
-                "signal_clarity_score": literacy.signal_clarity_score,
-                "beginner_friendliness_score": literacy.beginner_friendliness_score,
-                "research_usefulness_score": literacy.research_usefulness_score,
-                "noise_complexity_score": literacy.noise_complexity_score,
-            },
-            "interpretation_confidence": {
-                "level": confidence.level,
-                "confidence_reason": confidence.confidence_reason,
-                "limitations": confidence.limitations,
-            },
-            "what_this_data_cannot_tell": [
-                "智商",
-                "性格",
-                "心理健康",
-                "疾病",
-                "情绪",
-                "ADHD",
-                "抑郁症"
-            ]
-        }
-
+        for band_name, (low, high) in BANDS.items():
+            b, a = butter(4, [low / nyq, high / nyq], btype="band")
+            filtered = filtfilt(b, a, data_uv, axis=1)
+            avg = np.nanmean(filtered, axis=0)
+            result[band_name] = avg.tolist()
+        
         return result
+    except Exception as e:
+        print(f"[WARN] quick_band_waveforms filter failed: {e}")
+        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": []}
 
 
-def analyze_edf(edf_path: str, lang: str = "zh") -> Dict[str, Any]:
-    """便捷函数：分析单个 EEG 文件（支持 .edf/.bdf/.gdf）"""
-    analyzer = EEGAnalyzer(edf_path, lang=lang)
-    return analyzer.run_full_analysis()
+# =====================================================================
+# 主分析入口
+# =====================================================================
+
+def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
+    """快速分析 EDF 文件（v2.0 — 只做基础分析，不含 AI/Picture/PDF）
+    
+    流程：
+    1. 验证文件类型和大小
+    2. 读取元数据（preload=False）
+    3. 加载前60s数据做信号质量和频段分析
+    4. 快速波形预览（8s窗口）
+    5. 组装结果返回
+    
+    不在本函数中：Ollama AI解释、PDF生成、PNG波形图
+    """
+    # ── 格式验证 ──────────────────────────────────────
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext != ".edf":
+        if ext in (".bdf", ".gdf"):
+            msg = "BDF/GDF format is no longer supported. Only .edf files are supported in this version."
+            raise ValueError(msg)
+        raise ValueError(f"Unsupported file format: {ext}. Only .edf files are supported.")
+    
+    # ── 文件大小检查 ──────────────────────────────────
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        raise ValueError(
+            f"File too large for analysis ({file_size_mb:.1f}MB). "
+            f"Maximum supported file size is {MAX_FILE_SIZE_MB}MB."
+        )
+    
+    # ── 1. 元数据（preload=False，瞬间返回）─────────────
+    meta = fast_load_metadata(file_path)
+    filename = os.path.basename(file_path)
+    minutes = int(meta["duration_seconds"] // 60)
+    seconds = int(meta["duration_seconds"] % 60)
+    
+    overview = {
+        "filename": filename,
+        "channel_count": meta["channel_count"],
+        "sampling_rate": meta["sampling_rate"],
+        "duration": f"{minutes}分{seconds}秒",
+        "channel_names": meta["channel_names"],
+        "recording_duration_seconds": meta["duration_seconds"],
+    }
+    
+    # ── 2. 快速信号质量和频段分析（只用前60s数据）─────
+    try:
+        data_uv, ch_names, sfreq, _ = fast_load_segment(file_path, duration_sec=60.0, eeg_only=True)
+        # 限制分析通道数
+        data_uv = data_uv[:MAX_ANALYSIS_CHANNELS]
+        ch_names = ch_names[:MAX_ANALYSIS_CHANNELS]
+        
+        quality = quick_signal_quality(data_uv, ch_names, lang)
+        freq = quick_bandpower(data_uv, sfreq)
+        
+        # literacy scores
+        literacy = quick_literacy_scores(quality, overview)
+    except Exception as e:
+        print(f"[WARN] fast_load_segment failed: {e}, using fallback")
+        # 回退：部分文件可能格式特殊，用完整加载兜底
+        raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
+        picks = _pick_eeg_channels(raw)[:MAX_ANALYSIS_CHANNELS]
+        raw.pick(picks)
+        ch_names_2 = [raw.ch_names[i] for i in range(len(raw.ch_names))]
+        # 只取前60s
+        n_samples = min(int(60 * raw.info['sfreq']), raw.n_times)
+        d = raw.get_data(start=0, stop=n_samples) * 1e6
+        quality = quick_signal_quality(d, ch_names_2, lang)
+        freq = quick_bandpower(d, raw.info['sfreq'])
+        literacy = quick_literacy_scores(quality, overview)
+    
+    # ── 3. 波形预览（8s窗口，最多8通道）─────────────────
+    waveform_preview = fast_preview_window(file_path, duration_sec=8.0, max_channels=MAX_PREVIEW_CHANNELS)
+    
+    # ── 4. 频段波形（scipy滤波，10s窗口）────────────────
+    band_waveforms = quick_band_waveforms(file_path, duration_seconds=10.0)
+    
+    # ── 5. 组合结果 ─────────────────────────────────────
+    def _safe(v):
+        if isinstance(v, (np.integer, np.int32, np.int64)):
+            return int(v)
+        if isinstance(v, (np.floating, np.float32, np.float64)):
+            return float(v)
+        if isinstance(v, np.ndarray):
+            return v.tolist()
+        if isinstance(v, dict):
+            return {k: _safe(v) for k, v in v.items()}
+        if isinstance(v, list):
+            return [_safe(item) for item in v]
+        return v
+    
+    # 频道名称统一用 fast_load 获取的（取前 MAX_ANALYSIS_CHANNELS 个）
+    # waveform_preview 已经有自己的 channel_names
+    
+    return _safe({
+        "overview": overview,
+        "signal_quality": quality,
+        "frequency_analysis": {
+            "bandpower": freq.get("bandpower", {}),
+            "dominant_frequency": freq.get("dominant_frequency", 10.0),
+            "frequency_distribution": freq.get("frequency_distribution", []),
+            "average_bandpower": freq.get("average_bandpower", {}),
+            "relative_bandpower": freq.get("relative_bandpower", {}),
+            "bandpower_percent": freq.get("bandpower_percent", {}),
+            "frequency_distribution_array": freq.get("frequency_distribution_array", []),
+        },
+        "waveform_preview": waveform_preview,
+        "band_waveforms": band_waveforms,
+        "literacy_scores": literacy,
+        "what_this_data_cannot_tell": [
+            "智商", "性格", "心理健康", "疾病", "情绪", "ADHD", "抑郁症"
+        ],
+        "file_size_mb": round(file_size_mb, 2),
+    })

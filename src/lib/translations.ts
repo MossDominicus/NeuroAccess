@@ -123,6 +123,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     // 状态
     pending: "等待中",
     uploading: "上传中",
+    reading: "读取文件",
+    computing: "计算指标",
+    analysisReady: "基础分析完成",
     analyzingStatus: "分析中",
     explaining: "生成解释中",
     completed: "已完成",
@@ -749,6 +752,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     // Status
     pending: "Pending",
     uploading: "Uploading",
+    reading: "Reading file",
+    computing: "Computing metrics",
+    analysisReady: "Analysis ready",
     analyzingStatus: "Analyzing",
     explaining: "Explaining",
     completed: "Completed",
@@ -1429,6 +1435,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
     pending: "Pendiente",
     uploading: "Subiendo",
+    reading: "Leyendo archivo",
+    computing: "Calculando métricas",
+    analysisReady: "Análisis listo",
     analyzingStatus: "Analizando",
     explaining: "Explicando",
     completed: "Completado",
@@ -2090,6 +2099,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
     pending: "En attente",
     uploading: "Téléchargement",
+    reading: "Lecture du fichier",
+    computing: "Calcul des métriques",
+    analysisReady: "Analyse prête",
     analyzingStatus: "Analyse",
     explaining: "Explication",
     completed: "Terminé",
@@ -2751,6 +2763,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
     pending: "Ausstehend",
     uploading: "Lade hoch",
+    reading: "Datei lesen",
+    computing: "Metriken berechnen",
+    analysisReady: "Analyse bereit",
     analyzingStatus: "Analysiere",
     explaining: "Erkläre",
     completed: "Abgeschlossen",
@@ -3412,6 +3427,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
     pending: "保留",
     uploading: "アップロード中",
+    reading: "ファイル読み取り中",
+    computing: "指標計算中",
+    analysisReady: "基本分析完了",
     analyzingStatus: "分析中",
     explaining: "説明生成中",
     completed: "完了",
@@ -4073,6 +4091,9 @@ export const translations: Record<Lang, Record<string, string>> = {
 
     pending: "대기 중",
     uploading: "업로드 중",
+    reading: "파일 읽는 중",
+    computing: "지표 계산 중",
+    analysisReady: "기본 분석 완료",
     analyzingStatus: "분석 중",
     explaining: "설명 생성 중",
     completed: "완료",

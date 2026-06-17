@@ -22,16 +22,19 @@ import {
   Cpu, Pause,
 } from "lucide-react";
 
-type Status = "pending" | "analyzing" | "completed" | "failed";
+type Status = "pending" | "reading" | "computing" | "analysisReady" | "explaining" | "completed" | "failed";
 
 // ── Status badge ─────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Status }) {
   const { t } = useLang();
   const map: Record<Status, { key: string; color: string; Icon: any; spin?: boolean }> = {
-    pending:     { key: "pending",     color: "bg-[var(--color-border)] text-[var(--color-text-secondary)]",        Icon: Clock,     spin: false },
-    analyzing:   { key: "analyzing",  color: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",   Icon: Activity,  spin: true  },
+    pending:     { key: "pending",     color: "bg-[var(--color-border)] text-[var(--color-text-secondary)]",             Icon: Clock,        spin: false },
+    reading:     { key: "reading",     color: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",        Icon: UploadCloud,  spin: true  },
+    computing:   { key: "computing",   color: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",    Icon: Activity,     spin: true  },
+    analysisReady: { key: "analysisReady", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", Icon: CheckCircle2, spin: false },
+    explaining:  { key: "explaining",  color: "bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400", Icon: Cpu,        spin: true  },
     completed:   { key: "completed",   color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", Icon: CheckCircle2, spin: false },
-    failed:      { key: "failed",      color: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",       Icon: AlertTriangle, spin: false },
+    failed:      { key: "failed",      color: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",            Icon: AlertTriangle, spin: false },
   };
   const { key, color, Icon, spin } = map[status];
   return (
@@ -199,7 +202,7 @@ function FileCard({
         </div>
       )}
 
-      {expanded && item.status === "completed" && !item.error && (
+      {expanded && (item.status === "analysisReady" || item.status === "explaining" || item.status === "completed") && !item.error && (
         <div className="border-t border-[var(--color-border)] px-5 py-4">
           <div className="text-center mb-4">
             <Link
@@ -239,20 +242,32 @@ function DashboardInner() {
     handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis,
   } = useAnalysis();
 
-  // ── AI 状态 ─────────────────────────────────────────
+  // ── AI 状态（2次连续失败才显示离线，避免后端重启时误报）─────────
   const [aiStatus, setAiStatus] = useState<{ online: boolean; model: string; mode: string } | null>(null);
+  const aiFailCountRef = useRef(0);
   useEffect(() => {
     const fetchStatus = async () => {
       try {
         const res = await fetch("/api/health");
         const data = await res.json();
-        setAiStatus({
-          online: data.openrouter === true,
-          model: data.openrouter ? "qwen-2.5-7b" : (data.model || "qwen2.5:7b"),
-          mode: data.openrouter ? t("apiMode") : t("cpuMode"),
-        });
+        if (data.openrouter === true) {
+          aiFailCountRef.current = 0;
+          setAiStatus({
+            online: true,
+            model: "qwen-2.5-7b",
+            mode: t("apiMode"),
+          });
+        } else {
+          aiFailCountRef.current++;
+          if (aiFailCountRef.current >= 2) {
+            setAiStatus({ online: false, model: "-", mode: t("cpuMode") });
+          }
+        }
       } catch {
-        setAiStatus({ online: false, model: "-", mode: t("cpuMode") });
+        aiFailCountRef.current++;
+        if (aiFailCountRef.current >= 2) {
+          setAiStatus({ online: false, model: "-", mode: t("cpuMode") });
+        }
       }
     };
     fetchStatus();
@@ -264,7 +279,7 @@ function DashboardInner() {
     total:      files.length,
     completed:  files.filter((f: any) => f.status === "completed").length,
     failed:     files.filter((f: any) => f.status === "failed").length,
-    processing:  files.filter((f: any) => f.status === "analyzing").length,
+    processing:  files.filter((f: any) => f.status === "reading" || f.status === "computing" || f.status === "explaining").length,
   };
   // 分析进行中 = 正在运行且未暂停（暂停后可以继续上传文件）
   const hasActiveAnalysis = running && !paused;
@@ -274,7 +289,7 @@ function DashboardInner() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.05 }}
-      className="mx-auto max-w-5xl space-y-6 px-6 py-8"
+      className="mx-auto max-w-5xl space-y-4 sm:space-y-6 px-3 sm:px-6 py-4 sm:py-8 pb-[env(safe-area-inset-bottom,16px)]"
     >
       {/* 网站介绍 */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 p-5 text-sm leading-relaxed text-[var(--color-text)]">
@@ -286,18 +301,21 @@ function DashboardInner() {
         {/* Upload area */}
         {!hasActiveAnalysis ? (
           <div
-            className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] cursor-pointer"
+            className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-8 sm:p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] active:border-[var(--color-primary)] cursor-pointer min-h-[160px] flex flex-col items-center justify-center"
             onDragOver={(e) => { e.preventDefault(); }}
             onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
             onClick={() => inputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
           >
-            <UploadCloud className="mx-auto mb-4 h-10 w-10 text-[var(--color-text-secondary)]" />
-            <p className="text-sm font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
+            <UploadCloud className="mx-auto mb-3 sm:mb-4 h-8 w-8 sm:h-10 sm:w-10 text-[var(--color-text-secondary)]" />
+            <p className="text-sm sm:text-base font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
+            <p className="mt-1 text-xs sm:text-sm text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
             <input
               ref={inputRef}
               type="file"
-              accept=".edf,.bdf,.gdf"
+              accept=".edf"
               multiple
               className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
@@ -411,7 +429,7 @@ function DashboardInner() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  MAIN DASHBOARD PAGE (AnalysisProvider is in root layout)
+//  MAIN DASHBOARD PAGE
 // ═══════════════════════════════════════════════════════════════
 
 export default function DashboardPage() {
