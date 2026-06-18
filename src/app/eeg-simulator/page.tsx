@@ -39,15 +39,36 @@ const PARAM_HELP_KEYS: Record<string, string> = {
   artifact_powerline: "artifactPowerlineHelp",
 };
 
+// ── sessionStorage 持久化（页面切换不丢失模拟结果）─────────────────
+const SS_KEY = "neuroaccess-eeg-simulator";
+function loadSimState(): { params: any; result: any } | null {
+  try {
+    const raw = sessionStorage.getItem(SS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+function saveSimState(params: any, result: any | null) {
+  try {
+    sessionStorage.setItem(SS_KEY, JSON.stringify({ params, result }));
+  } catch {}
+}
+
+const DEFAULT_PARAMS = {
+  duration_sec: 10, sampling_rate: 250, n_channels: 8,
+  alpha_power: 1.0, beta_power: 0.5, theta_power: 0.3, delta_power: 0.8,
+  alpha_freq: 10.0, beta_freq: 20.0, theta_freq: 6.0, delta_freq: 3.0,
+  noise_level: 0.1,
+  artifact_blink: false, artifact_muscle: false, artifact_powerline: false,
+};
+
 export default function EegSimulatorPage() {
   const { t } = useLang();
 
-  // 设置页面标题
-  useEffect(() => {
-    document.title = `NeuroAccess`;
-  }, [t]);
+  // 页面标题
+  useEffect(() => { document.title = "NeuroAccess"; }, [t]);
 
-  // 每个滑块可展开的注释面板状态
+  // 每个滑块可展开的注释面板
   const [helpOpen, setHelpOpen] = useState<Set<string>>(new Set());
   const toggleHelp = (key: string) => {
     setHelpOpen((prev) => {
@@ -58,28 +79,29 @@ export default function EegSimulatorPage() {
     });
   };
 
-  // 模拟参数
-  const [params, setParams] = useState({
-    duration_sec: 10,
-    sampling_rate: 250,
-    n_channels: 8,
-    alpha_power: 1.0,
-    beta_power: 0.5,
-    theta_power: 0.3,
-    delta_power: 0.8,
-    alpha_freq: 10.0,
-    beta_freq: 20.0,
-    theta_freq: 6.0,
-    delta_freq: 3.0,
-    noise_level: 0.1,
-    artifact_blink: false,
-    artifact_muscle: false,
-    artifact_powerline: false,
-  });
-
+  // ── 状态：优先从 sessionStorage 恢复（页面切换不丢失）─────────────
+  const [params, setParams] = useState(DEFAULT_PARAMS);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+
+  // 客户端水合后从 sessionStorage 恢复状态
+  useEffect(() => {
+    const saved = loadSimState();
+    if (saved) {
+      if (saved.params) setParams(saved.params);
+      if (saved.result) setResult(saved.result);
+    }
+    setHydrated(true);
+  }, []);
+
+  // 参数变更时同步保存到 sessionStorage
+  useEffect(() => {
+    if (hydrated) {
+      saveSimState(params, result);
+    }
+  }, [params, result, hydrated]);
 
   // 生成 EEG 信号
   const generateEEG = useCallback(async () => {
@@ -105,6 +127,7 @@ export default function EegSimulatorPage() {
       }
 
       setResult(data);
+      saveSimState(params, data); // 立即持久化
       setLoading(false);
     } catch (err: any) {
       setError(err.message || t("networkErrorMsg") || "请求失败");
@@ -340,7 +363,7 @@ export default function EegSimulatorPage() {
                 {t("visualization")}
               </h2>
 
-              {!result && !loading && (
+              {!result && !loading && hydrated && (
                 <div className="text-center py-20 text-[var(--color-text-secondary)]">
                   <svg className="mx-auto h-16 w-16 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
