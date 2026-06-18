@@ -2,9 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSyncExternalStore, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { getDisplayInitial } from "@/lib/display-initial";
+import { EEGGenerationManager as gen } from "@/lib/eeg-generation-manager";
 
 interface TopNavProps {
   lang?: string;
@@ -34,13 +37,33 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
 
   const avatarColor = user?.avatar_color || "#3B82F6";
 
+  // ── 后台任务状态 ─────────────────────────────────────────────────
+  const genState = useSyncExternalStore(
+    useCallback((cb: () => void) => gen.subscribe(cb), []),
+    () => gen.getState(),
+    () => gen.getState(),
+  );
+  const isGenRunning = genState.status === "running";
+
   return (
     <header className="h-14 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-[var(--color-border)] flex items-center justify-between px-6 sticky top-0 z-40">
-      {/* Left: logo */}
-      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-        <span className="text-sm font-semibold text-[var(--color-text)]">NeuroAccess</span>
-        <span className="text-xs text-[var(--color-text-secondary)]">v1.5</span>
-      </Link>
+      {/* Left: logo + background task indicator */}
+      <div className="flex items-center gap-4">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <span className="text-sm font-semibold text-[var(--color-text)]">NeuroAccess</span>
+          <span className="text-xs text-[var(--color-text-secondary)]">v1.5</span>
+        </Link>
+
+        {/* Background task indicator */}
+        {isGenRunning && (
+          <Link href="/eeg-simulator"
+            className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-2.5 py-1 text-xs text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span className="hidden sm:inline">EEG</span>
+            <span>{genState.progress}%</span>
+          </Link>
+        )}
+      </div>
 
       {/* Right: user avatar */}
       <div>
