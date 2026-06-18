@@ -85,10 +85,48 @@ export function useAnalysis() {
   return ctx;
 }
 
+// ── sessionStorage persist (layout persists, but dashboard remounts) ──
+const FILES_CACHE_KEY = "neuroaccess-files-v2";
+
+function serializeFiles(files: FileJob[]): string {
+  const meta = {
+    savedAt: Date.now(),
+    items: files.map(f => ({
+      id: f.id, name: f.name, size: f.size, status: f.status,
+      result: f.result || null, eegData: f.eegData || null,
+      error: f.error || null,
+    })),
+  };
+  try { return JSON.stringify(meta); } catch { return '{"savedAt":0,"items":[]}'; }
+}
+
+function deserializeFiles(json: string): FileJob[] {
+  try {
+    const meta = JSON.parse(json);
+    if (!meta?.items || !Array.isArray(meta.items)) return [];
+    // Only restore if saved within last 30 min (prevent stale data)
+    if (Date.now() - (meta.savedAt || 0) > 30 * 60 * 1000) return [];
+    return meta.items.map((m: any) => ({
+      id: m.id, name: m.name, size: m.size || 0, status: m.status || "pending",
+      file: new File([], m.name || "unknown.edf"),
+      result: m.result || null, eegData: m.eegData || null,
+      error: m.error || null,
+    }));
+  } catch { return []; }
+}
+
 // ── Provider ────────────────────────────────────────────────────────
 export function AnalysisProvider({ children }: { children: ReactNode }) {
   const { lang, t } = useLang();
-  const [files, setFiles] = useState<FileJob[]>([]);
+  const [files, setFiles] = useState<FileJob[]>(() => {
+    // Try to load from sessionStorage on initial mount (SSR-safe with lazy init)
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = sessionStorage.getItem(FILES_CACHE_KEY);
+      if (raw) return deserializeFiles(raw);
+    } catch {}
+    return [];
+  });
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [expandId, setExpandId] = useState<string | null>(null);
@@ -96,6 +134,11 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const shouldPauseRef = useRef(false);
   const startAnalysisRef = useRef<(() => void) | null>(null);
   const runIdRef = useRef(0);
+
+  // Persist files to sessionStorage whenever they change
+  useEffect(() => {
+    try { sessionStorage.setItem(FILES_CACHE_KEY, serializeFiles(files)); } catch {}
+  }, [files]);
 
   useEffect(() => {
     setFiles((prev) =>
@@ -145,6 +188,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     runningRef.current = false;
     shouldPauseRef.current = false;
     runIdRef.current = 0;
+    try { sessionStorage.removeItem(FILES_CACHE_KEY); } catch {}
   }, []);
 
   const pauseAnalysis = useCallback(() => {

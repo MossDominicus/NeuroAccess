@@ -244,9 +244,13 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
     
     for band_name, (fmin, fmax) in BANDS.items():
         band_mask = (all_freqs >= fmin) & (all_freqs <= fmax)
-        band_power = np.array([
-            float(np.trapz(psd[band_mask], dx=df)) for psd in all_psds
-        ])
+        # NumPy 2.x removed np.trapz → use np.trapezoid with fallback
+        _trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
+        if _trapz is None:
+            # 最终回退：矩形积分求和
+            band_power = np.array([float(np.sum(psd[band_mask]) * df) for psd in all_psds])
+        else:
+            band_power = np.array([float(_trapz(psd[band_mask], dx=df)) for psd in all_psds])
         bandpower[band_name] = band_power.tolist()
         avg = float(np.mean(band_power))
         average_bandpower[band_name] = avg
