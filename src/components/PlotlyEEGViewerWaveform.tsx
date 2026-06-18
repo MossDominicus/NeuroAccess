@@ -1,123 +1,32 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { loadPlotly } from "@/lib/plotly-loader";
+import { useLang } from "@/lib/language-context";
 
 interface Props {
   eegData: any;
   selectedChannels: Set<string>;
 }
 
-export default function PlotlyEEGViewerWaveform({
-  eegData,
-  selectedChannels,
-}: Props) {
-  const plotRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!eegData || !eegData.times || !eegData.channels || !plotRef.current)
-      return;
-
-    loadPlotly().then((Plotly: any) => {
-      if (!plotRef.current) return;
-      const { times, channels, channel_names } = eegData;
-      const plotData: any[] = [];
-
-      // 计算自适应垂直偏移
-      let maxAbs = 1;
-      channel_names.forEach((chName: string) => {
-        if (!selectedChannels.has(chName)) return;
-        const d = channels[chName];
-        if (!d) return;
-        const mx = Math.max(...d.map((v: number) => Math.abs(v)));
-        if (mx > maxAbs) maxAbs = mx;
-      });
-      const CHANNEL_GAP = 1.5;
-      const offsetStep = maxAbs * 2 * CHANNEL_GAP;
-
-      let selIdx = 0;
-      channel_names.forEach((chName: string, idx: number) => {
-        if (!selectedChannels.has(chName)) return;
-        const chData = channels[chName];
-        if (!chData) return;
-        const offset = -selIdx * offsetStep;
-        const yData = chData.map((v: number) => v + offset);
-        selIdx++;
-        plotData.push({
-          x: times,
-          y: yData,
-          type: "scatter",
-          mode: "lines",
-          name: chName,
-          line: { width: 1 },
-          hovertemplate: `%{fullData.name}<br>Time: %{x:.2f}s<br>Amplitude: %{y:.2f}μV<extra></extra>`,
-        });
-      });
-
-      const yTicks: number[] = [];
-      const yTickLabels: string[] = [];
-      selIdx = 0;
-      channel_names.forEach((chName: string, idx: number) => {
-        if (selectedChannels.has(chName)) {
-          yTicks.push(-selIdx * offsetStep);
-          yTickLabels.push(chName);
-          selIdx++;
-        }
-      });
-
-      const isDark = document.documentElement.classList.contains("dark");
-      const layout = {
-        title: {
-          text: `EEG Waveform - ${eegData.file_name}`,
-          font: {
-            size: 16,
-            color: isDark ? "#e5e7eb" : "#111827",
-          },
-        },
-        xaxis: {
-          title: {
-            text: "Time (s)",
-            font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" },
-          },
-          showgrid: true,
-          gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        yaxis: {
-          title: {
-            text: "Channel",
-            font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" },
-          },
-          tickmode: "array" as const,
-          tickvals: yTicks,
-          ticktext: yTickLabels,
-          showgrid: true,
-          gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        plot_bgcolor: isDark ? "transparent" : "#fafafa",
-        paper_bgcolor: "transparent",
-        margin: { t: 50, r: 30, l: 80, b: 50 },
-        showlegend: false,
-        hovermode: "closest" as const,
-        font: { color: isDark ? "#e5e7eb" : "#111827" },
-      };
-
-      const config = {
-        responsive: true,
-        displayModeBar: true,
-        modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d"],
-      };
-
-      Plotly.newPlot(plotRef.current, plotData, layout, config);
-    });
-  }, [eegData, selectedChannels]);
+export default function PlotlyEEGViewerWaveform({ eegData }: Props) {
+  const { t } = useLang();
+  const waveformImage = eegData?.waveform_image || eegData?.waveform?.waveform_image || null;
 
   return (
-    <div
-      className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]"
-      ref={plotRef}
-      style={{ width: "100%", height: "600px" }}
-    />
+    <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
+      <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+        {t("waveformPreviewTitle")}
+      </h3>
+      {waveformImage ? (
+        <img
+          src={`data:image/png;base64,${waveformImage}`}
+          alt={t("waveformPreviewAlt")}
+          className="w-full rounded-xl border border-zinc-800 bg-black"
+        />
+      ) : (
+        <div className="flex items-center justify-center h-[400px] text-zinc-400">
+          {t("noWaveformPreview")}
+        </div>
+      )}
+    </div>
   );
 }

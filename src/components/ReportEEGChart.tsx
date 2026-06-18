@@ -1,246 +1,170 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
 import { useLang } from "@/lib/language-context";
-import { Waves } from "lucide-react";
-import { loadPlotly } from "@/lib/plotly-loader";
+import { Waves, Download, Move, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { useRef, useState, useEffect, useMemo } from "react";
 
 interface ReportEEGChartProps {
   reportFileName: string;
   eegData?: any;
+  analysis?: any;
 }
 
-export default function ReportEEGChart({ reportFileName, eegData: savedEegData }: ReportEEGChartProps) {
-  const { t } = useLang();
-  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(
-    savedEegData ? new Set(savedEegData.channel_names || []) : new Set()
-  );
-  const plotRef = useRef<HTMLDivElement>(null);
-  const plotlyRef = useRef<any>(null);
-  const initializedRef = useRef(false);
-  const moRef = useRef<MutationObserver | null>(null);
-  const noRef = useRef<MutationObserver | null>(null);
-  const cancelledRef = useRef(false);
+// 4 频段固定颜色
+const BAND_COLORS: Record<string, string> = {
+  delta: "#ef4444", // red
+  theta: "#f97316", // orange
+  alpha: "#eab308", // amber/yellow
+  beta:  "#3b82f6", // blue
+};
 
-  const toggleChannel = (ch: string) => {
-    setSelectedChannels((prev) => {
-      const next = new Set(prev);
-      if (next.has(ch)) next.delete(ch);
-      else next.add(ch);
-      return next;
-    });
+const BAND_ORDER = ["delta", "theta", "alpha", "beta"];
+
+export default function ReportEEGChart({ reportFileName, eegData: savedEegData, analysis }: ReportEEGChartProps) {
+  const { t } = useLang();
+
+  const src = analysis || savedEegData;
+  const times: number[] = savedEegData?.times || [];
+  const channels: Record<string, number[]> = savedEegData?.channels || {};
+  const chNames: string[] = Object.keys(channels);
+
+  // ── 频段波形数据（优先，跨通道平均后的 Delta/Theta/Alpha/Beta）─────
+  const bandData = useMemo(() => {
+    const bw = src?.band_waveforms;
+    if (bw && bw.times && bw.times.length > 0 && bw.delta) {
+      return bw; // { times, delta, theta, alpha, beta }
+    }
+    return null;
+  }, [src?.band_waveforms]);
+
+  // hasData: 有通道波形或有频段波形
+  const hasData = (times.length > 0 && chNames.length > 0) || !!bandData;
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [scale, setScale] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isPanMode, setIsPanMode] = useState(false);
+  const dragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const panStart = useRef({ x: 0, y: 0 });
+
+  // Draw canvas — 4 frequency bands with fixed colors
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container || !bandData) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w <= 0 || h <= 0) return;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const bt = bandData.times as number[];
+    const nPts = bt.length;
+    const pxPerPt = w / nPts;
+
+    // ── 4 频段垂直堆叠 ──────────────────────────────────
+    const nBands = 4;
+    const padV = 12;
+    const bandH = (h - padV * 2) / nBands;
+    const padH = 40; // left padding for labels
+
+    // Grid lines per band
+    for (let b = 0; b < nBands; b++) {
+      const baseY = padV + b * bandH;
+      const midY = baseY + bandH / 2;
+      ctx.strokeStyle = "#27272a";
+      ctx.lineWidth = 0.4;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(padH, midY);
+      ctx.lineTo(w, midY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Band labels (left side)
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "11px -apple-system, sans-serif";
+    ctx.textAlign = "right";
+    for (let b = 0; b < nBands; b++) {
+      const baseY = padV + b * bandH;
+      const midY = baseY + bandH / 2;
+      ctx.fillText(BAND_ORDER[b], padH - 8, midY + 4);
+    }
+    ctx.textAlign = "start";
+
+    // Waveforms
+    const dataSpan = 8; // auto-scale: ±4 μV around 0
+    for (let b = 0; b < nBands; b++) {
+      const bandName = BAND_ORDER[b];
+      const vals = bandData[bandName] as number[];
+      if (!vals || vals.length < 2) continue;
+
+      const baseY = padV + b * bandH;
+      const midY = baseY + bandH / 2;
+      const ampScale = bandH / (dataSpan * 2); // map ±dataSpan to band height
+
+      ctx.strokeStyle = BAND_COLORS[bandName];
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+
+      for (let j = 0; j < nPts && j < vals.length; j++) {
+        const x = padH + j * pxPerPt;
+        // vals are cross-channel averages in μV, center at 0
+        const clamped = Math.max(-dataSpan, Math.min(dataSpan, vals[j]));
+        const y = midY - clamped * ampScale;
+        if (j === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }, [bandData]);
+
+  // Mouse panning
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1.01 && !isPanMode) return;
+    dragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    panStart.current = { x: panX, y: panY };
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragging.current) return;
+    setPanX(panStart.current.x + (e.clientX - dragStart.current.x));
+    setPanY(panStart.current.y + (e.clientY - dragStart.current.y));
+  };
+  const onMouseUp = () => { dragging.current = false; };
+
+  // Download
+  const onDownload = () => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const a = document.createElement("a");
+    a.href = c.toDataURL("image/png");
+    a.download = reportFileName + "_waveform.png";
+    a.click();
   };
 
-  // 翻译 key 映射（大小写不敏感）
-  const getTooltipKey = useCallback((rawTitle: string): string | null => {
-    const map: Record<string, string> = {
-      pan: "plotlyPan",
-      "box select": "plotlyBoxSelect",
-      "zoom in": "plotlyZoomIn",
-      "zoom out": "plotlyZoomOut",
-      autoscale: "plotlyAutoscale",
-      "reset axes": "plotlyResetAxes",
-      "download plot as a png": "plotlyDownloadPng",
-      "toggle hover": "plotlyToggleHover",
-      "show closest data on hover": "plotlyToggleHover",
-    };
-    return map[rawTitle.toLowerCase()] ?? null;
-  }, []);
-
-  // 清理所有 tooltip 相关元素，处理 data-title
-  const sanitizeToolbar = useCallback(() => {
-    if (!plotRef.current) return;
-
-    plotRef.current.querySelectorAll(".modebar-btn").forEach((btn: any) => {
-      // 1. 移除原生 title 属性（浏览器 tooltip）
-      btn.removeAttribute("title");
-
-      // 2. 翻译 data-title 为当前语言
-      const raw = btn.getAttribute("data-title") || "";
-      const key = getTooltipKey(raw);
-      if (key) {
-        const translated = t(key);
-        if (translated) {
-          btn.setAttribute("data-title", translated);
-        }
-      }
-
-      // 3. 删除 SVG <title> 元素（另一种原生 tooltip 来源）
-      btn.querySelectorAll("title").forEach((t: any) => t.remove());
-
-      // 4. 删掉 Plotly 的 tooltip div
-      btn.querySelectorAll(".modebar-tooltip").forEach((el: any) => el.remove());
-
-      // 5. 全局也清理一遍
-      document.querySelectorAll(".modebar-tooltip").forEach((el: any) => el.remove());
-    });
-  }, [t, getTooltipKey]);
-
-  // 初始化 Plotly
-  const initPlotly = useCallback(() => {
-    if (initializedRef.current || !savedEegData || !plotRef.current) return;
-    initializedRef.current = true;
-    cancelledRef.current = false;
-
-    loadPlotly().then((Plotly: any) => {
-      plotlyRef.current = Plotly;
-      if (cancelledRef.current || !plotRef.current) return;
-
-      const { times, channels, channel_names } = savedEegData;
-      const plotData: any[] = [];
-
-      // 计算自适应垂直偏移：基于实际数据范围
-      let maxAbs = 1;
-      channel_names.forEach((chName: string) => {
-        if (!selectedChannels.has(chName)) return;
-        const d = channels[chName];
-        if (!d) return;
-        const mx = Math.max(...d.map((v: number) => Math.abs(v)));
-        if (mx > maxAbs) maxAbs = mx;
-      });
-      const CHANNEL_GAP = 1.5; // 通道间间隙倍率
-      const offsetStep = maxAbs * 2 * CHANNEL_GAP;
-
-      channel_names.forEach((chName: string, idx: number) => {
-        if (!selectedChannels.has(chName)) return;
-        const chData = channels[chName];
-        if (!chData) return;
-        const offset = -idx * offsetStep;
-        const yData = chData.map((v: number) => v + offset);
-        plotData.push({
-          x: times,
-          y: yData,
-          type: "scatter",
-          mode: "lines",
-          name: chName,
-          line: { width: 1 },
-          hovertemplate: `${t("hoverTime") || "Time"}: %{x:.2f}${t("timeUnitSec") || "s"}<br>${t("hoverAmplitude") || "Amplitude"}: %{y:.2f}${t("hoverUnit") || "μV"}<extra></extra>`,
-        });
-      });
-
-      const yTicks: number[] = [];
-      const yTickLabels: string[] = [];
-      let selIdx = 0;
-      channel_names.forEach((chName: string, idx: number) => {
-        if (selectedChannels.has(chName)) {
-          yTicks.push(-selIdx * offsetStep);
-          yTickLabels.push(chName);
-          selIdx++;
-        }
-      });
-
-      const isDark = document.documentElement.classList.contains("dark");
-      const layout = {
-        title: {
-          text: `${t("eegWaveformTitle") || "EEG Waveform"} - ${savedEegData.file_name || reportFileName}`,
-          font: { size: 16, color: isDark ? "#e5e7eb" : "#111827" },
-        },
-        xaxis: {
-          title: { text: t("timeSec") || "Time (s)", font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
-          showgrid: true,
-          gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { color: isDark ? "#9ca3af" : "#6b7280" },
-        },
-        yaxis: {
-          title: { text: t("channelAxis") || "Channel", font: { size: 12, color: isDark ? "#9ca3af" : "#6b7280" } },
-          tickmode: "array" as const,
-          tickvals: yTicks,
-          ticktext: yTickLabels,
-          showgrid: true,
-          gridcolor: isDark ? "#374151" : "#e5e7eb",
-          tickfont: { size: 11, color: isDark ? "#9ca3af" : "#6b7280" },
-          automargin: true,
-        },
-        plot_bgcolor: isDark ? "transparent" : "#fafafa",
-        paper_bgcolor: "transparent",
-        margin: { t: 50, r: 30, l: 120, b: 50 },
-        showlegend: false,
-        hovermode: "closest" as const,
-        autosize: true,
-        font: { color: isDark ? "#e5e7eb" : "#111827" },
-      };
-
-      const config = {
-        responsive: true,
-        displayModeBar: true,
-        displaylogo: false,
-        modeBarButtonsToRemove: ["select2d", "lasso2d", "zoom2d", "toggleHover", "resetScale"],
-      };
-
-      // 动态高度
-      const activeChannelCount = yTickLabels.length;
-      const calculatedHeight = Math.min(1200, Math.max(500, activeChannelCount * 22 + 100));
-      if (plotRef.current) {
-        plotRef.current.style.height = `${calculatedHeight}px`;
-      }
-
-      Plotly.newPlot(plotRef.current, plotData, layout, config).then(() => {
-        if (cancelledRef.current || !plotRef.current) return;
-
-        // 强制 resize 确保尺寸正确
-        Plotly.Plots.resize(plotRef.current);
-
-        // 立即清理 toolbar
-        sanitizeToolbar();
-
-        // 持续监听 DOM 变化
-        const mo = new MutationObserver(() => {
-          if (cancelledRef.current) return;
-          sanitizeToolbar();
-        });
-        mo.observe(plotRef.current, { childList: true, subtree: true });
-        moRef.current = mo;
-
-        // 隐藏下载快照通知
-        const hideSnapshot = () => {
-          document.querySelectorAll('.notifier-note, .notifier-note--visible, [class*="notifier"]')
-            .forEach((el: any) => {
-              if (el.textContent?.includes('Snapshot') || el.textContent?.includes('snapshot')) {
-                el.style.display = 'none';
-              }
-            });
-        };
-        const no = new MutationObserver(hideSnapshot);
-        no.observe(document.body, { childList: true, subtree: true });
-        noRef.current = no;
-      });
-    });
-  }, [savedEegData, selectedChannels, reportFileName, t, sanitizeToolbar]);
-
-  // 主 effect：用 requestAnimationFrame 轮询直到容器可见，再初始化 Plotly
-  useEffect(() => {
-    if (!savedEegData || !savedEegData.times || !savedEegData.channels) return;
-    if (!plotRef.current) return;
-
-    cancelledRef.current = false;
-    initializedRef.current = false;
-
-    const waitForVisible = () => {
-      if (cancelledRef.current) return;
-      if (!plotRef.current) return;
-      // offsetParent === null 表示元素或父元素 display: none
-      if (plotRef.current.offsetParent !== null) {
-        initPlotly();
-      } else {
-        requestAnimationFrame(waitForVisible);
-      }
-    };
-    requestAnimationFrame(waitForVisible);
-
-    return () => {
-      cancelledRef.current = true;
-      moRef.current?.disconnect();
-      noRef.current?.disconnect();
-    };
-  }, [savedEegData, selectedChannels, initPlotly]);
-
-  if (!savedEegData) {
+  if (!src && !hasData) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Waves className="h-12 w-12 text-[var(--color-text-secondary)]/50 mb-4" />
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          {t("noEegData") || "该报告未保存 EEG 波形数据"}
-        </p>
+        <p className="text-sm text-[var(--color-text-secondary)]">{t("noEegData")}</p>
       </div>
     );
   }
@@ -248,50 +172,69 @@ export default function ReportEEGChart({ reportFileName, eegData: savedEegData }
   return (
     <div className="space-y-6">
       <div className="bg-[var(--color-surface)] rounded-2xl p-6 shadow-sm border border-[var(--color-border)]">
-        <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">
-          {t("fileInfo") || "File info"}
-        </h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">{t("fileInfo")}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-[var(--color-text-secondary)]">{t("fileName") || "Filename"}:</span>
-            <p className="font-medium text-[var(--color-text)]">{savedEegData.file_name || reportFileName}</p>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">{t("channelCount") || "Channels"}:</span>
-            <p className="font-medium text-[var(--color-text)]">{savedEegData.total_channels}</p>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">{t("samplingRate") || "Sampling rate"}:</span>
-            <p className="font-medium text-[var(--color-text)]">{savedEegData.sampling_rate} Hz</p>
-          </div>
-          <div>
-            <span className="text-[var(--color-text-secondary)]">{t("duration") || "Duration"}:</span>
-            <p className="font-medium text-[var(--color-text)]">{savedEegData.duration_seconds} {t("timeUnitSec") || "s"}</p>
-          </div>
+          <div><span className="text-[var(--color-text-secondary)]">{t("fileNameEeg")}:</span><p className="font-medium text-[var(--color-text)] truncate">{src?.file_name || reportFileName}</p></div>
+          <div><span className="text-[var(--color-text-secondary)]">{t("channelCountEeg")}:</span><p className="font-medium text-[var(--color-text)]">{src?.channel_count || savedEegData?.total_channels || chNames.length}</p></div>
+          <div><span className="text-[var(--color-text-secondary)]">{t("samplingRateEeg")}:</span><p className="font-medium text-[var(--color-text)]">{src?.sampling_rate || savedEegData?.sampling_rate}</p></div>
+          <div><span className="text-[var(--color-text-secondary)]">{t("totalDurationEeg")}:</span><p className="font-medium text-[var(--color-text)]">{src?.duration || savedEegData?.duration_seconds} s</p></div>
         </div>
       </div>
 
-      <div className="bg-[var(--color-surface)] rounded-2xl p-6 shadow-sm border border-[var(--color-border)]">
-        <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">{t("channelSelect") || "Select channels"}</h3>
-        <div className="flex flex-wrap gap-2">
-          {savedEegData.channel_names?.map((ch: string) => (
-            <button
-              key={ch}
-              onClick={() => toggleChannel(ch)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                selectedChannels.has(ch)
-                  ? "bg-blue-600 text-white dark:bg-blue-500"
-                  : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]"
-              }`}
+      <div className="bg-[var(--color-surface)] rounded-2xl shadow-sm border border-[var(--color-border)] overflow-hidden">
+        <div className="flex items-center justify-between px-4 sm:px-5 pt-3 sm:pt-4 pb-1 sm:pb-2">
+          <h3 className="text-sm sm:text-base font-semibold text-[var(--color-text)]">{t("waveformPreviewTitle")}</h3>
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <button onClick={onDownload} title={t("plotlyDownloadPng")} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)] hover:text-[var(--color-text)] transition-colors"><Download size={16} /><span className="hidden sm:inline">{t("plotlyDownloadPng")}</span></button>
+            <button onClick={() => setIsPanMode(v => !v)} title={t("plotlyPan")} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${isPanMode ? "bg-blue-600 text-white" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)] hover:text-[var(--color-text)]"}`}><Move size={16} /><span className="hidden sm:inline">{t("plotlyPan")}</span></button>
+            <button onClick={() => setScale(s => Math.min(s * 1.3, 8))} title={t("plotlyZoomIn")} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)] hover:text-[var(--color-text)] transition-colors"><ZoomIn size={16} /><span className="hidden sm:inline">{t("plotlyZoomIn")}</span></button>
+            <button onClick={() => setScale(s => Math.max(s / 1.3, 0.25))} title={t("plotlyZoomOut")} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)] hover:text-[var(--color-text)] transition-colors"><ZoomOut size={16} /><span className="hidden sm:inline">{t("plotlyZoomOut")}</span></button>
+            <button onClick={() => { setScale(1); setPanX(0); setPanY(0); }} title={t("plotlyResetAxes")} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)] hover:text-[var(--color-text)] transition-colors"><RotateCcw size={16} /><span className="hidden sm:inline">{t("plotlyResetAxes")}</span></button>
+          </div>
+        </div>
+
+        {bandData ? (
+          <>
+            {/* 频段颜色图例 */}
+            <div className="px-4 sm:px-5 pb-2">
+              <p className="text-xs text-[var(--color-text-secondary)]">{t("bandColorLegend")}</p>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {BAND_ORDER.map((band) => (
+                  <span key={band} className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                    <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: BAND_COLORS[band] }} />
+                    {t(band + "Band")}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div
+              ref={containerRef}
+              className={`relative w-full bg-[#0a0a0a] overflow-hidden ${isPanMode || scale > 1.01 ? "cursor-grab" : "cursor-default"}`}
+              style={{ height: "min(320px, 50vh)" }}
+              onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
             >
-              {ch}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm border border-[var(--color-border)]">
-        <div ref={plotRef} style={{ width: "100%", minHeight: "500px" }} />
+              <canvas
+                ref={canvasRef}
+                className="block absolute top-0 left-0"
+                style={{
+                  transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`,
+                  transformOrigin: "0 0",
+                  transition: dragging.current ? "none" : "transform 0.1s ease-out",
+                }}
+              />
+              {Math.abs(scale - 1) > 0.01 && (
+                <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-1 rounded-md font-mono backdrop-blur-sm z-10">
+                  {Math.round(scale * 100)}%
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-[320px] text-zinc-500 gap-2">
+            <Waves className="h-10 w-10 opacity-40" /><p className="text-sm">{t("noBandWaveform")}</p>
+          </div>
+        )}
       </div>
     </div>
   );

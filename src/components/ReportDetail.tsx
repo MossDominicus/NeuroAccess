@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { StoredReport } from "@/lib/reports-storage";
 import AIExplanation from "@/components/AIExplanation";
+import FeedbackPanel from "@/components/FeedbackPanel";
 import {
   FileText, Activity, BarChart3, Brain, TrendingUp,
   Shield, AlertTriangle, CheckCircle, XCircle, Zap,
@@ -41,38 +42,54 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
   const [exporting, setExporting] = useState(false);
   const analysis = report.analysis || {};
 
+  const handleExportPDF = useCallback(async () => {
+    setExporting(true);
+    try {
+      // @ts-ignore: dom-to-image-more has no type declarations
+      const domtoimage = (await import("dom-to-image-more")).default;
+      const jsPDF = (await import("jspdf")).default;
+      const reportEl = document.getElementById("report-detail-content");
+      if (!reportEl) throw new Error("Report element not found");
+      const dataUrl = await domtoimage.toPng(reportEl, {
+        scale: 1.5, bgcolor: "#0a0e1a", quality: 1,
+      });
+      const getSize = (): Promise<{w: number, h: number}> => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.width, h: img.height });
+        img.src = dataUrl;
+      });
+      const { w, h } = await getSize();
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgWidth = pageWidth - 20;
+      const imgHeight = (h * imgWidth) / w;
+      let heightLeft = imgHeight;
+      let position = 10;
+      pdf.addImage(dataUrl, "PNG", 10, position, imgWidth, imgHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight() - 20;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + 10;
+        pdf.addPage();
+        pdf.addImage(dataUrl, "PNG", 10, position, imgWidth, imgHeight);
+        heightLeft -= pdf.internal.pageSize.getHeight() - 20;
+      }
+      pdf.save(`${report.fileName.replace(/\.[^.]+$/, "")}_NeuroAccess_Report.pdf`);
+    } catch (err: any) {
+      console.error("PDF export failed:", err);
+      alert("PDF export failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setExporting(false);
+    }
+  }, [report]);
+
   // 质量卡片的注释文本（7 语言）
   const qualityDesc = (key: string): string => {
-    const map: Record<string, Record<string, string>> = {
-      overallScore: {
-        zh: "基于噪声、伪影和数据完整性的综合评分",
-        en: "Overall score based on noise, artifacts, and data integrity",
-        es: "Puntuación general basada en ruido, artefactos e integridad de datos",
-        fr: "Score global basé sur le bruit, les artefacts et l'intégrité des données",
-        de: "Gesamtbewertung basierend auf Rauschen, Artefakten und Datenintegrität",
-        ja: "ノイズ、アーティファクト、データ整合性に基づく総合スコア",
-        ko: "노이즈, 아티팩트, 데이터 무결성을 기반으로 한 종합 점수",
-      },
-      noisyChannels: {
-        zh: "噪声过多的通道可能影响分析准确性",
-        en: "Channels with excessive noise that may affect accuracy",
-        es: "Canales con ruido excesivo que pueden afectar la precisión",
-        fr: "Canaux avec bruit excessif pouvant affecter la précision",
-        de: "Kanäle mit übermäßigem Rauschen, die die Genauigkeit beeinträchtigen können",
-        ja: "ノイズが多いチャンネルは精度に影響する可能性があります",
-        ko: "노이즈가 많은 채널은 정확도에 영향을 줄 수 있습니다",
-      },
-      blinks: {
-        zh: "检测到眨眼或运动伪影",
-        en: "Detected eye blinks or movement artifacts",
-        es: "Parpadeos o artefactos de movimiento detectados",
-        fr: "Clignements d'yeux ou artefacts de mouvement détectés",
-        de: "Augenblinzeln oder Bewegungsartefakte erkannt",
-        ja: "まばたきまたは動きアーティファクトが検出されました",
-        ko: "눈 깜빡임 또는 움직임 아티팩트 감지됨",
-      },
+    const map: Record<string, string> = {
+      overallScore: t("signalQualityTooltip") || "",
+      noisyChannels: t("noiseArtifactTooltip") || "",
+      blinks: t("eogArtifactTooltip") || "",
     };
-    return map[key]?.[lang] || map[key]?.en || key;
+    return map[key] || "";
   };
 
   const handleExportHTML = useCallback(async () => {
@@ -188,14 +205,14 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
   const bandpowerPercent = (analysis as any).bandpower_percent || (freqAnalysis as any).bandpower_percent || {};
 
   return (
-    <div id="report-detail-content" className="mx-auto max-w-4xl space-y-8 px-6 py-8">
+    <div id="report-detail-content" className="mx-auto max-w-4xl space-y-6 sm:space-y-8 px-4 sm:px-6 py-4 sm:py-8 pb-[env(safe-area-inset-bottom,16px)]">
       {/* ── 页面标题 ──────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-text)]">
             {report.fileName}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          <p className="mt-1 text-xs sm:text-sm text-[var(--color-text-secondary)]">
             {report.date} · {report.mode}
           </p>
         </div>
@@ -219,12 +236,11 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           </div>
           <h2 className="text-base font-bold text-[var(--color-text)]">{t("eegOverview")}</h2>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <OverviewItem label={t("fileName")} value={report.fileName || overview.file_name} />
           <OverviewItem label={t("duration")} value={overview.duration || "-"} />
           <OverviewItem label={t("samplingRate")} value={overview.sampling_rate ? `${overview.sampling_rate} Hz` : "-"} />
           <OverviewItem label={t("channelCount")} value={overview.channel_count || "-"} />
-          <OverviewItem label={t("channelNames")} value={Array.isArray(overview.channel_names) ? overview.channel_names.join(", ") : "-"} />
         </div>
       </section>
 
@@ -312,7 +328,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         </div>
         {/* Bandpower 百分比概览 */}
         {Object.keys(bandpowerPercent).length > 0 && (
-          <div className="mb-6 grid grid-cols-4 gap-3">
+          <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { key: "delta", bandKey: "bandDelta", color: "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400" },
               { key: "theta", bandKey: "bandTheta", color: "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400" },
@@ -430,6 +446,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
       )}
 
       {/* ── Section 9: Understanding Feedback ─────────── */}
+      <FeedbackPanel reportId={report.id} />
     </div>
   );
 }

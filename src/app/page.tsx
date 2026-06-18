@@ -242,7 +242,25 @@ function DashboardInner() {
     handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis,
   } = useAnalysis();
 
-  // ── AI 状态（2次连续失败才显示离线，避免后端重启时误报）─────────
+  // ── 自动展开最近的活动文件（页面切换回来时显示当前进度）─────────
+  useEffect(() => {
+    // 优先展开正在分析的文件
+    const active = files.find(f =>
+      f.status === "reading" || f.status === "computing" || f.status === "explaining"
+    );
+    if (active) {
+      setExpandId(active.id);
+      return;
+    }
+    // 其次展开最近完成的文件
+    const completed = [...files].reverse().find(f => f.status === "completed" || f.status === "analysisReady");
+    if (completed) {
+      setExpandId(completed.id);
+      return;
+    }
+    // 都不存在则折叠
+    setExpandId(null);
+  }, [files, setExpandId]);
   const [aiStatus, setAiStatus] = useState<{ online: boolean; model: string; mode: string } | null>(null);
   const aiFailCountRef = useRef(0);
   useEffect(() => {

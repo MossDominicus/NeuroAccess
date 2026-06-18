@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { X, FileText, Shield, AlertTriangle } from "lucide-react";
-import { privacySections, termsSections, disclaimerSections } from "@/lib/legal-content";
+import { Shield, ExternalLink } from "lucide-react";
 
 export default function PostLoginModals() {
   const { t, lang } = useLang();
@@ -20,7 +20,6 @@ export default function PostLoginModals() {
   const [usernameLoading, setUsernameLoading] = useState(false);
   const [termsLoading, setTermsLoading] = useState(false);
   const [termsError, setTermsError] = useState("");
-  const [showContent, setShowContent] = useState<"privacy" | "terms" | "disclaimer" | null>(null);
 
   // Check on mount and when user/token changes
   useEffect(() => {
@@ -138,17 +137,15 @@ export default function PostLoginModals() {
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
                     {t("agreePrivacy") || "我已阅读并同意"}{" "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowContent("privacy");
-                      }}
-                      className="text-blue-600 dark:text-blue-400 hover:underline font-medium bg-transparent border-none cursor-pointer p-0"
+                    <Link
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
                       {t("privacyPolicy") || "隐私政策"}
-                    </button>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
                   </span>
                 </div>
               </label>
@@ -164,17 +161,15 @@ export default function PostLoginModals() {
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
                     {t("agreeTerms") || "我已阅读并同意"}{" "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowContent("terms");
-                      }}
-                      className="text-blue-600 dark:text-blue-400 hover:underline font-medium bg-transparent border-none cursor-pointer p-0"
+                    <Link
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
                       {t("termsOfService") || "服务条款"}
-                    </button>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
                   </span>
                 </div>
               </label>
@@ -190,17 +185,15 @@ export default function PostLoginModals() {
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
                     {t("agreeDisclaimer") || "我已阅读并同意"}{" "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowContent("disclaimer");
-                      }}
-                      className="text-blue-600 dark:text-blue-400 hover:underline font-medium bg-transparent border-none cursor-pointer p-0"
+                    <Link
+                      href="/disclaimer"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
                       {t("disclaimer") || "免责声明"}
-                    </button>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
                   </span>
                 </div>
               </label>
@@ -289,81 +282,7 @@ export default function PostLoginModals() {
         </div>
       )}
 
-      {/* Content viewer overlay */}
-      {showContent && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowContent(null)}>
-          <div className="w-full max-w-lg mx-4 max-h-[80vh] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--color-text)]">
-                {showContent === "privacy" && (t("privacyPolicy") || "隐私政策")}
-                {showContent === "terms" && (t("termsOfService") || "服务条款")}
-                {showContent === "disclaimer" && (t("disclaimer") || "免责声明")}
-              </h3>
-              <button
-                onClick={() => setShowContent(null)}
-                className="p-1.5 rounded-lg hover:bg-[var(--color-bg)] text-[var(--color-text-secondary)]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto text-sm text-[var(--color-text)] leading-relaxed space-y-3">
-              {showContent === "privacy" && (
-                <div className="space-y-6">
-                  {(privacySections as any)[lang]?.map((section: any, i: number) => (
-                    <div key={i}>
-                      <h4 className="mb-2 text-base font-semibold text-[var(--color-text)]">
-                        {i + 1}. {section.title}
-                      </h4>
-                      <p className="text-[var(--color-text-secondary)] leading-relaxed">
-                        {section.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {showContent === "terms" && (
-                <div className="space-y-6">
-                  {(termsSections as any)[lang]?.map((section: any, i: number) => (
-                    <div key={i}>
-                      <h4 className="mb-2 text-base font-semibold text-[var(--color-text)]">
-                        {i + 1}. {section.title}
-                      </h4>
-                      <p className="text-[var(--color-text-secondary)] leading-relaxed">
-                        {section.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {showContent === "disclaimer" && (
-                <div className="space-y-6">
-                  {(disclaimerSections as any)[lang]?.map((section: any, i: number) => (
-                    <div key={i}>
-                      <h4 className="mb-2 text-base font-semibold text-[var(--color-text)]">
-                        {i + 1}. {section.title}
-                      </h4>
-                      <p className="text-[var(--color-text-secondary)] leading-relaxed">
-                        {section.content}
-                      </p>
-                    </div>
-                  ))}
-                  <div className="pt-2 border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]">
-                    {t("disclaimerAgreement") || '点击"我已了解并同意"即表示您理解并同意上述条款。'}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-[var(--color-border)] flex justify-end">
-              <button
-                onClick={() => setShowContent(null)}
-                className="py-2 px-5 rounded-xl bg-[var(--color-primary)] text-[var(--color-bg)] text-sm font-semibold hover:opacity-90 transition-all"
-              >
-                {t("close") || "关闭"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Content viewer removed — links now navigate to actual pages for consistency with footer */}
     </>
   );
 }

@@ -423,7 +423,7 @@ export default function ReportsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.05 }}
     >
-      <section className="mx-auto max-w-6xl px-5 py-8">
+      <section className="mx-auto max-w-6xl px-3 sm:px-5 py-4 sm:py-8 pb-[env(safe-area-inset-bottom,16px)]">
         {/* 标题栏 */}
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -477,9 +477,9 @@ export default function ReportsPage() {
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]/70">{t("noReportsDesc")}</p>
           </motion.div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-            {/* 表头 */}
-            <div className="grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)]">
+          <div className="overflow-x-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+            {/* 表头 — 桌面端显示，移动端隐藏 */}
+            <div className="hidden sm:grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)]">
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -503,8 +503,50 @@ export default function ReportsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                   transition={{ delay: i * 0.0125 }}
-                  className="grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3.5 border-t border-[var(--color-border)] hover:bg-[var(--color-bg)]/50 transition-colors items-center"
+                  className="sm:grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3.5 border-t border-[var(--color-border)] hover:bg-[var(--color-bg)]/50 transition-colors items-center"
                 >
+                  {/* 移动端：卡片式布局 */}
+                  <div className="sm:hidden flex flex-col gap-2 w-full">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(report.id)}
+                          onChange={(e) => { e.stopPropagation(); toggleSelect(report.id); }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 cursor-pointer accent-[var(--color-primary)] flex-shrink-0"
+                        />
+                        <FileText className="h-4 w-4 flex-shrink-0 text-[var(--color-text-secondary)]" />
+                        <span className="truncate text-sm font-mono">{report.fileName}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
+                        <span className={`text-xs font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                          {Number(report.quality).toFixed(0)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pl-8">
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                        <Calendar className="h-3 w-3" />
+                        {report.date}
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <Link href={`/reports/${report.id}`} onClick={(e) => e.stopPropagation()} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]" title={t("viewDetail")}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Link>
+                        <button onClick={(e) => { e.stopPropagation(); handleExport(report); }} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]" title={t("exportPdf")}>
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(report); }} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-red-50 hover:text-red-500 dark:text-red-400" title={t("delete")}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 桌面端：表格式布局 */}
+                  <div className="hidden sm:contents">
                   <input
                     type="checkbox"
                     checked={selected.includes(report.id)}
@@ -523,32 +565,20 @@ export default function ReportsPage() {
                   <div className="flex items-center gap-1.5">
                     <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
                     <span className={`text-sm font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                      {Number(report.quality).toFixed(2)}
+                      {Number(report.quality).toFixed(0)}
                     </span>
                   </div>
                   <div className="flex items-center justify-end gap-1">
-                    <Link
-                      href={`/reports/${report.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] inline-flex"
-                      title={t("viewDetail")}
-                    >
+                    <Link href={`/reports/${report.id}`} onClick={(e) => e.stopPropagation()} className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] inline-flex" title={t("viewDetail")}>
                       <Eye className="h-4 w-4" />
                     </Link>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleExport(report); }}
-                      className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
-                      title={t("exportPdf")}
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); handleExport(report); }} className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]" title={t("exportPdf")}>
                       <Download className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(report); }}
-                      className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-red-50 hover:text-red-500 dark:text-red-400"
-                      title={t("delete")}
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(report); }} className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-red-50 hover:text-red-500 dark:text-red-400" title={t("delete")}>
                       <Trash2 className="h-4 w-4" />
                     </button>
+                  </div>
                   </div>
                 </motion.div>
               ))}

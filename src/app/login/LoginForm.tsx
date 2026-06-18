@@ -57,7 +57,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.05 }}
     >
-      <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]">
+      <div className="w-full max-w-md p-5 sm:p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] mx-3 sm:mx-auto">
         {/* 网站介绍 */}
         <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 text-xs leading-relaxed text-[var(--color-text)]">
           {tf("siteIntro", "")}

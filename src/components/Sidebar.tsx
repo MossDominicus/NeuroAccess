@@ -53,7 +53,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col transition-[width] duration-300 ${
+      className={`bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col transition-[width] duration-300 hidden lg:flex ${
         collapsed ? "w-[68px]" : "w-[240px]"
       }`}
     >

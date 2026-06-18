@@ -118,15 +118,7 @@ function deserializeFiles(json: string): FileJob[] {
 // ── Provider ────────────────────────────────────────────────────────
 export function AnalysisProvider({ children }: { children: ReactNode }) {
   const { lang, t } = useLang();
-  const [files, setFiles] = useState<FileJob[]>(() => {
-    // Try to load from sessionStorage on initial mount (SSR-safe with lazy init)
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = sessionStorage.getItem(FILES_CACHE_KEY);
-      if (raw) return deserializeFiles(raw);
-    } catch {}
-    return [];
-  });
+  const [files, setFiles] = useState<FileJob[]>([]);
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [expandId, setExpandId] = useState<string | null>(null);

@@ -317,7 +317,7 @@ export default function AccountPage() {
         </span>
       </header>
 
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6 pb-[env(safe-area-inset-bottom,16px)]">
         {/* 1. 编辑资料 */}
         <section className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--color-border)]">

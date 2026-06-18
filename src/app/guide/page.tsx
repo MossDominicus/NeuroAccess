@@ -158,7 +158,7 @@ export default function GuidePage() {
 
   return (
     <div
-      className="mx-auto max-w-4xl space-y-8 px-6 py-8"
+      className="mx-auto max-w-4xl space-y-6 sm:space-y-8 px-4 sm:px-6 py-4 sm:py-8 pb-[env(safe-area-inset-bottom,16px)]"
     >
       {/* 标题区 */}
       <div className="flex items-center gap-4">

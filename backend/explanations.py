@@ -57,7 +57,7 @@ def call_openrouter(prompt: str, timeout: int = 30) -> Dict[str, Any]:
             json={
                 "model": OPENROUTER_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 700,
+                "max_tokens": 400,
                 "temperature": 0.15,
             },
             timeout=(10, timeout),
@@ -178,7 +178,9 @@ def template_research(a: Dict, lang: str) -> str:
 
 
 def _build_prompt(a: Dict, level: str, lang: str) -> str:
-    payload      = json.dumps(to_jsonable(a), ensure_ascii=False, indent=2)
+    # Strip large waveform data before sending to AI — the model only needs derived metrics
+    prompt_data = {k: v for k, v in a.items() if k not in ("waveform_preview", "waveform_image")}
+    payload      = json.dumps(to_jsonable(prompt_data), ensure_ascii=False, indent=2)
     output_lang  = LANG_NAME_MAP.get(lang, "English")
     boundary     = (
         "CRITICAL BOUNDARIES - You MUST follow these rules:\n"
@@ -256,25 +258,24 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
 
 
 def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str, Dict[str, str]]:
-    """为分析结果生成指定语言 + 英文双层解释（并行）"""
+    """为分析结果生成指定语言的三层解释；英文直接用模板（省掉另外 3 次 OpenRouter 调用）"""
     results: Dict[str, Dict[str, str]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_primary = executor.submit(_generate_explanations_for_lang, analysis, primary_lang)
-        future_en = executor.submit(_generate_explanations_for_lang, analysis, "en")
-        try:
-            results[primary_lang] = future_primary.result(timeout=30)
-        except Exception:
-            results[primary_lang] = {
-                "beginner": template_beginner(analysis, primary_lang),
-                "student": template_student(analysis, primary_lang),
-                "research": template_research(analysis, primary_lang),
-            }
-        try:
-            results["en"] = future_en.result(timeout=30)
-        except Exception:
-            results["en"] = {
-                "beginner": template_beginner(analysis, "en"),
-                "student": template_student(analysis, "en"),
-                "research": template_research(analysis, "en"),
-            }
+
+    # 主语言：调用 OpenRouter（3 路并行）
+    try:
+        results[primary_lang] = _generate_explanations_for_lang(analysis, primary_lang)
+    except Exception:
+        results[primary_lang] = {
+            "beginner": template_beginner(analysis, primary_lang),
+            "student": template_student(analysis, primary_lang),
+            "research": template_research(analysis, primary_lang),
+        }
+
+    # 英文：只用模板（避免额外 API 开销，分析加速 ~15s）
+    results["en"] = {
+        "beginner": template_beginner(analysis, "en"),
+        "student": template_student(analysis, "en"),
+        "research": template_research(analysis, "en"),
+    }
+
     return results

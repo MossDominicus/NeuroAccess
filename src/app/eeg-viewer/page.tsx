@@ -130,7 +130,7 @@ export default function EEGViewerPage() {
           <input
             id="eeg-file-input"
             type="file"
-            accept=".edf,.bdf,.gdf"
+            accept=".edf"
             onChange={handleFileChange}
             className="hidden"
           />

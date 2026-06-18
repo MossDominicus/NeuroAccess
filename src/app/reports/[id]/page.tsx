@@ -5,7 +5,7 @@ import nextDynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, FileX, FileText, Waves } from "lucide-react";
+import { ArrowLeft, FileX, FileText, Waves, AlertTriangle } from "lucide-react";
 import { StoredReport, getReportById } from "@/lib/reports-storage";
 import { useLang } from "@/lib/language-context";
 import ReportDetail from "@/components/ReportDetail";
@@ -16,6 +16,24 @@ const ReportEEGChart = nextDynamic(() => import("@/components/ReportEEGChart"), 
 });
 
 type Tab = "analysis" | "eeg";
+
+// ── Error Boundary: 组件渲染异常不导致整页白屏 ──────────────────
+import { Component, type ReactNode } from "react";
+class ReportErrorBoundary extends Component<{ children: ReactNode; fallback: string }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-500 mb-3" />
+          <p className="text-sm text-[var(--color-text-secondary)]">{this.props.fallback}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -123,10 +141,14 @@ export default function ReportDetailPage() {
       {/* Tab content — both mounted, one hidden to preserve state */}
       <div className="p-6">
         <div className={activeTab === "analysis" ? "block" : "hidden"}>
-          <ReportDetail report={report} />
+          <ReportErrorBoundary fallback={t("reportLoadError") || "Failed to load report section"}>
+            <ReportDetail report={report} />
+          </ReportErrorBoundary>
         </div>
         <div className={activeTab === "eeg" ? "block" : "hidden"}>
-          <ReportEEGChart reportFileName={report.fileName} eegData={report.eegData} />
+          <ReportErrorBoundary fallback={t("noBandWaveform") || "No waveform data"}>
+            <ReportEEGChart reportFileName={report.fileName} eegData={report.eegData} analysis={report.analysis} />
+          </ReportErrorBoundary>
         </div>
       </div>
     </motion.div>

@@ -935,7 +935,7 @@ export default function CasesPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.05 }}
     >
-      <section className="max-w-6xl mx-auto px-5 py-8">
+      <section className="max-w-6xl mx-auto px-3 sm:px-5 py-4 sm:py-8 pb-[env(safe-area-inset-bottom,16px)]">
         {/* 标题 */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tight">{t("casesTitle")}</h1>

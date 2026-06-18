@@ -36,34 +36,81 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+// ── 同意条款版本 ──────────────────────────────────────────────
+// 以后更新条款时改为 "v2"，所有用户会重新看到同意弹窗
+const CONSENT_VERSION = "v1";
+const CONSENT_STORAGE_KEY = "neuroaccess-consent-v1";
+
+interface ConsentRecord {
+  accepted: boolean;
+  acceptedAt: string;
+  version: string;
+}
+
+/** 从 localStorage 读取同���记录（兼容版本检查） */
+function loadConsent(): boolean {
+  try {
+    const raw = localStorage.getItem(CONSENT_STORAGE_KEY);
+    if (!raw) return false;
+    const record: ConsentRecord = JSON.parse(raw);
+    return record.accepted === true && record.version === CONSENT_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+/** 保存同意记录到 localStorage */
+function saveConsent(): void {
+  try {
+    const record: ConsentRecord = {
+      accepted: true,
+      acceptedAt: new Date().toISOString(),
+      version: CONSENT_VERSION,
+    };
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(record));
+  } catch {
+    // localStorage 不可用时忽略
+  }
+}
+
+/** 清除同意记录 */
+function clearConsent(): void {
+  try {
+    localStorage.removeItem(CONSENT_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [needsUsernameSetup, setNeedsUsernameSetup] = useState(false);
-  const { t } = useLang();
+
+  // termsAccepted 从 localStorage consent 记录初始化，不依赖后端
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
-    // Load token and terms state from localStorage
+    // 加载 token、用户、同意记录
     try {
       const savedToken = localStorage.getItem("neuroaccess-token");
       const savedUser = localStorage.getItem("neuroaccess-user");
-      const savedTerms = localStorage.getItem("neuroaccess-terms-accepted");
       if (savedToken && savedUser) {
         const parsedUser = JSON.parse(savedUser);
         setToken(savedToken);
         setUser(parsedUser);
-        // Restore terms accepted state so popup doesn't reappear on refresh
-        if (savedTerms === "true") {
-          setTermsAccepted(true);
-        }
+      }
+      // 检查本地 consent 记录（页面刷新时不显示弹窗）
+      if (loadConsent()) {
+        setTermsAccepted(true);
       }
     } catch {}
     setLoading(false);
   }, []);
 
   const tf = (key: string, fb: string) => { const v = t(key); return v === key ? fb : v; };
+  const { t } = useLang();
 
   const login = async (usernameOrEmail: string, password: string): Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
     try {
@@ -78,22 +125,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        // 同步写 cookie，供 middleware 读取
         document.cookie = `neuroaccess-token=${data.token}; path=/; max-age=2592000`;
-        // Handle terms acceptance and username setup flags
-        const ta = !!data.terms_accepted;
+
         const nu = !!data.needs_username_setup;
         setNeedsUsernameSetup(nu);
-        // termsAccepted: 仅首次注册时要求勾选，后续登录不再重置
-        // 如果 localStorage 已标记为同意，保持 true
-        const savedTerms = localStorage.getItem("neuroaccess-terms-accepted");
-        if (savedTerms === "true") {
+
+        // 本地同意记录 > 后端记录（用户离线同意过就算数）
+        if (loadConsent()) {
+          setTermsAccepted(true);
+        } else if (data.terms_accepted) {
+          // 后端说已同意但本地无记录 → 同步到本地
+          saveConsent();
           setTermsAccepted(true);
         } else {
-          setTermsAccepted(ta);
-          localStorage.setItem("neuroaccess-terms-accepted", ta ? "true" : "false");
+          setTermsAccepted(false);
         }
-        return { success: true, termsAccepted: ta, needsUsernameSetup: nu };
+
+        return { success: true, termsAccepted: !!data.terms_accepted, needsUsernameSetup: nu };
       }
       return { success: false, error: data.error || tf("loginFailed", "登录失败") };
     } catch (e: any) {
@@ -115,10 +163,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
         document.cookie = `neuroaccess-token=${data.token}; path=/; max-age=2592000`;
-        // New registered users also need to accept terms
+
+        // 新注册用户需要同意条款
         setTermsAccepted(false);
         setNeedsUsernameSetup(false);
-        localStorage.removeItem("neuroaccess-terms-accepted");
+        // 如果用户以前注册过并且同意了（比如重注册），清除旧的 consent
+        // 但不影响当前这个全新注册流程
+        clearConsent();
         return { success: true };
       }
       return { success: false, error: data.error || tf("registerFailed", "注册失败") };
@@ -128,21 +179,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptTerms = async (): Promise<boolean> => {
-    if (!token) return false;
+    // 1. 始终保存到 localStorage（离线场景也生效）
+    saveConsent();
+    setTermsAccepted(true);
+
+    // 2. 同时同步到后端（接收失败不影响本地）
+    if (!token) return true;
     try {
       const resp = await fetch(`${API_BASE}/api/auth/accept-terms`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await resp.json();
-      if (data.success) {
-        setTermsAccepted(true);
-        localStorage.setItem("neuroaccess-terms-accepted", "true");
+      if (resp.status === 401) {
+        // token 过期 → 不清除本地 consent，只是静默忽略后端同步
         return true;
       }
-      return false;
+      const data = await resp.json();
+      return data.success !== false; // 后端失败也不影响本地
     } catch {
-      return false;
+      return true; // 网络错误也不影响本地
     }
   };
 
@@ -292,14 +347,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const result = await resp.json();
       if (result.success) {
-        // 账号已删除，清除本地状态
         setToken(null);
         setUser(null);
         setTermsAccepted(false);
         setNeedsUsernameSetup(false);
         localStorage.removeItem("neuroaccess-token");
         localStorage.removeItem("neuroaccess-user");
-        localStorage.removeItem("neuroaccess-terms-accepted");
+        // 删除账号时清除同意记录
+        clearConsent();
         return { success: true };
       }
       return { success: false, error: result.error || tf("deleteAccountFailed", "删除失败") };
@@ -315,8 +370,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsUsernameSetup(false);
     localStorage.removeItem("neuroaccess-token");
     localStorage.removeItem("neuroaccess-user");
-    localStorage.removeItem("neuroaccess-terms-accepted");
-    // 同步清除 cookie
+    // 注销时 NOT 清除同意记录，这样重新登录后不再显示弹窗
+    // 只有用户主动删除账号才会清除
     document.cookie = "neuroaccess-token=; path=/; max-age=0";
   };
 

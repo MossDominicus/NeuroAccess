@@ -99,7 +99,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4" />
         <link rel="apple-touch-icon" sizes="512x512" href="/neuroaccess-logo-512.png?v=4" />
       </head>
-      <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased">
+      <body className="bg-[var(--color-bg)] text-[var(--color-text)] antialiased" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <AuthProvider>
           <ThemeProvider>
             <LanguageProvider initialLang={initialLang}>
@@ -111,7 +111,7 @@ export default async function RootLayout({
                 <Sidebar />
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <TopNav />
-                  <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth transition-all duration-200">
+                  <main className="flex-1 overflow-y-auto overflow-x-auto scroll-smooth transition-all duration-200">
                     {children}
                   </main>
                   <PublicPreviewFooter />

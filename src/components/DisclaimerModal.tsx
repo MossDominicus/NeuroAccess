@@ -73,28 +73,22 @@ export default function DisclaimerModal() {
           </p>
           <ul className="space-y-2 pl-4 list-disc text-[var(--color-text-secondary)]">
             <li>
-              {t("disclaimerPoint1") ||
-                "NeuroAccess 是一个 EEG 科普教育平台，旨在帮助用户理解脑电图数据，不构成医疗诊断、医疗建议或治疗建议。"}
+              {t("disclaimerPoint1")}
             </li>
             <li>
-              {t("disclaimerPoint2") ||
-                "EEG 数据的专业解释需要由合格的医疗专业人员结合完整的临床背景进行判断。"}
+              {t("disclaimerPoint2")}
             </li>
             <li>
-              {t("disclaimerPoint3") ||
-                "本平台不会、也不能判断任何疾病、心理状态、智力水平、人格特征或健康风险。"}
+              {t("disclaimerPoint3")}
             </li>
             <li>
-              {t("disclaimerPoint4") ||
-                "所有分析结果和 AI 解释仅供科普学习使用，不应作为任何医疗决策的依据。"}
+              {t("disclaimerPoint4")}
             </li>
             <li>
-              {t("disclaimerPoint5") ||
-                "如有任何健康问题或疑虑，请务必咨询专业的医疗人员。"}
+              {t("disclaimerPoint5")}
             </li>
             <li>
-              {t("disclaimerPoint6") ||
-                "上传的 EEG 文件仅用于实时分析，不会被长期存储或用于其他目的。"}
+              {t("disclaimerPoint6")}
             </li>
           </ul>
           <div className="pt-2 border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]">
