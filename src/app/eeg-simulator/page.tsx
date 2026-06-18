@@ -87,7 +87,9 @@ export default function EegSimulatorPage() {
     if (hydrated) saveParams(params);
   }, [params, hydrated]);
 
-  // ── 帮助面板 ───────────────────────────────────────────────────────
+  // init manager (client-side only)
+  useEffect(() => { gen.init(); }, []);
+
   const [helpOpen, setHelpOpen] = useState<Set<string>>(new Set());
   const toggleHelp = (key: string) => setHelpOpen(prev => {
     const next = new Set(prev);
