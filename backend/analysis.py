@@ -514,31 +514,48 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     grad_stds = np.std(diffs, axis=1)
     mean_grad = float(np.mean(grad_stds))
 
-    # 伪影扣分（对真实噪声/伪影敏感，干净数据保持 0）
+    # 伪影扣分（所有指标连续评分，无二值门槛）
     artifact_penalty = 0.0
     noisy_channels_list = []
 
-    # 逐通道检测噪声通道（任一强异常指标即可标记，避免“需≥2项才触发”过弱）
+    # 逐通道连续噪声严重度——每个维度输出连续值 0~1，不设"通不通关"门槛
+    ch_noise_scores = []
     for i in range(n_ch):
-        ch_issues = 0
-        if kurt[i] > 5 or (0 < kurt[i] < 0.5):
-            ch_issues += 1                      # 峰度异常（尖峰/平坦）
-        if var_mean > 0 and variances[i] > var_mean * 2:
-            ch_issues += 1                       # 该通道方差远超平均（局部噪声）
-        if mean_grad > 0 and grad_stds[i] > mean_grad * 2:
-            ch_issues += 1                       # 高频梯度异常（肌电/工频）
-        if ch_issues >= 1:
+        score = 0.0
+        # 峰度偏离正常值 (3.0)：偏离越大贡献越多，3.0→0, 10→0.2, 50→0.5
+        kurt_val = kurt[i]
+        if kurt_val > 0:
+            score += min(0.5, abs(kurt_val - 3.0) / 60)
+        # 方差偏离整体均值比：比值 1→0, 0.1 或 10→0.3
+        if var_mean > 1e-12:
+            var_ratio = variances[i] / var_mean
+            ratio_dev = abs(np.log10(max(var_ratio, 1e-6)))
+            score += min(0.3, ratio_dev / 2.0)
+        # 梯度偏离均值比：同上
+        if mean_grad > 1e-12:
+            grad_ratio = grad_stds[i] / mean_grad
+            grad_dev = abs(np.log10(max(grad_ratio, 1e-6)))
+            score += min(0.3, grad_dev / 2.0)
+        # 峰度接近 0 表示平坦信号
+        if 0 < kurt_val < 0.5:
+            score += min(0.2, (0.5 - kurt_val) * 0.5)
+
+        ch_noise_scores.append(score)
+        if score > 0.2:
             noisy_channels_list.append(ch_names[i])
 
-    noisy_ratio = len(noisy_channels_list) / max(1, n_ch)
-    artifact_penalty += min(noisy_ratio * 20, 20)   # 噪声通道占比: 0~20分
-    artifact_penalty += min(outlier_pct * 600, 10)  # 异常值比例: 0~10分
+    # 连续噪声总分（所有通道加和），映射到惩罚分
+    total_noise = sum(ch_noise_scores)
+    artifact_penalty += min(total_noise * 8, 20)        # 连续得分 → 0~20 分
 
-    # 大幅度尖峰检测（250μV 以上即记分，真实 EEG 极少超过 150μV）
-    if np.any(np.abs(data_uv) > 250):
-        artifact_penalty += 3
-    if np.any(np.abs(data_uv) > 600):
-        artifact_penalty += 2
+    # 异常值比例（已是连续）
+    artifact_penalty += min(outlier_pct * 600, 10)      # 异常值比例: 0~10 分
+
+    # 尖峰检测（连续映射：150μV→0.5, 250μV→2, 600μV→5, >1000μV→8）
+    max_amp = float(np.max(np.abs(data_uv)))
+    if max_amp > 150:
+        spike_score = min(8, (max_amp - 150) / 100)
+        artifact_penalty += spike_score
 
     artifact_penalty = min(artifact_penalty, 35)
 
@@ -603,7 +620,8 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     if has_missing:
         integrity_penalty += 8
 
-    # 5b. 削波检测（连续评分：轻微削波扣少，严重扣多）
+    # 5b. 削波检测（连续评分：接近削波边界的样本比例越大扣分越多）
+    # 1% 以下的自然信号峰值不视为削波，超过 1% 后 clip_ratio × 200 连续递增
     clipping_detected = False
     clip_scores = []
     for i in range(n_ch):
@@ -611,8 +629,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         if max_abs > 0:
             near_max_count = int(np.sum(np.abs(data_uv[i]) > 0.99 * max_abs))
             clip_ratio = near_max_count / n_samples
-            # 连续评分：0.2% 样本在峰值→约0.4分, 5%→10分
-            if clip_ratio > 0.002:
+            if clip_ratio > 0.01:
                 clipping_detected = True
                 clip_scores.append(min(10, clip_ratio * 200))
     if clip_scores:
