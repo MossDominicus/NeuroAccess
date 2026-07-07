@@ -143,7 +143,7 @@ def _compute_literacy_scores(data: Dict, quality: Dict, bp: Dict) -> Dict[str, A
     #   artifact 0~10, integrity 0~15, drift 0~10. Multipliers adjusted to preserve
     #   score range (~0-100) via old_max/new_max ratio.
     reliability = max(0, min(100, cons_c * 8.0 + base_c * 0.8 - int_c * 3.333 - drift_c * 1.6))          # 可靠性评估
-    clarity = max(0, min(100, snr_c * 6.667 - art_c * 7.0 - (15 if snr_c < 4.8 else 0)))                 # 信号清晰度
+    clarity = max(0, min(100, snr_c * 6.667 - art_c * 5.0))                                              # 信号清晰度（降低伪影权重，避免正常噪声直接压到0）
     beginner = max(0, min(100, base_c * 1.6 + cons_c * 6.0 - art_c * 5.25 - int_c * 1.333))              # 入口友好度
     research = max(0, min(100, snr_c * 3.333 + spec_c * 1.667 + cons_c * 2.0 - drift_c * 1.6))           # 研究可用性
     noise_complexity = max(0, min(100, art_c * 5.25 + int_c * 2.0 + drift_c * 1.2))                      # 噪声复杂度
