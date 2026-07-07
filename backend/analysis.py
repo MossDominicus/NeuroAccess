@@ -706,7 +706,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     if flat_channels:
         possible_artifacts.append(f"{len(flat_channels)} flat/disconnected channel(s)")
 
-    print(f"[QualityScore] score={quality_score:.1f}  snr={component_snr:.1f}  consistency={component_consistency:.1f}  spectral={spectral_score:.1f}  artifact_pen={artifact_penalty:.1f}  integrity_pen={integrity_penalty:.1f}  drift_pen={drift_penalty:.1f}")
+    print(f"[QualityScore] score={quality_score:.1f}  snr={component_snr*factor_snr:.1f}  consistency={component_consistency*factor_cons:.1f}  spectral={spectral_score*factor_spec:.1f}  artifact_pen={artifact_penalty*factor_art:.1f}  integrity_pen={integrity_penalty*factor_int:.1f}  drift_pen={drift_penalty*factor_drift:.1f}")
     return {
         "signal_quality_score": quality_score,
         "noisy_channels": noisy_channels_list,
@@ -718,13 +718,13 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             "average_variance": round(var_mean, 4),
             "max_variance": round(float(np.max(variances)), 4),
             "outlier_percentage": round(outlier_pct * 100, 3),
-            "snr_component": round(component_snr, 2),
-            "consistency_component": round(component_consistency, 2),
-            "spectral_component": round(spectral_score, 2),
-            "artifact_penalty": round(artifact_penalty, 2),
-            "integrity_penalty": round(integrity_penalty, 2),
-            "drift_penalty": round(drift_penalty, 2),
-            "base_score": round(base_score, 2),
+            "snr_component": round(component_snr * factor_snr, 2),
+            "consistency_component": round(component_consistency * factor_cons, 2),
+            "spectral_component": round(spectral_score * factor_spec, 2),
+            "artifact_penalty": round(artifact_penalty * factor_art, 2),
+            "integrity_penalty": round(integrity_penalty * factor_int, 2),
+            "drift_penalty": round(drift_penalty * factor_drift, 2),
+            "base_score": round(base_score * factor_base, 2),
         },
     }
 
