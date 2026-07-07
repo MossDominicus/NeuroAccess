@@ -448,15 +448,16 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if eeg_power < 1e-6:
                 snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~25 分（非常宽松：≥10dB 即满分，典型 EEG (10~15dB) 轻松拿高分）
-            if snr_db >= 10:
+            # 映射到 0~25 分：平滑连续曲线，无硬顶，让不同信噪比文件拉开差距。
+            # 典型 EEG 10~20dB 会落在 13~23/25 之间，而非全部满分。
+            if snr_db >= 25:
                 s = 25.0
             elif snr_db >= 0:
-                s = 10.0 + snr_db * 1.5           # 0~10 dB → 10~25
-            elif snr_db >= -5:
-                s = max(2.0, 2.5 + (snr_db + 5) * 0.5)  # -5~0 dB → 2.5~5
+                s = 10.0 + snr_db * 0.75          # 0→10, 20→25, 线性递增
+            elif snr_db >= -10:
+                s = max(0.0, 10.0 + snr_db)       # -10→0, 0→10
             else:
-                s = max(0.0, snr_db + 7.0)        # 负 dB → 趋近 0
+                s = 0.0
             snr_scores.append(s)
         except Exception:
             snr_scores.append(20.0)  # 中等默认值
@@ -490,16 +491,9 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射（宽松）：0.06 以下趋近 0（断连/独立噪声），0.60 即满分 20，
-    # 极高相关(>0.60)仅极轻微回落（疑似短路才扣），整体随相关性自然爬升。
-    if avg_correlation < 0.06:
-        component_consistency = max(0.0, avg_correlation * 40.0)        # 0.06→2.4, 0→0
-    elif avg_correlation <= 0.60:
-        component_consistency = (avg_correlation - 0.06) / 0.54 * 20.0  # 0.06→0, 0.60→20
-    else:
-        component_consistency = max(15.0, 20.0 - (avg_correlation - 0.60) * 25.0)  # 疑似短路极轻回落
-
-    component_consistency = max(0.0, min(20.0, component_consistency))
+    # 相关性映射：线性连续，0.60 对应满分 20；低于 0.06 接近 0。
+    # 这样不同文件的一致性会拉开，而不是集中在 20/20。
+    component_consistency = max(0.0, min(20.0, avg_correlation / 0.60 * 20.0))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
@@ -559,19 +553,14 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         r_df = r_freqs[1] - r_freqs[0] if len(r_freqs) > 1 else 1.0
         _trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
 
-        # Alpha 带 (8-13Hz) 是否有峰值
+        # Alpha 带 (8-13Hz) 峰值：连续评分，ratio 1.0→0, 2.0→3.5
         alpha_mask = (r_freqs >= 8) & (r_freqs <= 13)
         alpha_psd = r_psd[alpha_mask] if np.any(alpha_mask) else np.array([0])
         if len(alpha_psd) > 2:
             alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
-            if alpha_max_ratio > 1.3:
-                spectral_score += 6.5   # 明显 alpha 峰
-            elif alpha_max_ratio > 1.15:
-                spectral_score += 4.0   # 有 alpha 活动
-            elif alpha_max_ratio > 1.05:
-                spectral_score += 2.0   # 微弱 alpha
+            spectral_score += min(3.5, max(0.0, (alpha_max_ratio - 1.0) / 1.0 * 3.5))
 
-        # 频谱斜率（低频应比高频强 — 1/f 特征）
+        # 频谱斜率（低频应比高频强 — 1/f 特征）：连续评分，ratio_db 0→0, 10→4
         low_mask = (r_freqs >= 2) & (r_freqs <= 10)
         high_mask = (r_freqs >= 30) & (r_freqs <= 60)
         if _trapz is not None and np.any(low_mask) and np.any(high_mask):
@@ -579,12 +568,15 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             high_pow = _trapz(r_psd[high_mask], dx=r_df)
             if high_pow > 1e-12:
                 ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
-                if ratio_db > 6:
-                    spectral_score += 7.0   # 正常 1/f 衰减
-                elif ratio_db > 3:
-                    spectral_score += 4.0
-                else:
-                    spectral_score += 1.5
+                spectral_score += min(4.0, max(0.0, ratio_db / 10.0 * 4.0))
+
+        # 频谱熵：低熵 = 谱结构清晰（如 alpha 峰），高熵 = 平坦/噪声。连续评分 0~2.5
+        if len(r_psd) > 10:
+            psd_norm = r_psd / (np.sum(r_psd) + 1e-12)
+            spectral_entropy = -np.sum(psd_norm * np.log2(psd_norm + 1e-12))
+            max_entropy = np.log2(len(r_psd))
+            entropy_norm = min(1.0, max(0.0, spectral_entropy / max_entropy))
+            spectral_score += min(2.5, max(0.0, (1.0 - entropy_norm) * 2.5))
 
         # 高频污染检测（肌电/工频噪声）：30–100Hz 功率相对 1–30Hz 过高 → 伪影
         hf_mask = (r_freqs >= 30) & (r_freqs <= 100)
@@ -652,21 +644,23 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
                 drift_penalty = 2.0
 
     # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
-    # 0 = 平坦/全噪声（什么也检测不到）；8 = 多数通道信号健康
+    # 0 = 平坦/全噪声；8 = 多数通道信号健康。使用逐通道方差连续度量，避免二值化。
     usable_ch = n_ch - n_flat - len(noisy_channels_list)
     usable_ratio = max(0.0, usable_ch) / max(1, n_ch)
-    if usable_ratio <= 0:
+    if usable_ratio <= 0 or var_mean <= 1e-6:
         base_score = 0.0
     else:
-        med_var = float(np.median(variances))
-        # 真实脑电通道方差通常在数百 μV² 量级；过低(平坦/断连)→接近0，正常→1.0
-        if med_var < 1:
-            strength = 0.0
-        elif med_var < 10:
-            strength = med_var / 10.0                # 1~10 μV² → 0.1~1.0
-        else:
-            strength = 1.0                           # 真实脑电信号，正常方差
-        base_score = max(0.0, min(8.0, usable_ratio * 8.0 * strength))
+        # 逐通道信号强度：方差 <1 μV² 视为无信号，1~100 之间线性，>100 视为强信号
+        channel_strengths = []
+        for v in variances:
+            if v < 1.0:
+                channel_strengths.append(0.0)
+            elif v < 100.0:
+                channel_strengths.append(v / 100.0)
+            else:
+                channel_strengths.append(1.0)
+        avg_strength = float(np.mean(channel_strengths))
+        base_score = max(0.0, min(8.0, usable_ratio * 8.0 * avg_strength))
 
     # ── 最终评分组装 ──────────────────────────────────
     # 每个分量乘 (新满分/原满分) 比例调至用户指定的满分范围

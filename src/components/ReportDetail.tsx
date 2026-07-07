@@ -377,7 +377,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
 
       {/* ── Section 6: Signal Quality Hint ──────────── */}
       <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-        <div className="flex items-start gap-4">
+        <div className="flex items-center gap-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/30">
             <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           </div>
