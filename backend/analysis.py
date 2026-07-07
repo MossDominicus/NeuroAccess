@@ -491,8 +491,8 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射：线性连续，0.20 对应满分 20。即使弱相关也给保底 2 raw。
-    component_consistency = max(2.0, min(20.0, avg_correlation / 0.20 * 20.0))
+    # 相关性映射：线性连续，0.20 对应满分 20。保底 10 raw，弱相关信号也有 5/10。
+    component_consistency = max(10.0, min(20.0, avg_correlation / 0.20 * 20.0))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
