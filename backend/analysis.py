@@ -448,17 +448,17 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if eeg_power < 1e-6:
                 snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~25 分（原始标定：SNR 越高越接近满分；平坦/断连 snr_db 极低 → 0）
-            if snr_db >= 30:
+            # 映射到 0~25 分（宽松版：≥20dB 即满分，典型 EEG (10~15dB) 轻松拿高分）
+            if snr_db >= 20:
                 s = 25.0
-            elif snr_db >= 20:
-                s = 15.0 + (snr_db - 20) * 1.0
             elif snr_db >= 10:
-                s = 8.0 + (snr_db - 10) * 0.7
+                s = 12.0 + (snr_db - 10) * 1.3   # 10~20 dB → 12~25
             elif snr_db >= 0:
-                s = max(3.0, 4.0 + snr_db * 0.4)
+                s = 5.0 + snr_db * 0.7           # 0~10 dB → 5~12
+            elif snr_db >= -5:
+                s = max(2.0, 2.5 + (snr_db + 5) * 0.5)  # -5~0 dB → 2.5~5
             else:
-                s = max(0.0, 5.0 + snr_db * 1.5)
+                s = max(0.0, snr_db + 7.0)        # 负 dB → 趋近 0
             snr_scores.append(s)
         except Exception:
             snr_scores.append(20.0)  # 中等默认值
@@ -692,8 +692,8 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         drift_penalty * factor_drift           # 0~10
     )
 
-    # 线性重映射：原始分量之和(最大 65) ×2.5 → 0~100（保底 5 分）
-    quality_score = max(5.0, min(100.0, quality_score * 2.5))
+    # 直接 clamp，不做 ×2.5 缩放。满分 = 15+10+15+25 = 65（无扣分时）。
+    quality_score = max(0.0, min(100.0, quality_score))
 
     # ── 伪影描述文本 ──────────────────────────────────
     possible_artifacts = []
