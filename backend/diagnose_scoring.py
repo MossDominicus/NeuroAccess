@@ -333,16 +333,16 @@ try:
     alpha_psd = r_psd[alpha_mask] if np.any(alpha_mask) else np.array([0])
     if len(alpha_psd) > 2:
         alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
-        print(f"       Alpha peak ratio: {alpha_max_ratio:.2f} (thresholds: >2.5→+7.5, >1.5→+3, >1.2→+1.5)")
-        if alpha_max_ratio > 2.5:
-            spectral_score += 7.5
-            print(f"         → +7.5 (clear alpha peak)")
-        elif alpha_max_ratio > 1.5:
-            spectral_score += 3.0
-            print(f"         → +3.0 (weak alpha peak)")
-        elif alpha_max_ratio > 1.2:
-            spectral_score += 1.5
-            print(f"         → +1.5 (subtle alpha peak)")
+        print(f"       Alpha peak ratio: {alpha_max_ratio:.2f} (thresholds: >1.3→+6.5, >1.15→+4, >1.05→+2)")
+        if alpha_max_ratio > 1.3:
+            spectral_score += 6.5
+            print(f"         → +6.5 (clear alpha peak)")
+        elif alpha_max_ratio > 1.15:
+            spectral_score += 4.0
+            print(f"         → +4.0 (weak alpha peak)")
+        elif alpha_max_ratio > 1.05:
+            spectral_score += 2.0
+            print(f"         → +2.0 (subtle alpha peak)")
         else:
             print(f"         → +0 (no alpha peak detected)")
 
@@ -354,18 +354,19 @@ try:
         high_pow = _trapz(r_psd[high_mask], dx=r_df)
         if high_pow > 1e-12:
             ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
-            print(f"       1/f slope ratio: {ratio_db:.2f} dB (thresholds: >15→+7.5, >8→+4)")
-            if ratio_db > 15:
-                spectral_score += 7.5
-                print(f"         → +7.5 (normal 1/f decay)")
-            elif ratio_db > 8:
+            print(f"       1/f slope ratio: {ratio_db:.2f} dB (thresholds: >6→+7, >3→+4, else +1.5)")
+            if ratio_db > 6:
+                spectral_score += 7.0
+                print(f"         → +7.0 (normal 1/f decay)")
+            elif ratio_db > 3:
                 spectral_score += 4.0
                 print(f"         → +4.0 (weak 1/f decay)")
             else:
-                print(f"         → +0 (no 1/f decay)")
+                spectral_score += 1.5
+                print(f"         → +1.5 (flat spectrum)")
 except Exception as e:
     print(f"       SPECTRAL ANALYSIS FAILED: {e}")
-    spectral_score = 3.0
+    spectral_score = 4.0
 
 spectral_score = min(15, max(0, spectral_score))
 print(f"\n       → Spectral score: {spectral_score:.2f} / 15")
@@ -417,15 +418,15 @@ if n_samples_data > 500:
         drift_ratio = seg_range / overall_range
         print(f"       Segment means: {[f'{m:.4f}' for m in seg_means]}")
         print(f"       Drift ratio: {drift_ratio:.4f} (range={overall_range:.4f}, seg_range={seg_range:.4f})")
-        if drift_ratio > 0.3:
-            drift_penalty = 8.0
-            print(f"         → -8 (large drift)")
-        elif drift_ratio > 0.15:
-            drift_penalty = 4.0
-            print(f"         → -4 (moderate drift)")
-        elif drift_ratio > 0.05:
-            drift_penalty = 2.0
-            print(f"         → -2 (mild drift)")
+        if drift_ratio > 0.4:
+            drift_penalty = 5.0
+            print(f"         → -5 (large drift)")
+        elif drift_ratio > 0.25:
+            drift_penalty = 3.0
+            print(f"         → -3 (moderate drift)")
+        elif drift_ratio > 0.12:
+            drift_penalty = 1.5
+            print(f"         → -1.5 (mild drift)")
         else:
             print(f"         → -0 (stable baseline)")
 

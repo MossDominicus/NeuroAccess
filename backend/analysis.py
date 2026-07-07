@@ -379,7 +379,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
       基础分         : 0~20 分（是否采集到真实可用脑电活动；0=平坦/全噪声什么也没检测到）
       伪影水平       : 0~-35 分（峰度/幅度异常值）
       数据完整性     : 0~-25 分（削波/平坦/缺失）
-      基线稳定性     : 0~-8 分（慢漂移/DC偏移）
+      基线稳定性     : 0~-5 分（慢漂移/DC偏移）
 
     总分 = SNR + 通道一致性 + 频谱特征 + 基础分 − 伪影 − 完整性 − 漂移，直接 clamp 到 0~100。
     最低 0 分（什么也检测不到，如全平坦/全噪声），最高 100 分（全部组件满分且无扣分）。
@@ -447,17 +447,17 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if eeg_power < 1e-6:
                 snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~40 分（宽松：典型真实 EEG 10~18dB 即可拿 26~40，确保"可用数据"高分）
-            if snr_db >= 18:
+            # 映射到 0~40 分（按真实脑电标定：典型 ~10dB 即 38~40，低/负 SNR 自然趋低）
+            if snr_db >= 10:
                 s = 40.0
-            elif snr_db >= 10:
-                s = 26.0 + (snr_db - 10) * 1.75    # 10~18 dB → 26~40
-            elif snr_db >= 2:
-                s = 12.0 + (snr_db - 2) * 1.75     # 2~10 dB → 12~26
+            elif snr_db >= 5:
+                s = 28.0 + (snr_db - 5) * 2.4       # 5~10 dB → 28~40
             elif snr_db >= 0:
-                s = 5.0 + snr_db * 3.5             # 0~2 dB → 5~12
+                s = 14.0 + snr_db * 2.8             # 0~5 dB → 14~28
+            elif snr_db >= -5:
+                s = 5.0 + (snr_db + 5) * 1.8        # -5~0 dB → 5~14
             else:
-                s = max(0.0, 5.0 + snr_db * 1.5)    # 负 dB → 趋近 0
+                s = max(0.0, snr_db + 9.0)           # 负 dB → 趋近 0
             snr_scores.append(s)
         except Exception:
             snr_scores.append(20.0)  # 中等默认值
@@ -566,12 +566,12 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         alpha_psd = r_psd[alpha_mask] if np.any(alpha_mask) else np.array([0])
         if len(alpha_psd) > 2:
             alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
-            if alpha_max_ratio > 2.5:
-                spectral_score += 7.5   # 明显 alpha 峰
-            elif alpha_max_ratio > 1.5:
-                spectral_score += 3.0
-            elif alpha_max_ratio > 1.2:
-                spectral_score += 1.5
+            if alpha_max_ratio > 1.3:
+                spectral_score += 6.5   # 明显 alpha 峰
+            elif alpha_max_ratio > 1.15:
+                spectral_score += 4.0   # 有 alpha 活动
+            elif alpha_max_ratio > 1.05:
+                spectral_score += 2.0   # 微弱 alpha
 
         # 频谱斜率（低频应比高频强 — 1/f 特征）
         low_mask = (r_freqs >= 2) & (r_freqs <= 10)
@@ -581,12 +581,14 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             high_pow = _trapz(r_psd[high_mask], dx=r_df)
             if high_pow > 1e-12:
                 ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
-                if ratio_db > 15:
-                    spectral_score += 7.5   # 正常 1/f 衰减
-                elif ratio_db > 8:
+                if ratio_db > 6:
+                    spectral_score += 7.0   # 正常 1/f 衰减
+                elif ratio_db > 3:
                     spectral_score += 4.0
+                else:
+                    spectral_score += 1.5
     except Exception:
-        spectral_score = 3.0  # 默认中等
+        spectral_score = 4.0  # 默认中等
 
     spectral_score = min(15, max(0, spectral_score))
 
@@ -633,12 +635,12 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         overall_range = float(np.max(data_uv) - np.min(data_uv))
         if overall_range > 0:
             drift_ratio = seg_range / overall_range
-            if drift_ratio > 0.3:
-                drift_penalty = 8.0
-            elif drift_ratio > 0.15:
-                drift_penalty = 4.0
-            elif drift_ratio > 0.05:
-                drift_penalty = 2.0
+            if drift_ratio > 0.4:
+                drift_penalty = 5.0
+            elif drift_ratio > 0.25:
+                drift_penalty = 3.0
+            elif drift_ratio > 0.12:
+                drift_penalty = 1.5
 
     # ── 组件 4: 基础分 (0~20) — 是否采集到真实、可用的脑电活动 ──
     # 0 = 平坦/全噪声（什么也检测不到）；20 = 多数通道信号健康
