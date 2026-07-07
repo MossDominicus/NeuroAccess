@@ -491,9 +491,8 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射：线性连续，0.60 对应满分 20；低于 0.06 接近 0。
-    # 这样不同文件的一致性会拉开，而不是集中在 20/20。
-    component_consistency = max(0.0, min(20.0, avg_correlation / 0.60 * 20.0))
+    # 相关性映射：线性连续，0.20 对应满分 20。即使弱相关也给保底 2 raw。
+    component_consistency = max(2.0, min(20.0, avg_correlation / 0.20 * 20.0))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
@@ -570,14 +569,14 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         r_df = r_freqs[1] - r_freqs[0] if len(r_freqs) > 1 else 1.0
         _trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
 
-        # Alpha 带 (8-13Hz) 峰值：连续评分，ratio 1.0→0, 2.0→3.5
+        # Alpha 带 (8-13Hz) 峰值：连续评分，ratio 1.0→0, 1.3→3.5（极宽松）
         alpha_mask = (r_freqs >= 8) & (r_freqs <= 13)
         alpha_psd = r_psd[alpha_mask] if np.any(alpha_mask) else np.array([0])
         if len(alpha_psd) > 2:
             alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
-            spectral_score += min(3.5, max(0.0, (alpha_max_ratio - 1.0) / 1.0 * 3.5))
+            spectral_score += min(3.5, max(0.0, (alpha_max_ratio - 1.0) / 0.3 * 3.5))
 
-        # 频谱斜率（低频应比高频强 — 1/f 特征）：连续评分，ratio_db 0→0, 10→4
+        # 频谱斜率（低频应比高频强 — 1/f 特征）：连续评分，ratio_db 0→0, 3→4（极宽松）
         low_mask = (r_freqs >= 2) & (r_freqs <= 10)
         high_mask = (r_freqs >= 30) & (r_freqs <= 60)
         if _trapz is not None and np.any(low_mask) and np.any(high_mask):
@@ -585,15 +584,15 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             high_pow = _trapz(r_psd[high_mask], dx=r_df)
             if high_pow > 1e-12:
                 ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
-                spectral_score += min(4.0, max(0.0, ratio_db / 10.0 * 4.0))
+                spectral_score += min(4.0, max(0.0, ratio_db / 3.0 * 4.0))
 
-        # 频谱熵：低熵 = 谱结构清晰（如 alpha 峰），高熵 = 平坦/噪声。连续评分 0~2.5
+        # 频谱熵：低熵 = 谱结构清晰（如 alpha 峰），高熵 = 平坦/噪声。连续评分 0~3.5
         if len(r_psd) > 10:
             psd_norm = r_psd / (np.sum(r_psd) + 1e-12)
             spectral_entropy = -np.sum(psd_norm * np.log2(psd_norm + 1e-12))
             max_entropy = np.log2(len(r_psd))
             entropy_norm = min(1.0, max(0.0, spectral_entropy / max_entropy))
-            spectral_score += min(2.5, max(0.0, (1.0 - entropy_norm) * 2.5))
+            spectral_score += min(3.5, max(0.0, (1.0 - entropy_norm) * 3.5))
 
         # 高频污染检测（肌电/工频噪声）：30–100Hz 功率相对 1–30Hz 过高 → 伪影
         hf_mask = (r_freqs >= 30) & (r_freqs <= 100)
