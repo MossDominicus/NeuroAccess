@@ -425,7 +425,7 @@ function DashboardInner() {
           {aiStatus.online ? (
             <>
               <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-              <span className="font-medium text-green-700 dark:text-green-400">AI 模型 · qwen2.5</span>
+              <span className="font-medium text-green-700 dark:text-green-400">{t("aiModelLabel")}</span>
             </>
           ) : (
             <>
