@@ -626,22 +626,28 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     integrity_penalty = min(integrity_penalty, 25)
 
     # ── 组件 6: 基线稳定性 (0 ~ -8分扣分) ─────────────
-    # 慢漂移检测：数据均值随时间的变化率
+    # 慢漂移检测：逐通道计算漂移比，避免多通道均值正负抵消导致漏检
     drift_penalty = 0.0
     if n_samples > 500:
-        # 把数据分成4段，看各段均值差异
         seg_size = n_samples // 4
-        seg_means = [float(np.mean(data_uv[:, i*seg_size:(i+1)*seg_size])) for i in range(4)]
-        seg_range = max(seg_means) - min(seg_means)
-        overall_range = float(np.max(data_uv) - np.min(data_uv))
-        if overall_range > 0:
-            drift_ratio = seg_range / overall_range
-            if drift_ratio > 0.25:
+        ch_drift_ratios = []
+        for i in range(n_ch):
+            ch_data = data_uv[i]
+            ch_seg_means = [float(np.mean(ch_data[j*seg_size:(j+1)*seg_size])) for j in range(4)]
+            ch_range = max(ch_seg_means) - min(ch_seg_means)
+            ch_overall = float(np.max(ch_data) - np.min(ch_data))
+            if ch_overall > 0:
+                ch_drift_ratios.append(ch_range / ch_overall)
+        if ch_drift_ratios:
+            mean_drift_ratio = float(np.mean(ch_drift_ratios))
+            if mean_drift_ratio > 0.25:
                 drift_penalty = 8.0
-            elif drift_ratio > 0.14:
+            elif mean_drift_ratio > 0.14:
                 drift_penalty = 4.0
-            elif drift_ratio > 0.06:
+            elif mean_drift_ratio > 0.06:
                 drift_penalty = 2.0
+            elif mean_drift_ratio > 0.025:
+                drift_penalty = 1.0   # 新增：极轻微漂移
 
     # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
     # 0 = 平坦/全噪声；8 = 多数通道信号健康。使用逐通道方差连续度量，避免二值化。
