@@ -23,8 +23,9 @@ module.exports = {
         SMTP_HOST: "smtp.gmail.com",
         SMTP_PORT: "587",
         SMTP_USERNAME: "neuroaccess2026@gmail.com",
-        SMTP_PASSWORD: "",  // 从环境变量读取
+        SMTP_PASSWORD: "yaib cmrc zioa mzad",  // Gmail App Password (16位)
         SMTP_FROM: "neuroaccess2026@gmail.com",
+        JWT_SECRET_KEY: "P9d2uTL0KzSJh6UbYlsWXh3VjKmIrJe8IQYMukg8E_Ufor9yeP1aY0iAgbLwYkBz",
       },
     },
   ],
