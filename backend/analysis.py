@@ -448,13 +448,11 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if eeg_power < 1e-6:
                 snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~25 分（宽松版：≥20dB 即满分，典型 EEG (10~15dB) 轻松拿高分）
-            if snr_db >= 20:
+            # 映射到 0~25 分（非常宽松：≥10dB 即满分，典型 EEG (10~15dB) 轻松拿高分）
+            if snr_db >= 10:
                 s = 25.0
-            elif snr_db >= 10:
-                s = 12.0 + (snr_db - 10) * 1.3   # 10~20 dB → 12~25
             elif snr_db >= 0:
-                s = 5.0 + snr_db * 0.7           # 0~10 dB → 5~12
+                s = 10.0 + snr_db * 1.5           # 0~10 dB → 10~25
             elif snr_db >= -5:
                 s = max(2.0, 2.5 + (snr_db + 5) * 0.5)  # -5~0 dB → 2.5~5
             else:
