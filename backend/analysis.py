@@ -661,49 +661,31 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             # 连续映射：0μV→0, 20μV→8（满分）。无门槛，微弱漂移也扣分。
             drift_penalty = max(0.0, min(8.0, mean_drift / 20.0 * 8.0))
 
-    # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
-    # 0 = 平坦/全噪声；8 = 多数通道信号健康。使用逐通道方差连续度量，避免二值化。
-    usable_ch = n_ch - n_flat - len(noisy_channels_list)
+    # ── 基础分 (0~8) — 这是真脑电图吗 ──────────
+    # 正常脑电 ≈ 满分 8，有异常根据异常扣分；不是脑电 ≈ 0。
+    # 只有噪声得分 > 0.4 的才计为"不可用"（之前 0.2 太敏感，会标记所有通道）
+    n_seriously_noisy = sum(1 for s in ch_noise_scores if s > 0.4)
+    usable_ch = n_ch - n_flat - n_seriously_noisy
     usable_ratio = max(0.0, usable_ch) / max(1, n_ch)
-    if usable_ratio <= 0 or var_mean <= 1e-6:
+
+    # 判断是否像脑电：真实 EEG 各通道方差有差异，纯噪声/纯正弦高度一致
+    eeg_like = False
+    if var_mean > 1e-6:
+        median_var = float(np.median(variances))
+        if median_var > 1e-12:
+            var_max_ratio = float(np.max(variances)) / median_var
+            eeg_like = var_max_ratio > 1.3
+
+    if not eeg_like or var_mean <= 0.001 or usable_ratio <= 0.0:
         base_score = 0.0
     else:
-        # 逐通道信号强度：方差 <1 μV² 视为无信号，1~100 之间线性，>100 视为强信号
-        channel_strengths = []
-        for v in variances:
-            if v < 1.0:
-                channel_strengths.append(0.0)
-            elif v < 100.0:
-                channel_strengths.append(v / 100.0)
-            else:
-                channel_strengths.append(1.0)
-        avg_strength = float(np.mean(channel_strengths))
-
-        # ── 信号真实度因子 ────────────────────────────
-        # ① 峰度偏离高斯：纯噪声 kurt≈3，真实 EEG 各有偏差
-        avg_kurt = float(np.mean(kurt))
-        kurt_factor = min(1.0, abs(avg_kurt - 3.0) * 2.0)  # 0→0, ≥0.5→1
-
-        # ② 频谱平坦度：取代表性通道快速评估谱倾
-        flat_factor = 0.3  # 默认中等
-        try:
-            mid_ch = data_uv[n_ch // 2]
-            freqs_k = np.fft.rfftfreq(n_samples, d=1.0/sfreq)
-            if len(freqs_k) > 32:
-                fft_vals = np.abs(np.fft.rfft(mid_ch)) ** 2
-                lo = np.mean(fft_vals[freqs_k <= 10])
-                hi = np.mean(fft_vals[(freqs_k >= 30) & (freqs_k <= min(sfreq/2, 60))])
-                if hi > 0 and lo > 0:
-                    slope = lo / hi
-                    # 真实 EEG slope > 2（低频远强于高频）；噪声 slope ≈ 1
-                    flat_factor = min(1.0, max(0.0, (slope - 1.0) / 3.0))
-        except Exception:
-            flat_factor = 0.3
-
-        # 真实度综合：两项都差 = 不像脑电
-        eeg_likeness = max(kurt_factor, flat_factor)  # 至少有一项符合即可
-
-        base_score = max(0.0, min(8.0, usable_ratio * 8.0 * avg_strength * eeg_likeness))
+        # ── 正常脑电：从满分开始扣 ────────────────
+        deduct = n_flat * 1.0 + n_seriously_noisy * 0.5
+        if median_var < 10:
+            deduct += (10 - median_var) * 0.3
+        if mean_grad > var_mean * 2 if var_mean > 0 else False:
+            deduct += 1.0
+        base_score = max(0.0, min(8.0, 8.0 - deduct))
 
     # ── 最终评分组装 ──────────────────────────────────
     # 每个分量乘 (新满分/原满分) 比例调至用户指定的满分范围
