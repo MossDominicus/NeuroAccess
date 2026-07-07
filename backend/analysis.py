@@ -409,7 +409,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     stds = np.std(data_uv, axis=1, keepdims=True)
     means = np.mean(data_uv, axis=1, keepdims=True)
 
-    # ── 组件 1: SNR 信噪比 (0~30分) ─────────────────
+    # ── 组件 1: SNR 信噪比 (0~40分) ─────────────────
     # Welch PSD 每通道
     nperseg = min(int(4.0 * min(sfreq, n_samples // 30)), 1024, n_samples)
     nperseg = max(nperseg, 16)
@@ -444,25 +444,27 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
             # 用安全下限避免 0/0：平坦/无信号(eeg≈0)时 snr_db≈0，而非误判为"极干净"
             snr_db = 10 * np.log10(max(eeg_power, 1e-12) / max(noise_power, 1e-12))
+            if eeg_power < 1e-6:
+                snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~40 分（高 SNR 满分，低/负 SNR 趋近 0，不保底）
-            if snr_db >= 35:
+            # 映射到 0~40 分（宽松：典型真实 EEG 10~18dB 即可拿 26~40，确保"可用数据"高分）
+            if snr_db >= 18:
                 s = 40.0
-            elif snr_db >= 20:
-                s = 20.0 + (snr_db - 20) * 1.333  # 20~35 dB → 20~40
             elif snr_db >= 10:
-                s = 10.0 + (snr_db - 10) * 1.0     # 10~20 dB → 10~20
+                s = 26.0 + (snr_db - 10) * 1.75    # 10~18 dB → 26~40
+            elif snr_db >= 2:
+                s = 12.0 + (snr_db - 2) * 1.75     # 2~10 dB → 12~26
             elif snr_db >= 0:
-                s = max(0.0, snr_db * 1.0)          # 0~10 dB → 0~10
+                s = 5.0 + snr_db * 3.5             # 0~2 dB → 5~12
             else:
-                s = max(0.0, 5.0 + snr_db * 1.5)     # 负 dB → 0
+                s = max(0.0, 5.0 + snr_db * 1.5)    # 负 dB → 趋近 0
             snr_scores.append(s)
         except Exception:
             snr_scores.append(20.0)  # 中等默认值
 
     component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
 
-    # ── 组件 2: 通道一致性 (0~20分) ───────────────────
+    # ── 组件 2: 通道一致性 (0~25分) ───────────────────
     # 计算相邻通道间的 Pearson 相关系数（取所有通道对的均值）
     if var_mean <= 1e-6:
         # 全平坦/无信号：通道间无任何有意义的差异，一致性视为 0
@@ -489,14 +491,14 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射：0.10 以下趋近 0（各通道独立噪声/断连），0.85 附近满分 25，
-    # 过高(>0.90)可能短路故回落。整体随相关性自然爬升。
-    if avg_correlation < 0.10:
-        component_consistency = max(0.0, avg_correlation * 50.0)        # 0.10→5, 0→0
-    elif avg_correlation <= 0.85:
-        component_consistency = (avg_correlation - 0.10) / 0.75 * 25.0  # 0.10→0, 0.85→25
+    # 相关性映射（宽松）：0.06 以下趋近 0（断连/独立噪声），0.60 即满分 25，
+    # 极高相关(>0.60)仅极轻微回落（疑似短路才扣），整体随相关性自然爬升。
+    if avg_correlation < 0.06:
+        component_consistency = max(0.0, avg_correlation * 45.0)        # 0.06→2.7, 0→0
+    elif avg_correlation <= 0.60:
+        component_consistency = (avg_correlation - 0.06) / 0.54 * 25.0  # 0.06→0, 0.60→25
     else:
-        component_consistency = max(8.0, 25.0 - (avg_correlation - 0.85) * 70.0)  # 可能短路→回落
+        component_consistency = max(18.0, 25.0 - (avg_correlation - 0.60) * 30.0)  # 疑似短路极轻回落
 
     component_consistency = max(0.0, min(25.0, component_consistency))
 

@@ -195,16 +195,18 @@ for i, ch_data in enumerate(data_uv):
 
         # 安全下限避免 0/0：平坦/无信号时 snr_db≈0，而非误判为"极干净"
         snr_db = 10 * np.log10(max(eeg_power, 1e-12) / max(noise_power, 1e-12))
+        if eeg_power < 1e-6:
+            snr_db = -40.0  # 实质上无 EEG 频段能量 → 最差
 
-        # Mapping to score (0~40, new scale — no artificial floor)
-        if snr_db >= 35:
+        # Mapping to score (0~40, lenient — typical 10~18dB already reaches 26~40)
+        if snr_db >= 18:
             s = 40.0
-        elif snr_db >= 20:
-            s = 20.0 + (snr_db - 20) * 1.333
         elif snr_db >= 10:
-            s = 10.0 + (snr_db - 10) * 1.0
+            s = 26.0 + (snr_db - 10) * 1.75
+        elif snr_db >= 2:
+            s = 12.0 + (snr_db - 2) * 1.75
         elif snr_db >= 0:
-            s = max(0.0, snr_db * 1.0)
+            s = 5.0 + snr_db * 3.5
         else:
             s = max(0.0, 5.0 + snr_db * 1.5)
         snr_scores.append(s)
@@ -219,7 +221,7 @@ component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
 print(f"\n       → SNR component (mean across channels): {component_snr:.2f} / 40")
 
 # ── 5c: Channel Consistency (0~20) ─────────────────────────
-print(f"\n  5c. Channel Consistency (0~20 points):")
+print(f"\n  5c. Channel Consistency (0~25 points):")
 
 corr_n = min(5000, n_samples_data)
 corr_data = data_uv[:, :corr_n]
@@ -251,12 +253,12 @@ for i in range(min(6, n_corr_ch)):
             print(f"         corr({ch_names[i]:<20},{ch_names[j]:<20}) = {corr_matrix[i][j]:.4f}")
             shown += 1
 
-if avg_correlation < 0.10:
-    component_consistency = max(0.0, avg_correlation * 50.0)
-elif avg_correlation <= 0.85:
-    component_consistency = (avg_correlation - 0.10) / 0.75 * 25.0
+if avg_correlation < 0.06:
+    component_consistency = max(0.0, avg_correlation * 45.0)
+elif avg_correlation <= 0.60:
+    component_consistency = (avg_correlation - 0.06) / 0.54 * 25.0
 else:
-    component_consistency = max(8.0, 25.0 - (avg_correlation - 0.85) * 70.0)
+    component_consistency = max(18.0, 25.0 - (avg_correlation - 0.60) * 30.0)
 component_consistency = max(0.0, min(25.0, component_consistency))
 
 print(f"       → Consistency score: {component_consistency:.2f} / 25")
