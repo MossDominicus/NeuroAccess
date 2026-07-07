@@ -296,16 +296,23 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                 ))}
               </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                {items.slice(4).map((item) => (
-                  <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
-                    <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
-                    {item.value > 0 ? (
-                      <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}/{item.maxVal}</span>
-                    ) : (
-                      <span className="text-sm font-semibold tabular-nums text-[var(--color-text-secondary)]">{item.value}/{item.maxVal}</span>
-                    )}
-                  </div>
-                ))}
+                {items.slice(4).map((item) => {
+                  // 扣分项显示的是"满分-扣分"，即该维度对总分的实际贡献，
+                  // 这样七个卡片数值相加等于总分。
+                  const goodScore = Math.max(0, item.maxVal - item.value);
+                  const ratio = item.maxVal > 0 ? goodScore / item.maxVal : 0;
+                  const colorClass = ratio >= 0.8
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : ratio >= 0.5
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-red-600 dark:text-red-400";
+                  return (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
+                      <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
+                      <span className={`text-sm font-bold tabular-nums ${colorClass}`}>{goodScore}/{item.maxVal}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
