@@ -3,11 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useAnalysis } from "@/lib/analysis-context";
-const EEGWaveform = nextDynamic(() => import("@/components/PlotlyEEGWaveform"), { ssr: false, loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64 mt-4" /> });
 import {
   UploadCloud,
   FileText,
@@ -36,7 +34,7 @@ function StatusBadge({ status }: { status: Status }) {
     completed:   { key: "completed",   color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", Icon: CheckCircle2, spin: false },
     failed:      { key: "failed",      color: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",            Icon: AlertTriangle, spin: false },
   };
-  const { key, color, Icon, spin } = map[status];
+  const { key, color, Icon, spin } = map[status] || map.failed;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
       <Icon className={`w-3.5 h-3.5 ${spin ? "animate-spin" : ""}`} />
@@ -54,7 +52,7 @@ function OverviewCard({ analysis }: { analysis: any }) {
     { label: t("channelCount"), value: analysis.channel_count ?? "-" },
     { label: t("samplingRate"), value: analysis.sampling_rate ?? "-" },
     { label: t("duration"),     value: analysis.duration ?? "-" },
-    { label: t("signalQuality"), value: analysis.signal_quality_score ?? "-" },
+    { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(0) : "-" },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -137,7 +135,15 @@ function ExplanationCards({ analysis }: { analysis: any }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <div className="text-sm font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</div>
-          <div className="mt-2 text-sm text-[var(--color-text-secondary)]">{analysis.confidence?.level || "-"}</div>
+          <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            {(() => {
+              const lvl = analysis.confidence?.level;
+              if (!lvl) return "-";
+              const k = `confidence${lvl}`;
+              const l = t(k);
+              return l === k ? lvl : l;
+            })()}
+          </div>
           <div className="mt-1 text-xs leading-6 text-[var(--color-text-secondary)]">{analysis.confidence?.reason || ""}</div>
         </div>
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 lg:col-span-2">
@@ -204,7 +210,7 @@ function FileCard({
 
       {expanded && (item.status === "analysisReady" || item.status === "explaining" || item.status === "completed") && !item.error && (
         <div className="border-t border-[var(--color-border)] px-5 py-4">
-          <div className="text-center mb-4">
+          <div className="text-center">
             <Link
               href="/reports"
               className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
@@ -212,8 +218,6 @@ function FileCard({
               {t("viewInReports") || "View report →"}
             </Link>
           </div>
-          {/* EEG Waveform */}
-          {item.eegData && <EEGWaveform eegData={item.eegData} />}
         </div>
       )}
     </div>
@@ -312,6 +316,7 @@ function DashboardInner() {
       {/* 网站介绍 */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 p-5 text-sm leading-relaxed text-[var(--color-text)]">
         {t("siteIntro")}
+        <span className="mt-2 block font-semibold text-blue-600 dark:text-blue-400 text-sm">{t("freePlatform")}</span>
       </div>
 
       {/* EEG Analysis Panel */}
@@ -333,7 +338,7 @@ function DashboardInner() {
             <input
               ref={inputRef}
               type="file"
-              accept=".edf"
+              accept=".edf,.bdf,.gdf"
               multiple
               className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
@@ -362,20 +367,17 @@ function DashboardInner() {
                 {/* Primary button: Start / Processing (disabled) / Resume */}
                 <button
                   onClick={() => {
-                    if (!user) { window.location.href = "/login"; return; }
                     if (paused) {
                       resumeAnalysis();
                     } else {
                       startAnalysis();
                     }
                   }}
-                  disabled={!user || files.length === 0 || (running && !paused)}
+                  disabled={files.length === 0 || (running && !paused)}
                   className="rounded-2xl bg-[var(--color-primary)] dark:bg-[var(--color-primary)] dark:text-[var(--color-bg)] px-6 py-2.5 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:opacity-90 disabled:opacity-40"
                 >
-                  {!user ? (t("pleaseLogin") || "Please login to analyze") : (
-                    paused ? (t("resumeAnalysis") || "Resume") : (
-                      running ? t("processing") : (t("startAnalysis") || "Start Analysis")
-                    )
+                  {paused ? (t("resumeAnalysis") || "Resume") : (
+                    running ? t("processing") : (t("startAnalysis") || "Start Analysis")
                   )}
                 </button>
 
@@ -417,29 +419,20 @@ function DashboardInner() {
         )}
       </div>
 
-      {/* AI Status Bar */}
+      {/* AI Status Bar — 仅保留绿色对号 + qwen2.5 */}
       {aiStatus && (
-        <div className="flex items-center justify-center gap-4 py-2 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] mt-4">
-          <div className="flex items-center gap-1.5">
-            {aiStatus.online ? (
+        <div className="flex items-center justify-center gap-1.5 py-2 text-xs border-t border-[var(--color-border)] mt-4">
+          {aiStatus.online ? (
+            <>
               <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-            ) : (
+              <span className="font-medium text-green-700 dark:text-green-400">AI 模型 · qwen2.5</span>
+            </>
+          ) : (
+            <>
               <AlertTriangle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
-            )}
-            <span className={aiStatus.online ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
-              {aiStatus.online ? t("aiOnline") : t("aiOffline")}
-            </span>
-          </div>
-          {aiStatus.online && (
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-              <span>{aiStatus.model}</span>
-            </div>
+              <span className="font-medium text-red-700 dark:text-red-400">{t("aiOffline")}</span>
+            </>
           )}
-          <div className="flex items-center gap-1.5">
-            <Cpu className="w-3.5 h-3.5" />
-            <span>{aiStatus.mode}</span>
-          </div>
         </div>
       )}
     </motion.div>

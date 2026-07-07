@@ -26,7 +26,7 @@ class ReportErrorBoundary extends Component<{ children: ReactNode; fallback: str
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <AlertTriangle className="h-10 w-10 text-amber-500 mb-3" />
+          <AlertTriangle className="h-10 w-10 text-amber-500 dark:text-amber-400 mb-3" />
           <p className="text-sm text-[var(--color-text-secondary)]">{this.props.fallback}</p>
         </div>
       );
@@ -138,18 +138,22 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {/* Tab content — both mounted, one hidden to preserve state */}
+      {/* Tab content */}
       <div className="p-6">
-        <div className={activeTab === "analysis" ? "block" : "hidden"}>
-          <ReportErrorBoundary fallback={t("reportLoadError") || "Failed to load report section"}>
-            <ReportDetail report={report} />
-          </ReportErrorBoundary>
-        </div>
-        <div className={activeTab === "eeg" ? "block" : "hidden"}>
-          <ReportErrorBoundary fallback={t("noBandWaveform") || "No waveform data"}>
-            <ReportEEGChart reportFileName={report.fileName} eegData={report.eegData} analysis={report.analysis} />
-          </ReportErrorBoundary>
-        </div>
+        {activeTab === "analysis" && (
+          <div>
+            <ReportErrorBoundary fallback={t("reportLoadError")}>
+              <ReportDetail report={report} />
+            </ReportErrorBoundary>
+          </div>
+        )}
+        {activeTab === "eeg" && (
+          <div>
+            <ReportErrorBoundary fallback={t("noBandWaveform")}>
+              <ReportEEGChart reportFileName={report.fileName} eegData={report.eegData} analysis={report.analysis} />
+            </ReportErrorBoundary>
+          </div>
+        )}
       </div>
     </motion.div>
   );

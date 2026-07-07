@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { useLang } from "./language-context";
 
 interface User {
@@ -17,6 +17,8 @@ interface AuthContextType {
   token: string | null;
   login: (usernameOrEmail: string, password: string) => Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }>;
   register: (username: string, email: string, password: string, code?: string) => Promise<{ success: boolean; error?: string }>;
+  sendLoginCode: (email: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithCode: (email: string, code: string) => Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }>;
   logout: () => void;
   loading: boolean;
   updateUser: (user: User) => void;
@@ -24,6 +26,8 @@ interface AuthContextType {
   changePassword: (data: { verification_code: string; new_password: string }) => Promise<{ success: boolean; error?: string }>;
   sendVerificationCode: (data: { email?: string }) => Promise<{ success: boolean; error?: string }>;
   updateEmail: (data: { new_email: string; verification_code: string }) => Promise<{ success: boolean; error?: string }>;
+  sendOldEmailCode: () => Promise<{ success: boolean; error?: string }>;
+  verifyOldEmail: (code: string) => Promise<{ success: boolean; error?: string }>;
   sendDeleteAccountCode: () => Promise<{ success: boolean; error?: string }>;
   deleteAccount: (data: { verification_code: string }) => Promise<{ success: boolean; error?: string }>;
   termsAccepted: boolean;
@@ -40,6 +44,16 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 // 以后更新条款时改为 "v2"，所有用户会重新看到同意弹窗
 const CONSENT_VERSION = "v1";
 const CONSENT_STORAGE_KEY = "neuroaccess-consent-v1";
+
+const SECURE_COOKIE = typeof window !== "undefined" && window.location.protocol === "https:" ? "Secure; " : "";
+
+function setAuthCookie(token: string, maxAge: number) {
+  document.cookie = `neuroaccess-token=${token}; path=/; ${SECURE_COOKIE}SameSite=Lax; max-age=${maxAge}`;
+}
+
+function clearAuthCookie() {
+  document.cookie = `neuroaccess-token=; path=/; ${SECURE_COOKIE}SameSite=Lax; max-age=0`;
+}
 
 interface ConsentRecord {
   accepted: boolean;
@@ -82,6 +96,24 @@ function clearConsent(): void {
   }
 }
 
+/** 解码 JWT 获取过期时间（毫秒），失败返回 null */
+function decodeJwtExpiry(token: string): number | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    // Base64 URL-safe decode
+    const decoded = JSON.parse(
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    if (decoded.exp) {
+      return decoded.exp * 1000; // seconds → milliseconds
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -109,8 +141,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const tf = (key: string, fb: string) => { const v = t(key); return v === key ? fb : v; };
+  // ── Token 过期自动登出 ──────────────────────────
+  const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLogoutTimer = () => {
+    if (logoutTimerRef.current) {
+      clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = null;
+    }
+  };
+
+  const scheduleLogout = (jwtToken: string) => {
+    clearLogoutTimer();
+    const expiry = decodeJwtExpiry(jwtToken);
+    if (expiry && expiry > Date.now()) {
+      const msUntilExpiry = expiry - Date.now();
+      logoutTimerRef.current = setTimeout(() => {
+        console.warn("[Auth] Token expired, logging out");
+        logout();
+      }, msUntilExpiry);
+    }
+  };
+
+  // Schedule logout on mount if token exists
+  useEffect(() => {
+    if (token) {
+      scheduleLogout(token);
+    }
+    return clearLogoutTimer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const { t } = useLang();
+
+  const tf = (key: string, fb: string) => { const v = t(key); return v === key ? fb : v; };
 
   const login = async (usernameOrEmail: string, password: string): Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
     try {
@@ -125,7 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        document.cookie = `neuroaccess-token=${data.token}; path=/; max-age=2592000`;
+        setAuthCookie(data.token, 2592000);
+        scheduleLogout(data.token);
 
         const nu = !!data.needs_username_setup;
         setNeedsUsernameSetup(nu);
@@ -143,9 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return { success: true, termsAccepted: !!data.terms_accepted, needsUsernameSetup: nu };
       }
-      return { success: false, error: data.error || tf("loginFailed", "登录失败") };
+      return { success: false, error: data.error || data.detail || tf("loginFailed", "Login failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
@@ -162,7 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        document.cookie = `neuroaccess-token=${data.token}; path=/; max-age=2592000`;
+        setAuthCookie(data.token, 2592000);
+        scheduleLogout(data.token);
 
         // 新注册用户需要同意条款
         setTermsAccepted(false);
@@ -170,11 +236,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // 如果用户以前注册过并且同意了（比如重注册），清除旧的 consent
         // 但不影响当前这个全新注册流程
         clearConsent();
+        // 清除可能遗留的旧账号 local 数据
+        //（销号后从另一台设备重新注册，旧 localStorage 还在）
+        localStorage.removeItem("neuroaccess-reports");
+        localStorage.removeItem("neuroaccess-feedback");
+        localStorage.removeItem("neuroaccess-survey");
         return { success: true };
       }
-      return { success: false, error: data.error || tf("registerFailed", "注册失败") };
+      return { success: false, error: data.error || tf("registerFailed", "Registration failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
+    }
+  };
+
+  const sendLoginCode = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/send-login-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ email }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        return { success: false, error: data.detail || data.error || tf("sendCodeFailed", "Failed to send code") };
+      }
+      if (data.success) {
+        return { success: true };
+      }
+      return { success: false, error: data.error || tf("sendCodeFailed", "Failed to send code") };
+    } catch (e: any) {
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
+    }
+  };
+
+  const loginWithCode = async (email: string, code: string): Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/login-with-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ email, code }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem("neuroaccess-token", data.token);
+        localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
+        setAuthCookie(data.token, 2592000);
+        scheduleLogout(data.token);
+        const nu = !!data.needs_username_setup;
+        setNeedsUsernameSetup(nu);
+        if (loadConsent()) {
+          setTermsAccepted(true);
+        } else if (data.terms_accepted) {
+          saveConsent();
+          setTermsAccepted(true);
+        }
+        return { success: true, termsAccepted: !!data.terms_accepted, needsUsernameSetup: nu };
+      }
+      return { success: false, error: data.error || tf("verificationCodeFailed", "Verification failed") };
+    } catch (e: any) {
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
+    }
+  };
+
+  const sendOldEmailCode = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/send-old-email-code`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await resp.json();
+      if (!resp.ok) {
+        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "Failed to send code") };
+      }
+      if (result.success) return { success: true };
+      return { success: false, error: result.error || tf("sendCodeFailed", "Failed to send code") };
+    } catch (e: any) {
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
+    }
+  };
+
+  const verifyOldEmail = async (code: string): Promise<{ success: boolean; error?: string }> => {
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/verify-old-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Bearer ${token}`,
+        },
+        body: new URLSearchParams({ code }),
+      });
+      const result = await resp.json();
+      if (result.success) return { success: true };
+      return { success: false, error: result.error || tf("verificationCodeFailed", "Verification failed") };
+    } catch (e: any) {
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
@@ -202,7 +361,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (data: { username?: string; avatar_color?: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/profile`, {
         method: "PUT",
@@ -214,19 +373,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const result = await resp.json();
       if (result.success) {
-        const updatedUser = { ...user!, ...result.user };
-        setUser(updatedUser);
-        localStorage.setItem("neuroaccess-user", JSON.stringify(updatedUser));
+        const updatedUser = result.user ? { ...(user || {}), ...result.user } as User : user!;
+        if (updatedUser) {
+          setUser(updatedUser);
+          localStorage.setItem("neuroaccess-user", JSON.stringify(updatedUser));
+        }
         return { success: true };
       }
-      return { success: false, error: result.error || tf("failedToUpdateProfile", "更新失败") };
+      return { success: false, error: result.error || tf("failedToUpdateProfile", "Profile update failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
   const changePassword = async (data: { verification_code: string; new_password: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: "POST",
@@ -243,14 +404,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || tf("failedToChangePasswordMsg", "修改失败") };
+      return { success: false, error: result.error || tf("failedToChangePasswordMsg", "Password change failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
   const sendVerificationCode = async (data: { email?: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/verification-code`, {
         method: "POST",
@@ -262,22 +423,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         result = await resp.json();
       } catch {
-        result = { detail: tf("sendCodeFailed", "验证码发送失败") };
+        result = { detail: tf("sendCodeFailed", "Failed to send verification code") };
       }
       if (!resp.ok) {
-        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "验证码发送失败") };
+        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "Failed to send verification code") };
       }
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || tf("sendFailed", "发送失败") };
+      return { success: false, error: result.error || tf("sendFailed", "Send failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
   const updateEmail = async (data: { new_email: string; verification_code: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/confirm-email-change`, {
         method: "POST",
@@ -293,20 +454,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await resp.json();
       if (result.success) {
         if (result.user) {
-          const updatedUser = { ...user!, ...result.user };
+          const updatedUser = { ...(user || {}), ...result.user } as User;
           setUser(updatedUser);
           localStorage.setItem("neuroaccess-user", JSON.stringify(updatedUser));
         }
         return { success: true };
       }
-      return { success: false, error: result.error || tf("failedToChangePasswordMsg", "修改失败") };
+      return { success: false, error: result.error || "Email change failed" };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
   const sendDeleteAccountCode = async (): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/send-delete-account-code`, {
         method: "POST",
@@ -318,22 +479,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         result = await resp.json();
       } catch {
-        result = { detail: tf("sendCodeFailed", "验证码发送失败") };
+        result = { detail: tf("sendCodeFailed", "Failed to send verification code") };
       }
       if (!resp.ok) {
-        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "验证码发送失败") };
+        return { success: false, error: result.detail || result.error || tf("sendCodeFailed", "Failed to send verification code") };
       }
       if (result.success) {
         return { success: true };
       }
-      return { success: false, error: result.error || tf("sendFailed", "发送失败") };
+      return { success: false, error: result.error || tf("sendFailed", "Send failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
   const deleteAccount = async (data: { verification_code: string }): Promise<{ success: boolean; error?: string }> => {
-    if (!token) return { success: false, error: tf("notLoggedIn", "未登录") };
+    if (!token) return { success: false, error: tf("notLoggedIn", "Not logged in") };
     try {
       const resp = await fetch(`${API_BASE}/api/auth/confirm-delete-account`, {
         method: "POST",
@@ -346,6 +507,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
       });
       const result = await resp.json();
+      if (!resp.ok) {
+        return { success: false, error: result.detail || result.error || tf("deleteAccountFailed", "Account deletion failed") };
+      }
       if (result.success) {
         setToken(null);
         setUser(null);
@@ -353,13 +517,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setNeedsUsernameSetup(false);
         localStorage.removeItem("neuroaccess-token");
         localStorage.removeItem("neuroaccess-user");
+        localStorage.removeItem("neuroaccess-reports");
+        localStorage.removeItem("neuroaccess-feedback");
+        localStorage.removeItem("neuroaccess-survey");
         // 删除账号时清除同意记录
         clearConsent();
         return { success: true };
       }
-      return { success: false, error: result.error || tf("deleteAccountFailed", "删除失败") };
+      return { success: false, error: result.error || tf("deleteAccountFailed", "Account deletion failed") };
     } catch (e: any) {
-      return { success: false, error: e.message || tf("networkErrorMsg", "网络错误") };
+      return { success: false, error: e.message || tf("networkErrorMsg", "Network error") };
     }
   };
 
@@ -370,9 +537,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsUsernameSetup(false);
     localStorage.removeItem("neuroaccess-token");
     localStorage.removeItem("neuroaccess-user");
+    // 注销时清除问卷本地记录，防止未登录状态下看到已提交状态
+    localStorage.removeItem("neuroaccess-survey");
     // 注销时 NOT 清除同意记录，这样重新登录后不再显示弹窗
     // 只有用户主动删除账号才会清除
-    document.cookie = "neuroaccess-token=; path=/; max-age=0";
+    clearAuthCookie();
   };
 
   const updateUser = (updatedUser: User) => {
@@ -381,7 +550,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading, updateUser, updateProfile, changePassword, sendVerificationCode, updateEmail, sendDeleteAccountCode, deleteAccount, termsAccepted, needsUsernameSetup, acceptTerms, setNeedsUsernameSetup }}>
+    <AuthContext.Provider value={{ user, token, login, register, sendLoginCode, loginWithCode, logout, loading, updateUser, updateProfile, changePassword, sendVerificationCode, updateEmail, sendOldEmailCode, verifyOldEmail, sendDeleteAccountCode, deleteAccount, termsAccepted, needsUsernameSetup, acceptTerms, setNeedsUsernameSetup }}>
       {children}
     </AuthContext.Provider>
   );

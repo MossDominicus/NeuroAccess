@@ -5,9 +5,8 @@ import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import type { Lang } from "@/lib/translations";
 import KnowledgeCard, { KnowledgeCardData } from "@/components/KnowledgeCard";
-import { BookOpen, Search, Filter } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 
-export const dynamic = "force-static";
 
 // ── 知识卡片数据（key 由 t() 翻译）────────────────────
 function getCards(t: (key: string) => string): KnowledgeCardData[] {

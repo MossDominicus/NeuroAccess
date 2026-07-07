@@ -108,31 +108,6 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
         })}
       </div>
 
-      {data?.confidence && (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-          <h4 className="mb-3 text-sm font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</h4>
-          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${levelClass[data.confidence.level || "Low"] || levelClass.Low}`}>
-            <Shield className="h-3.5 w-3.5" />
-            <span>{data.confidence.level ? t(`confidence${data.confidence.level}`) : t("confidenceLow")}</span>
-            {data.confidence.reason && <span>— {data.confidence.reason}</span>}
-          </div>
-        </section>
-      )}
-
-      {data?.limitations && data.limitations.length > 0 && (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-          <h4 className="mb-3 text-sm font-bold text-[var(--color-text)]">{t("whatDataCannotTell")}</h4>
-          <ul className="space-y-2">
-            {data.limitations.map((item, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-yellow-500 dark:text-yellow-400" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       {disclaimerText && (
         <section className="rounded-xl border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-900/50 p-4">
           <div className="mb-1 text-xs font-bold text-yellow-900 dark:text-yellow-300">{t("nonMedicalDisclaimer")}</div>

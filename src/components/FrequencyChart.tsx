@@ -51,7 +51,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
             <XAxis dataKey="band" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip formatter={(value: any) => [`${value}`, t("energyLabel")]} />
-            <Legend formatter={() => t("chartLegendPower") || "Power"} />
+            <Legend formatter={() => t("chartLegendPower")} />
             <Bar dataKey="power" fill="#4f46e5" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -61,7 +61,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
         <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-6 hover:shadow-lg hover:shadow-gray-900/5 transition-all duration-300">
           <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] mb-4">{t("frequencyDistributionTitle")}</h4>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={distributionData.slice(0, 50)}>
+            <BarChart data={distributionData.slice(0, 200)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis
                 dataKey="frequency"

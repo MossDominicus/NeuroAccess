@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// 公开路径：无需登录即可访问
 const publicPaths = [
+  "/",  // 首页（游客也可上传分析）
   "/login", "/register",
   "/guide", "/cases", "/privacy", "/terms", "/disclaimer",
   "/eeg-simulator", "/eeg-viewer",
@@ -20,14 +20,19 @@ const publicPaths = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const token = request.cookies.get("neuroaccess-token")?.value;
+
+  // 已登录用户访问登录/注册页：重定向到首页
+  if (token && (pathname === "/login" || pathname === "/register")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
 
   // 公开路径直接放行（静态页面可被浏览器/CDN 缓存）
   if (publicPaths.some((p) => pathname === p || pathname.startsWith(p))) {
     return NextResponse.next();
   }
-
-  // 受保护路径：检查登录 token
-  const token = request.cookies.get("neuroaccess-token")?.value;
   if (!token) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

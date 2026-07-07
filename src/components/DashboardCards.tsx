@@ -25,7 +25,14 @@ export default function DashboardCards({ analysisResult }: DashboardCardsProps) 
     },
     {
       title: t("confidenceCard"),
-      value: confidence ? t(`confidence${confidence.level}`) : "-",
+      value: confidence
+        ? (() => {
+            const key = `confidence${confidence.level}`;
+            const label = t(key);
+            // Fallback for legacy reports whose `level` is an already-translated word
+            return label === key ? confidence.level : label;
+          })()
+        : "-",
       icon: TrendingUp,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-50 dark:bg-purple-950/30",

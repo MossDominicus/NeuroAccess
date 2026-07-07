@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/language-context";
 
-export const dynamic = "force-static";
 
 
 const EEGViewerPlot = nextDynamic(() => import("@/components/PlotlyEEGViewerWaveform"), {
@@ -130,7 +129,7 @@ export default function EEGViewerPage() {
           <input
             id="eeg-file-input"
             type="file"
-            accept=".edf"
+            accept=".edf,.bdf,.gdf"
             onChange={handleFileChange}
             className="hidden"
           />

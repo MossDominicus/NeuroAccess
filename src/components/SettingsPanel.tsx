@@ -7,8 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Moon, Sun, Monitor, User, X, Eye, Key, MessageSquare, CheckCircle2, AlertTriangle, Cpu } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, User, X, Eye, Key, MessageSquare, FileText, CheckCircle2, AlertTriangle, Cpu } from "lucide-react";
 const FeedbackPanel = dynamic(() => import("@/components/FeedbackPanel"), { ssr: false, loading: () => null });
+const SurveyPanel = dynamic(() => import("@/components/SurveyPanel"), { ssr: false, loading: () => null });
 
 type SettingsPanelProps = {
   open: boolean;
@@ -21,15 +22,12 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { user, token, logout, updateUser } = useAuth();
 
   const [showFeedback, setShowFeedback] = useState(false);
-  const [deleteSuccess, setDeleteSuccess] = useState("");
-  const [deleteCountdown, setDeleteCountdown] = useState(0);
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [surveyLoginHint, setSurveyLoginHint] = useState(false);
 
   const [aiStatus, setAiStatus] = useState<{ online: boolean; model: string; mode: string } | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-
-
-
 
 
   // 点击遮罩关闭
@@ -81,7 +79,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             onClick={handleOverlay}
           >
           {/* 遮罩 */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
           {/* 面板：从左侧滑入 */}
           <motion.aside
@@ -162,24 +160,46 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   >
                     <span className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                      {t("helpImprove")}
+                      {t("feedback")}
                     </span>
-                    <span className="text-xs text-[var(--color-text-secondary)]">{t("clickToOpen") || "点击打开"}</span>
+                    <span className="text-xs text-[var(--color-text-secondary)]">{t("clickToOpen")}</span>
                   </button>
-                </div>
-              </section>
-
-              {/* 移动端提示 */}
-              <section>
-                <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex items-start gap-3">
-                  <Monitor className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-                    {t("mobileNotOptimized")}
+                  <p className="px-3 pb-3 text-[11px] leading-relaxed text-[var(--color-text-secondary)] opacity-60">
+                    {t("feedbackHint")}
                   </p>
                 </div>
+          </section>
+
+          {/* 问卷调查 */}
+              <section>
+                <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+                  {t("surveyTitle")}
+                </h3>
+                <div className="rounded-xl bg-[var(--color-bg)]">
+                  <button
+                    onClick={() => {
+                      if (!user || !token) {
+                        setSurveyLoginHint(true);
+                        setTimeout(() => setSurveyLoginHint(false), 3000);
+                      } else {
+                        setShowSurvey(true);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-3 text-sm text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors rounded-xl"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                      {t("surveyTitle")}
+                    </span>
+                    <span className="text-xs text-[var(--color-text-secondary)]">{t("clickToOpen")}</span>
+                  </button>
+                  {surveyLoginHint && (
+                    <p className="px-3 pb-2 text-xs text-amber-500 dark:text-amber-400">{t("surveyLoginRequired")}</p>
+                  )}
+                </div>
               </section>
 
-              {/* 关于 */}
+          {/* 关于 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
                   {t("about")}
@@ -189,7 +209,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     <span className="text-sm text-[var(--color-text-secondary)]">
                       {t("version")}
                     </span>
-                    <span className="text-sm font-mono text-[var(--color-text)]">v1.7.2</span>
+                    <span className="text-sm font-mono text-[var(--color-text)]">v2.0</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[var(--color-text-secondary)]">
@@ -208,29 +228,11 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               </section>
 
               {/* AI 状态 — 仅未登录时显示 */}
-              {!token && aiStatus && (
+              {!token && aiStatus && aiStatus.online && (
                 <section>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] pt-4">
-                    <div className="flex items-center gap-1.5">
-                      {aiStatus.online ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-                      ) : (
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
-                      )}
-                      <span className={aiStatus.online ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
-                        {aiStatus.online ? t("aiOnline") : t("aiOffline")}
-                      </span>
-                    </div>
-                    {aiStatus.online && (
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-                        <span>{aiStatus.model}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                      <Cpu className="w-3.5 h-3.5" />
-                      <span>{aiStatus.mode}</span>
-                    </div>
+                  <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] border-t border-[var(--color-border)] pt-4">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
+                    <span className="text-green-700 dark:text-green-400">{aiStatus.model}</span>
                   </div>
                 </section>
               )}
@@ -251,8 +253,27 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               <X className="w-4 h-4 text-[var(--color-text-secondary)]" />
             </button>
           </div>
-          <div className="p-5">
+          <div className="p-5 space-y-6">
             <FeedbackPanel />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+
+    {/* Survey Modal — portal to document.body */}
+    {showSurvey && typeof document !== 'undefined' && createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowSurvey(false)} />
+        <div className="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto bg-[var(--color-surface)] rounded-2xl shadow-2xl border border-[var(--color-border)]">
+          <div className="sticky top-0 z-10 flex items-center justify-between px-5 h-14 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+            <h2 className="text-sm font-semibold">{t("surveyTitle")}</h2>
+            <button onClick={() => setShowSurvey(false)} className="p-1.5 rounded-lg hover:bg-[var(--color-bg)] transition-colors">
+              <X className="w-4 h-4 text-[var(--color-text-secondary)]" />
+            </button>
+          </div>
+          <div className="p-5">
+            <SurveyPanel />
           </div>
         </div>
       </div>,

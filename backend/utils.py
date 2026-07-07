@@ -49,7 +49,11 @@ def to_jsonable(obj: Any) -> Any:
 
 
 def normalize_language(language: Optional[str]) -> str:
-    return "en" if language == "en" else "zh"
+    if not language:
+        return "zh"
+    lang = language.lower().split("-")[0].split("_")[0]
+    SUPPORTED = {"zh", "en", "es", "fr", "de", "ja", "ko"}
+    return lang if lang in SUPPORTED else "zh"
 
 
 def safe_name(filename: str) -> str:

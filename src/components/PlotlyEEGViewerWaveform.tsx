@@ -20,10 +20,10 @@ export default function PlotlyEEGViewerWaveform({ eegData }: Props) {
         <img
           src={`data:image/png;base64,${waveformImage}`}
           alt={t("waveformPreviewAlt")}
-          className="w-full rounded-xl border border-zinc-800 bg-black"
+          className="w-full rounded-xl border border-zinc-300 bg-white dark:border-zinc-800 dark:bg-black"
         />
       ) : (
-        <div className="flex items-center justify-center h-[400px] text-zinc-400">
+        <div className="flex items-center justify-center h-[400px] text-zinc-500 dark:text-zinc-400">
           {t("noWaveformPreview")}
         </div>
       )}

@@ -1,30 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
-import PublicPreviewFooter from "@/components/PublicPreviewFooter";
 import { DisclaimerModal, PostLoginModals } from "@/components/LazyModals";
+import RoutePrefetcher from "@/components/RoutePrefetcher";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import PublicPreviewFooter from "@/components/PublicPreviewFooter";
 import type { Lang } from "@/lib/translations";
 import { LanguageProvider } from "@/lib/language-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import IntroProvider from "@/components/IntroProvider";
+import { AppEventProvider } from "@/lib/app-events";
 
-// Metadata 使用默认中文，语言切换由客户端 LanguageProvider 处理
+// Metadata in English (SEO default); client-side language handled by LanguageProvider
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = "https://neuroaccess.cloud";
 
   return {
-    title: "NeuroAccess",
-    description: "EEG 科普教育平台，将脑电图数据翻译成人话",
+    title: "NeuroAccess — EEG Education Platform",
+    description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
     applicationName: "NeuroAccess",
+    alternates: { canonical: baseUrl },
     openGraph: {
-      title: "NeuroAccess",
-      description: "EEG 科普教育平台，将脑电图数据翻译成人话",
+      title: "NeuroAccess — EEG Education Platform",
+      description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
       url: baseUrl,
       siteName: "NeuroAccess",
       images: [
@@ -35,18 +39,20 @@ export async function generateMetadata(): Promise<Metadata> {
           alt: "NeuroAccess",
         },
       ],
-      locale: "zh_CN",
+      locale: "en_US",
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "NeuroAccess",
-      description: "EEG 科普教育平台，将脑电图数据翻译成人话",
+      title: "NeuroAccess — EEG Education Platform",
+      description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
       images: [`${baseUrl}/neuroaccess-logo-512.png`],
     },
     icons: {
       icon: [
+        { url: "/favicon.ico?v=4", sizes: "any" },
         { url: "/favicon.png?v=4", sizes: "32x32", type: "image/png" },
+        { url: "/neuroaccess-logo-small.png?v=4", sizes: "128x128", type: "image/png" },
       ],
       apple: [
         { url: "/apple-touch-icon.png?v=4", sizes: "180x180", type: "image/png" },
@@ -58,6 +64,17 @@ export async function generateMetadata(): Promise<Metadata> {
       capable: true,
       statusBarStyle: "default",
       title: "NeuroAccess",
+    },
+    other: {
+      "application/ld+json": JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: "NeuroAccess",
+        url: baseUrl,
+        description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
+        applicationCategory: "EducationalApplication",
+        operatingSystem: "Web",
+      }),
     },
   };
 }
@@ -76,7 +93,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // 从 cookie 读取用户语言偏好（SSR）
+  // 从 cookie 读取用户语言偏好（SSR），无 cookie 则检测 Accept-Language
   let initialLang: Lang | undefined;
   try {
     const cookieStore = await cookies();
@@ -86,6 +103,21 @@ export default async function RootLayout({
       initialLang = langCookie.value as Lang;
     }
   } catch {}
+  if (!initialLang) {
+    try {
+      const headersList = await headers();
+      const acceptLang = headersList.get("accept-language") || "";
+      // Parse Accept-Language: "zh-CN,zh;q=0.9,en;q=0.8" → try to find best match
+      const browserLangs = acceptLang.split(",").map(s => s.split(";")[0].trim().toLowerCase().split("-")[0].split("_")[0]);
+      const LANGUAGES: Lang[] = ["zh", "en", "es", "fr", "de", "ja", "ko"];
+      for (const bl of browserLangs) {
+        if (LANGUAGES.includes(bl as Lang)) {
+          initialLang = bl as Lang;
+          break;
+        }
+      }
+    } catch {}
+  }
   // 默认英文
   initialLang = initialLang || "en";
 
@@ -95,6 +127,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{
           __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}})()`
         }} />
+        <link rel="shortcut icon" href="/favicon.ico?v=4" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4" />
         <link rel="apple-touch-icon" sizes="512x512" href="/neuroaccess-logo-512.png?v=4" />
@@ -103,22 +136,27 @@ export default async function RootLayout({
         <AuthProvider>
           <ThemeProvider>
             <LanguageProvider initialLang={initialLang}>
+              <AppEventProvider>
               <IntroProvider>
               <AnalysisProvider>
               <DisclaimerModal />
               <PostLoginModals />
+              <RoutePrefetcher />
               <div className="flex h-screen overflow-hidden">
                 <Sidebar />
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <TopNav />
                   <main className="flex-1 overflow-y-auto overflow-x-auto scroll-smooth transition-all duration-200">
-                    {children}
+                    <ErrorBoundary>
+                      {children}
+                    </ErrorBoundary>
                   </main>
                   <PublicPreviewFooter />
                 </div>
               </div>
               </AnalysisProvider>
               </IntroProvider>
+              </AppEventProvider>
             </LanguageProvider>
           </ThemeProvider>
         </AuthProvider>

@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
+import { useAppEvents } from "@/lib/app-events";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 
 export default function DisclaimerModal() {
   const { t } = useLang();
   const { user } = useAuth();
+  const { setOpenDisclaimer } = useAppEvents();
   const [visible, setVisible] = useState(false);
   const hasOpenedRef = useRef(false);
 
@@ -26,18 +28,12 @@ export default function DisclaimerModal() {
       hasOpenedRef.current = true;
     }
 
-    // 支持两种方式打开：事件 (__openDisclaimer) 或回调 (__openDisclaimerModal)
-    function onOpenEvent() {
-      setVisible(true);
-    }
-    window.addEventListener("__openDisclaimer", onOpenEvent);
-    (window as any).__openDisclaimerModal = () => setVisible(true);
+    setOpenDisclaimer(() => () => setVisible(true));
 
     return () => {
-      window.removeEventListener("__openDisclaimer", onOpenEvent);
-      delete (window as any).__openDisclaimerModal;
+      setOpenDisclaimer(() => () => {});
     };
-  }, []);
+  }, [user, setOpenDisclaimer]);
 
   const handleAccept = () => {
     try {
@@ -58,10 +54,10 @@ export default function DisclaimerModal() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-[var(--color-text)]">
-              {t("disclaimerModalTitle") || "免责声明"}
+              {t("disclaimerModalTitle")}
             </h2>
             <p className="text-xs text-[var(--color-text-secondary)]">
-              {t("disclaimerModalSubtitle") || "使用 NeuroAccess 前，请仔细阅读"}
+              {t("disclaimerModalSubtitle")}
             </p>
           </div>
         </div>
@@ -69,7 +65,7 @@ export default function DisclaimerModal() {
         {/* Content */}
         <div className="px-6 py-4 space-y-3 text-sm text-[var(--color-text)] leading-relaxed max-h-[50vh] overflow-y-auto">
           <p className="font-medium text-red-500 dark:text-red-400">
-            {t("disclaimerImportant") || "重要提示："}
+            {t("disclaimerImportant")}
           </p>
           <ul className="space-y-2 pl-4 list-disc text-[var(--color-text-secondary)]">
             <li>
@@ -92,8 +88,7 @@ export default function DisclaimerModal() {
             </li>
           </ul>
           <div className="pt-2 border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]">
-            {t("disclaimerAgreement") ||
-              '点击"我已了解并同意"即表示您理解并同意上述条款。'}
+            {t("disclaimerAgreement")}
           </div>
         </div>
 
@@ -104,7 +99,7 @@ export default function DisclaimerModal() {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-primary)] text-[var(--color-surface)] font-semibold text-sm hover:opacity-90 transition-opacity"
           >
             <CheckCircle className="w-4 h-4" />
-            {t("close") || "关闭"}
+            {t("close")}
           </button>
         </div>
       </div>

@@ -63,7 +63,11 @@ def call_openrouter(prompt: str, timeout: int = 30) -> Dict[str, Any]:
             timeout=(10, timeout),
         )
         if resp.status_code != 200:
-            return {"success": False, "error": f"OpenRouter failed (HTTP {resp.status_code}): {resp.text[:500]}"}
+            body = resp.text[:500]
+            # 友好的错误归类：上下文超长属于已知可降级情况，不向用户暴露原始 API 文本
+            if "input length" in body.lower() or "too long" in body.lower():
+                return {"success": False, "error": "AI input exceeded model context limit; using template explanation."}
+            return {"success": False, "error": f"OpenRouter failed (HTTP {resp.status_code})."}
         text = str(resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")).strip()
         if not text:
             return {"success": False, "error": "OpenRouter returned empty response"}
@@ -177,10 +181,48 @@ def template_research(a: Dict, lang: str) -> str:
     )
 
 
+def _summarize_for_ai(a: Dict) -> Dict:
+    """
+    只保留 AI 解释需要的「派生标量指标」，剔除所有数组 / 波形 / 时间序列数据。
+    目的：防止把过大的 analysis JSON 直接塞给 qwen2.5-7b（32K 上下文），
+    触发 OpenRouter 的 "400 input length too long" 错误。
+    """
+    sq       = a.get("signal_quality") or {}
+    fa       = a.get("frequency_analysis") or {}
+    overview = a.get("overview") or {}
+    literacy = a.get("literacy_scores") or {}
+    return {
+        "channel_count":            overview.get("channel_count"),
+        "sampling_rate":            overview.get("sampling_rate"),
+        "duration":                 overview.get("duration"),
+        "duration_seconds":         overview.get("recording_duration_seconds"),
+        "signal_quality_score":     sq.get("signal_quality_score"),
+        # 只保留前若干项，避免超长通道列表
+        "noisy_channels":           (sq.get("noisy_channels") or [])[:20],
+        "possible_artifacts":       (sq.get("possible_artifacts") or [])[:10],
+        "clipping_detected":        sq.get("clipping_detected"),
+        "missing_data":             sq.get("missing_data"),
+        "high_frequency_noise":     sq.get("high_frequency_noise"),
+        # 频段只用聚合百分比 / 均值（已经是 5 个 key 的字典），丢弃逐通道 bandpower 数组
+        "bandpower_percent":        fa.get("bandpower_percent") or {},
+        "average_bandpower":        fa.get("average_bandpower") or {},
+        "dominant_frequency":       fa.get("dominant_frequency"),
+        "literacy_scores":          literacy,
+        "file_size_mb":             a.get("file_size_mb"),
+        "what_this_data_cannot_tell": a.get("what_this_data_cannot_tell"),
+    }
+
+
 def _build_prompt(a: Dict, level: str, lang: str) -> str:
-    # Strip large waveform data before sending to AI — the model only needs derived metrics
-    prompt_data = {k: v for k, v in a.items() if k not in ("waveform_preview", "waveform_image")}
-    payload      = json.dumps(to_jsonable(prompt_data), ensure_ascii=False, indent=2)
+    # 只发送精简后的派生指标，避免超出模型上下文窗口
+    prompt_data = _summarize_for_ai(a)
+    payload     = json.dumps(to_jsonable(prompt_data), ensure_ascii=False, indent=2)
+
+    # 安全网：硬性限制发给模型的内容长度（qwen2.5-7b 上下文约 32K token ≈ 128K 字符，
+    # 留出充裕余量给指令文本）。正常精简后远低于此值，这里仅作兜底。
+    MAX_PROMPT_CHARS = 12000
+    if len(payload) > MAX_PROMPT_CHARS:
+        payload = payload[:MAX_PROMPT_CHARS] + "\n... [truncated: remaining metrics omitted]"
     output_lang  = LANG_NAME_MAP.get(lang, "English")
     boundary     = (
         "CRITICAL BOUNDARIES - You MUST follow these rules:\n"

@@ -7,8 +7,7 @@ import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/language-context";
 const SettingsPanel = dynamic(() => import("./SettingsPanel"), { ssr: false, loading: () => null });
 import { useAuth } from "@/lib/auth-context";
-import {
-  Brain,
+import { Brain,
   LayoutDashboard,
   FileText,
   BookOpen,
@@ -18,6 +17,7 @@ import {
   ChevronRight,
   Settings,
 } from "lucide-react";
+import { useAppEvents } from "@/lib/app-events";
 
 const menuKeys = [
   { key: "dashboard", href: "/", icon: LayoutDashboard },
@@ -33,12 +33,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { lang, t } = useLang();
   const { user } = useAuth();
+  const { setOpenSettings } = useAppEvents();
 
   // 暴露全局方法供 TopNav 调用
   useEffect(() => {
-    (window as any).__openSettingsPanel = () => setSettingsOpen(true);
-    return () => { delete (window as any).__openSettingsPanel; };
-  }, []);
+    setOpenSettings(() => () => setSettingsOpen(true));
+  }, [setOpenSettings]);
 
   // 语言变化时重新计算菜单标签
   const menuItems = useMemo(() => {

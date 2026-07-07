@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from "react";
 import { useLang } from "@/lib/language-context";
-import { addReport, type StoredReport } from "@/lib/reports-storage";
+import { addReport, syncReportToServer, type StoredReport } from "@/lib/reports-storage";
 
 // ── Types ───────────────────────────────────────────────────────────
 export type Status = "pending" | "reading" | "computing" | "analysisReady" | "explaining" | "completed" | "failed";
@@ -20,10 +20,24 @@ export interface FileJob {
 
 // ── safeJsonFetch ───────────────────────────────────────────────────
 const API_BASE = "";
-const ANALYZE_TIMEOUT = 60_000;   // 60s for /analyze (fast basic analysis)
+const ANALYZE_TIMEOUT = 120_000;   // 120s for /analyze (64ch files need more time)
 const EXPLAIN_TIMEOUT = 180_000;  // 180s for /explain (AI may be slow)
 
-async function safeJsonFetch(url: string, timeoutMs: number, options: RequestInit = {}): Promise<any> {
+// Lazy cache key to avoid SSR access to sessionStorage
+let _filesCacheKey: string | null = null;
+function getFilesCacheKey(): string {
+  if (!_filesCacheKey && typeof window !== "undefined") {
+    const sid = sessionStorage.getItem("neuroaccess-session-id")
+      || (sessionStorage.setItem("neuroaccess-session-id", Math.random().toString(36).slice(2)),
+          sessionStorage.getItem("neuroaccess-session-id"));
+    _filesCacheKey = `neuroaccess-files-${sid}`;
+  }
+  return _filesCacheKey || "";
+}
+const SESSION_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function safeJsonFetch(url: string, timeoutMs: number, options: RequestInit = {}, t?: (key: string) => string): Promise<any> {
+  const tx = t || ((key: string) => key);
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("neuroaccess-token");
     if (token) {
@@ -40,21 +54,30 @@ async function safeJsonFetch(url: string, timeoutMs: number, options: RequestIni
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     const text = await res.text();
-    if (!text.trim()) throw new Error("Empty response from backend");
+    if (!text.trim()) throw new Error(tx("emptyResponseFromBackend"));
     let data: any;
     try {
       data = JSON.parse(text);
     } catch {
-      throw new Error(`Invalid JSON from backend: ${text.slice(0, 300)}`);
+      throw new Error(`${tx("invalidJSON")}: ${text.slice(0, 300)}`);
     }
     if (!res.ok || data?.success === false) {
       const msg = data?.error || data?.detail || `HTTP ${res.status}`;
+      // 凭证过期 (HTTP 401) → 自动跳转登录页
+      if (res.status === 401) {
+        try {
+          localStorage.removeItem("neuroaccess-token");
+          sessionStorage.removeItem(getFilesCacheKey());
+          window.dispatchEvent(new CustomEvent("neuroaccess-token-expired"));
+        } catch {}
+        if (typeof window !== "undefined") window.location.href = "/login";
+      }
       throw new Error(String(msg));
     }
     return data;
   } catch (err: any) {
     if (err.name === "AbortError") {
-      throw new Error("Request timed out. Please try again.");
+      throw new Error(tx("requestTimedOut"));
     }
     throw err;
   } finally {
@@ -86,7 +109,11 @@ export function useAnalysis() {
 }
 
 // ── sessionStorage persist (layout persists, but dashboard remounts) ──
-const FILES_CACHE_KEY = "neuroaccess-files-v2";
+// 每次全页加载生成唯一会话ID，跨页面加载的旧数据永不恢复
+// 注意：sessionStorage 跨页面加载保持，所以必须每次都生成新 ID，不能复用旧值
+const SESSION_ID = typeof window !== "undefined"
+  ? Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+  : "ssr";
 
 function serializeFiles(files: FileJob[]): string {
   const meta = {
@@ -106,7 +133,11 @@ function deserializeFiles(json: string): FileJob[] {
     if (!meta?.items || !Array.isArray(meta.items)) return [];
     // Only restore if saved within last 30 min (prevent stale data)
     if (Date.now() - (meta.savedAt || 0) > 30 * 60 * 1000) return [];
-    return meta.items.map((m: any) => ({
+    // 过滤掉因凭证过期导致的失败文件（登录页后会残留）
+    const filtered = meta.items.filter((m: any) =>
+      m.status !== "failed" || !(m.error && /Invalid credentials|401|unauthorized|not.logged.in/i.test(m.error))
+    );
+    return filtered.map((m: any) => ({
       id: m.id, name: m.name, size: m.size || 0, status: m.status || "pending",
       file: new File([], m.name || "unknown.edf"),
       result: m.result || null, eegData: m.eegData || null,
@@ -129,8 +160,21 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 
   // Persist files to sessionStorage whenever they change
   useEffect(() => {
-    try { sessionStorage.setItem(FILES_CACHE_KEY, serializeFiles(files)); } catch {}
+    try { sessionStorage.setItem(getFilesCacheKey(), serializeFiles(files)); } catch {}
   }, [files]);
+
+  // Restore files from sessionStorage for this session (SPA navigation preservation)
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(getFilesCacheKey());
+      if (cached) {
+        const restored = deserializeFiles(cached);
+        if (restored.length > 0) {
+          setFiles(restored);
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     setFiles((prev) =>
@@ -150,8 +194,8 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     if (!selected || selected.length === 0) return;
     const valid = Array.from(selected).filter((f) => {
       const ext = f.name.split(".").pop()?.toLowerCase();
-      // 只接受 .edf
-      return ext === "edf";
+      // 支持 .edf / .bdf / .gdf
+      return ext === "edf" || ext === "bdf" || ext === "gdf";
     });
     if (valid.length === 0) return;
     setFiles((prev) => [
@@ -180,7 +224,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     runningRef.current = false;
     shouldPauseRef.current = false;
     runIdRef.current = 0;
-    try { sessionStorage.removeItem(FILES_CACHE_KEY); } catch {}
+    try { sessionStorage.removeItem(getFilesCacheKey()); } catch {}
   }, []);
 
   const pauseAnalysis = useCallback(() => {
@@ -250,9 +294,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
             const data = await safeJsonFetch(`${API_BASE}/api/analyze`, ANALYZE_TIMEOUT, {
               method: "POST",
               body: formData,
-            });
+            }, t);
 
-            if (!data.success) throw new Error(data.error || t("analysisFailed") || "Analysis failed");
+            if (!data.success) throw new Error(data.error || t("analysisFailed"));
 
             if (runIdRef.current !== myRunId) return;
             if (shouldPauseRef.current) {
@@ -296,6 +340,22 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
             });
 
             // 保存到 localStorage（Reports 页面立即可用）
+            // 保存 eegData 但限制到 500 点/通道（原始 2500→500，~80%空间节省）
+            // waveform 图需要 eegData.times/channels 来渲染，不存则图表空白
+            let safeEegData: any = null;
+            if (eegData) {
+              safeEegData = { ...eegData };
+              if (safeEegData.times && safeEegData.channels) {
+                const maxPts = Math.min(safeEegData.times.length, 500);
+                const step = Math.max(1, Math.floor(safeEegData.times.length / maxPts));
+                safeEegData.times = safeEegData.times.filter((_: any, i: number) => i % step === 0);
+                const chNames = Object.keys(safeEegData.channels);
+                for (const ch of chNames) {
+                  safeEegData.channels[ch] = safeEegData.channels[ch].filter((_: any, i: number) => i % step === 0);
+                }
+                safeEegData.total_samples = safeEegData.times.length;
+              }
+            }
             const report: StoredReport = {
               id: item.id,
               fileName: item.name,
@@ -304,9 +364,14 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
               quality: (data.analysis as any)?.signal_quality_score ?? 0,
               language: lang,
               analysis: data.analysis,
-              eegData,
+              eegData: safeEegData,
             };
-            addReport(report);
+            try {
+              addReport(report);
+              syncReportToServer(report); // 跨设备同步
+            } catch (e) {
+              console.warn("[AnalysisProvider] addReport failed:", e);
+            }
 
             // ── 阶段3：调用 /explain（后台生成 AI 解释）────────
             setFiles((prev) => {
@@ -342,16 +407,14 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                           : f
                       );
                     });
-                    // 同步 localStorage
+                    // 同步 localStorage（使用 loadReports/saveReports 防止覆盖）
                     try {
-                      const stored = localStorage.getItem("neuroaccess-reports");
-                      if (stored) {
-                        const reports = JSON.parse(stored);
-                        const idx = reports.findIndex((r: any) => r.id === item.id);
-                        if (idx >= 0 && reports[idx].analysis) {
-                          reports[idx].analysis.explanations = pollData.explanations;
-                          localStorage.setItem("neuroaccess-reports", JSON.stringify(reports));
-                        }
+                      const { loadReports, saveReports } = await import("@/lib/reports-storage");
+                      const reports = loadReports();
+                      const idx = reports.findIndex((r: any) => r.id === item.id);
+                      if (idx >= 0 && reports[idx].analysis) {
+                        reports[idx].analysis.explanations = pollData.explanations;
+                        saveReports(reports);
                       }
                     } catch {}
                     aiReady = true;
@@ -370,7 +433,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ analysis: analysisForExplain, language: lang }),
-                  });
+                  }, t);
                   if (explainResp.success && explainResp.explanations && runIdRef.current === myRunId) {
                     setFiles((prev) => {
                       if (runIdRef.current !== myRunId) return prev;
@@ -427,6 +490,27 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     startAnalysisRef.current = startAnalysis;
   }, [startAnalysis]);
+
+  // Listen for token-expired event (dispatched by safeJsonFetch on 401)
+  useEffect(() => {
+    const handler = () => {
+      setFiles([]);
+      setRunning(false);
+      setPaused(false);
+      runningRef.current = false;
+      shouldPauseRef.current = false;
+      runIdRef.current = 0;
+      try { sessionStorage.removeItem(getFilesCacheKey()); } catch {}
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("neuroaccess-token-expired", handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("neuroaccess-token-expired", handler);
+      }
+    };
+  }, []);
 
   return (
     <AnalysisContext.Provider

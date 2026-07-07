@@ -34,6 +34,14 @@ let _listeners: Set<GenListener> = new Set();
 let _abortController: AbortController | null = null;
 let _initialized = false;
 
+// ── useSyncExternalStore 缓存快照（避免无限重渲染）─────────
+let _cachedState: GenState = { ..._state };
+let _cachedResult: GenResult | null = null;
+let _stateVersion = 0;
+let _resultVersion = 0;
+let _cachedStateVersion = -1;
+let _cachedResultVersion = -1;
+
 // ── localStorage 读写 ─────────────────────────────────────────
 function _loadState(): GenState | null {
   if (!_isBrowser()) return null;
@@ -59,7 +67,14 @@ function _saveResult(r: GenResult) {
 
 // ── 通知订阅者 ──────────────────────────────────────────────
 function _notify() {
+  _stateVersion++; // 状态变化时增加版本号，触发缓存刷新
   _listeners.forEach((fn) => { try { fn(); } catch {} });
+}
+
+// ── 结果变化时标记版本 ──────────────────────────────────────
+function _notifyResult() {
+  _resultVersion++;
+  _notify();
 }
 
 // ── 公共 API ─────────────────────────────────────────────────
@@ -73,16 +88,24 @@ export const EEGGenerationManager = {
       _state = { ...saved, status: "failed", error: "Generation interrupted by page refresh" };
       _saveState();
     }
-    _result = _loadResult();
-    _notify();
+    _result = null;
+    _notifyResult();
   },
 
   getState(): GenState {
-    return { ..._state };
+    if (_stateVersion !== _cachedStateVersion) {
+      _cachedState = { ..._state };
+      _cachedStateVersion = _stateVersion;
+    }
+    return _cachedState;
   },
 
   getResult(): GenResult | null {
-    return _result ? { ..._result } : null;
+    if (_resultVersion !== _cachedResultVersion) {
+      _cachedResult = _result ? { ..._result } : null;
+      _cachedResultVersion = _resultVersion;
+    }
+    return _cachedResult;
   },
 
   subscribe(listener: GenListener): () => void {
@@ -118,10 +141,9 @@ export const EEGGenerationManager = {
       _state.progress = 90; _saveState(); _notify();
 
       _result = { data, params: { ...params }, generatedAt: Date.now() };
-      _saveResult(_result);
 
       _state = { status: "completed", progress: 100, startedAt: _state.startedAt, error: null, params: { ...params } };
-      _saveState(); _notify();
+      _saveState(); _notifyResult();
 
       setTimeout(() => { if (_state.status === "completed") _clearState(); }, 5000);
 
@@ -146,7 +168,7 @@ export const EEGGenerationManager = {
   clearResult() {
     _result = null;
     if (_isBrowser()) { try { localStorage.removeItem(RESULT_LS_KEY); } catch {} }
-    _notify();
+    _notifyResult();
   },
 
   reset() {

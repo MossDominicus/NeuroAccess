@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/language-context";
@@ -16,7 +16,7 @@ const AVATAR_COLORS = [
 ];
 
 export default function AccountPage() {
-  const { user, token, logout, updateUser, updateProfile, changePassword, sendVerificationCode, updateEmail, sendDeleteAccountCode, deleteAccount, loading } = useAuth();
+  const { user, token, logout, updateUser, updateProfile, changePassword, sendVerificationCode, updateEmail, sendOldEmailCode, verifyOldEmail, sendDeleteAccountCode, deleteAccount, loading } = useAuth();
   const { lang } = useLang();
   const router = useRouter();
 
@@ -26,6 +26,9 @@ export default function AccountPage() {
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [loading, user, router]);
+
+  // 防连点: 所有发送验证码都用同一个 ref
+  const codeSendingRef = useRef(false);
 
   // ---------- 编辑资料 ----------
   const [editUsername, setEditUsername] = useState(user?.username || "");
@@ -39,29 +42,29 @@ export default function AccountPage() {
   // 实时校验 username（保证保存按钮可正确禁用）
   const validateUsername = (v: string): { ok: boolean; error: string } => {
     if (!v || v === "") {
-      return { ok: false, error: t(lang, "usernameRequired") || "请填写用户名" };
+      return { ok: false, error: t(lang, "usernameRequired") };
     }
     // 第一个字符必须是文字
     const firstChar = getDisplayInitial(v);
     const isLetterStart = /^\p{L}/u.test(firstChar);
     if (!isLetterStart) {
-      return { ok: false, error: t(lang, "usernameMustStartWithLetter") || "名字开头必须是文字" };
+      return { ok: false, error: t(lang, "usernameMustStartWithLetter") };
     }
     // 禁止特殊符号（允许字母/数字/空格/中日韩/emoji/下划线/连字符）
     if (/[!@#$%^&*()+\=\[\]{}|\\;:'"`/<>?~.,。]/.test(v)) {
-      return { ok: false, error: t(lang, "usernameNoSpecialChars") || "名字不能包含特殊符号" };
+      return { ok: false, error: t(lang, "usernameNoSpecialChars") };
     }
     // 禁止连续空格
     if (/\s{2,}/.test(v)) {
-      return { ok: false, error: t(lang, "noConsecutiveSpaces") || "名字中不能有连续空格" };
+      return { ok: false, error: t(lang, "noConsecutiveSpaces") };
     }
     // 视觉长度 1-20
     const vlen = Array.from(v).filter(ch => !/[\u0300-\u036f\u0483-\u0489]/.test(ch)).length;
     if (vlen < 1) {
-      return { ok: false, error: t(lang, "usernameRequired") || "请填写用户名" };
+      return { ok: false, error: t(lang, "usernameRequired") };
     }
     if (vlen > 20) {
-      return { ok: false, error: t(lang, "usernameTooLong") || "名字最多 20 个字符" };
+      return { ok: false, error: t(lang, "usernameTooLong") };
     }
     return { ok: true, error: "" };
   };
@@ -88,17 +91,17 @@ export default function AccountPage() {
     try {
       const result = await updateProfile({ username: editUsername, avatar_color: editAvatarUrl });
       if (result.success) {
-        setEditSuccess(t(lang, "profileUpdated") || "资料更新成功");
+        setEditSuccess(t(lang, "profileUpdated"));
         // 更新本地用户状态
         if (user) {
           const updated = { ...user, username: editUsername, avatar_color: editAvatarUrl };
           updateUser(updated);
         }
       } else {
-        setEditError(result.error || t(lang, "failedToUpdateProfile") || "更新失败");
+        setEditError(result.error || t(lang, "failedToUpdateProfile"));
       }
     } catch (e: any) {
-      setEditError(e.message || t(lang, "failedToUpdateProfile") || "更新失败");
+      setEditError(e.message || t(lang, "failedToUpdateProfile"));
     }
     setEditLoading(false);
   };
@@ -121,55 +124,110 @@ export default function AccountPage() {
   }, [pwCountdown]);
 
   const sendPwCode = async () => {
+    if (codeSendingRef.current) return;
+    codeSendingRef.current = true;
     setPwError("");
     setPwLoading(true);
     try {
       const result = await sendVerificationCode({});
       if (result.success) {
-        setPwSuccess(t(lang, "codeSentToEmail") || "验证码已发送到邮箱");
+        setPwSuccess(t(lang, "codeSentToEmail"));
         setPwCountdown(60);
       } else {
-        setPwError(result.error || t(lang, "sendCodeFailed") || "验证码发送失败");
+        setPwError(result.error || t(lang, "sendCodeFailed"));
       }
     } catch (e: any) {
-      setPwError(e.message || t(lang, "networkError") || "网络错误");
+      setPwError(e.message || t(lang, "networkError"));
+    } finally {
+      setPwLoading(false);
+      codeSendingRef.current = false;
     }
-    setPwLoading(false);
   };
 
   const submitPwChange = async () => {
     setPwError("");
     setPwSuccess("");
     if (pwNew !== pwConfirm) {
-      setPwError(t(lang, "passwordMismatch") || "两次密码不一致");
+      setPwError(t(lang, "passwordMismatch"));
       return;
     }
     if (pwNew.length < 6) {
-      setPwError(t(lang, "passwordTooShort") || "密码至少6位");
+      setPwError(t(lang, "passwordTooShort"));
       return;
     }
     if (!pwCode) {
-      setPwError(t(lang, "verificationCodeRequired") || "请输入验证码");
+      setPwError(t(lang, "verificationCodeRequired"));
       return;
     }
     setPwLoading(true);
     try {
       const result = await changePassword({ verification_code: pwCode, new_password: pwNew });
       if (result.success) {
-        setPwSuccess(t(lang, "passwordChanged") || "密码已修改");
+        setPwSuccess(t(lang, "passwordChanged"));
         setPwCode("");
         setPwNew("");
         setPwConfirm("");
       } else {
-        setPwError(result.error || t(lang, "failedToChangePasswordMsg") || "修改失败");
+        setPwError(result.error || t(lang, "failedToChangePasswordMsg"));
       }
     } catch (e: any) {
-      setPwError(e.message || t(lang, "failedToChangePasswordMsg") || "修改失败");
+      setPwError(e.message || t(lang, "failedToChangePasswordMsg"));
     }
     setPwLoading(false);
   };
 
-  // ---------- 修改邮箱 ----------
+  // ---------- 修改邮箱（两步验证） ----------
+  // Step 1: 验证旧邮箱
+  const [oldEmailVerified, setOldEmailVerified] = useState(false);
+  const [oldEmailCode, setOldEmailCode] = useState("");
+  const [oldEmailLoading, setOldEmailLoading] = useState(false);
+  const [oldEmailCountdown, setOldEmailCountdown] = useState(0);
+
+  useEffect(() => {
+    if (oldEmailCountdown <= 0) return;
+    const t2 = setTimeout(() => setOldEmailCountdown(oldEmailCountdown - 1), 1000);
+    return () => clearTimeout(t2);
+  }, [oldEmailCountdown]);
+
+  const handleSendOldEmailCode = async () => {
+    if (codeSendingRef.current) return;
+    codeSendingRef.current = true;
+    setEmailError(""); setOldEmailLoading(true);
+    try {
+      const result = await sendOldEmailCode();
+      if (result.success) {
+        setEmailSuccess(t(lang, "codeSentToEmail"));
+        setOldEmailCountdown(60);
+      } else {
+        setEmailError(result.error || t(lang, "sendCodeFailed"));
+      }
+    } catch (e: any) {
+      setEmailError(e.message || t(lang, "networkError"));
+    } finally {
+      codeSendingRef.current = false;
+    }
+    setOldEmailLoading(false);
+  };
+
+  const handleVerifyOldEmail = async () => {
+    setEmailError(""); setEmailSuccess("");
+    if (!oldEmailCode) { setEmailError(t(lang, "verificationCodeRequired")); return; }
+    setOldEmailLoading(true);
+    try {
+      const result = await verifyOldEmail(oldEmailCode);
+      if (result.success) {
+        setOldEmailVerified(true);
+        setEmailSuccess(t(lang, "oldEmailVerified"));
+      } else {
+        setEmailError(result.error || t(lang, "verificationCodeFailed"));
+      }
+    } catch (e: any) {
+      setEmailError(e.message || t(lang, "verificationCodeFailed"));
+    }
+    setOldEmailLoading(false);
+  };
+
+  // Step 2: 设置新邮箱（原流程）
   const [emailNew, setEmailNew] = useState("");
   const [emailCode, setEmailCode] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
@@ -179,14 +237,16 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (emailCountdown <= 0) return;
-    const t = setTimeout(() => setEmailCountdown(emailCountdown - 1), 1000);
-    return () => clearTimeout(t);
+    const t2 = setTimeout(() => setEmailCountdown(emailCountdown - 1), 1000);
+    return () => clearTimeout(t2);
   }, [emailCountdown]);
 
   const sendEmailCode = async () => {
+    if (codeSendingRef.current) return;
+    codeSendingRef.current = true;
     setEmailError("");
     if (!emailNew || !emailNew.includes("@")) {
-      setEmailError(t(lang, "validEmailRequired") || "请输入有效邮箱");
+      setEmailError(t(lang, "validEmailRequired"));
       return;
     }
     setEmailLoading(true);
@@ -203,16 +263,18 @@ export default function AccountPage() {
       try {
         result = await resp.json();
       } catch {
-        result = { detail: t(lang, "sendCodeFailed") || "验证码发送失败" };
+        result = { detail: t(lang, "sendCodeFailed") };
       }
       if (resp.ok && result.success) {
-        setEmailSuccess(t(lang, "codeSentToEmail") || "验证码已发送到新邮箱");
+        setEmailSuccess(t(lang, "codeSentToEmail"));
         setEmailCountdown(60);
       } else {
-        setEmailError(result.detail || result.error || t(lang, "sendCodeFailed") || "验证码发送失败");
+        setEmailError(result.detail || result.error || t(lang, "sendCodeFailed"));
       }
     } catch (e: any) {
-      setEmailError(e.message || t(lang, "networkError") || "网络错误");
+      setEmailError(e.message || t(lang, "networkError"));
+    } finally {
+      codeSendingRef.current = false;
     }
     setEmailLoading(false);
   };
@@ -221,21 +283,22 @@ export default function AccountPage() {
     setEmailError("");
     setEmailSuccess("");
     if (!emailCode) {
-      setEmailError(t(lang, "verificationCodeRequired") || "请输入验证码");
+      setEmailError(t(lang, "verificationCodeRequired"));
       return;
     }
     setEmailLoading(true);
     try {
       const result = await updateEmail({ new_email: emailNew, verification_code: emailCode });
       if (result.success) {
-        setEmailSuccess(t(lang, "emailUpdated") || "邮箱已更新");
+        setEmailSuccess(t(lang, "emailUpdated"));
         setEmailNew("");
         setEmailCode("");
+        setOldEmailVerified(false); // reset for next time
       } else {
-        setEmailError(result.error || t(lang, "failedToChangeEmail") || "邮箱修改失败");
+        setEmailError(result.error || t(lang, "failedToChangeEmail"));
       }
     } catch (e: any) {
-      setEmailError(e.message || t(lang, "failedToChangeEmail") || "邮箱修改失败");
+      setEmailError(e.message || t(lang, "failedToChangeEmail"));
     }
     setEmailLoading(false);
   };
@@ -247,17 +310,21 @@ export default function AccountPage() {
   const [deleteSuccess, setDeleteSuccess] = useState("");
 
   const sendDeleteCode = async () => {
+    if (codeSendingRef.current) return;
+    codeSendingRef.current = true;
     setDeleteError("");
     setDeleteLoading(true);
     try {
       const result = await sendDeleteAccountCode();
       if (result.success) {
-        setDeleteSuccess(t(lang, "codeSentToEmail") || "验证码已发送到邮箱");
+        setDeleteSuccess(t(lang, "codeSentToEmail"));
       } else {
-        setDeleteError(result.error || t(lang, "sendCodeFailed") || "验证码发送失败");
+        setDeleteError(result.error || t(lang, "sendCodeFailed"));
       }
     } catch (e: any) {
-      setDeleteError(e.message || t(lang, "networkError") || "网络错误");
+      setDeleteError(e.message || t(lang, "networkError"));
+    } finally {
+      codeSendingRef.current = false;
     }
     setDeleteLoading(false);
   };
@@ -266,10 +333,10 @@ export default function AccountPage() {
     setDeleteError("");
     setDeleteSuccess("");
     if (!deleteCode) {
-      setDeleteError(t(lang, "verificationCodeRequired") || "请输入验证码");
+      setDeleteError(t(lang, "verificationCodeRequired"));
       return;
     }
-    const confirmMsg = t(lang, "deleteAccountConfirm") || "确认注销账号？此操作不可撤销！";
+    const confirmMsg = t(lang, "deleteAccountConfirm");
     if (!window.confirm(confirmMsg)) {
       return;
     }
@@ -277,13 +344,13 @@ export default function AccountPage() {
     try {
       const result = await deleteAccount({ verification_code: deleteCode });
       if (result.success) {
-        setDeleteSuccess(t(lang, "accountDeleted") || "账号已注销");
+        setDeleteSuccess(t(lang, "accountDeleted"));
         setTimeout(() => { logout(); router.push("/"); }, 1500);
       } else {
-        setDeleteError(result.error || t(lang, "failedToDeleteAccount") || "注销失败");
+        setDeleteError(result.error || t(lang, "failedToDeleteAccount"));
       }
     } catch (e: any) {
-      setDeleteError(e.message || t(lang, "failedToDeleteAccount") || "注销失败");
+      setDeleteError(e.message || t(lang, "failedToDeleteAccount"));
     }
     setDeleteLoading(false);
   };
@@ -291,7 +358,7 @@ export default function AccountPage() {
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center">
-        <div className="text-[var(--color-text-secondary)]">{t(lang, "loading") || "加载中..."}</div>
+        <div className="text-[var(--color-text-secondary)]">{t(lang, "loading")}</div>
       </div>
     );
   }
@@ -310,10 +377,10 @@ export default function AccountPage() {
           className="flex items-center gap-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">{t(lang, "back") || "返回"}</span>
+          <span className="text-sm">{t(lang, "back")}</span>
         </button>
         <span className="ml-4 text-sm font-semibold text-[var(--color-text)]">
-          {t(lang, "accountSettings") || "账号设置"}
+          {t(lang, "accountSettings")}
         </span>
       </header>
 
@@ -323,7 +390,7 @@ export default function AccountPage() {
           <div className="px-5 py-4 border-b border-[var(--color-border)]">
             <h3 className="text-sm font-semibold text-[var(--color-text)] flex items-center gap-2">
               <User className="w-4 h-4" />
-              {t(lang, "editProfile") || "编辑资料"}
+              {t(lang, "editProfile")}
             </h3>
           </div>
           <div className="p-5 space-y-4">
@@ -339,7 +406,7 @@ export default function AccountPage() {
             {/* 头像颜色选择 */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-2">
-                {t(lang, "avatarColor") || "头像颜色"}
+                {t(lang, "avatarColor")}
               </label>
               <div className="flex flex-row gap-4 flex-wrap justify-center">
                 {AVATAR_COLORS.map((color) => (
@@ -359,7 +426,7 @@ export default function AccountPage() {
             {/* 用户名 */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "username") || "用户名"}
+                {t(lang, "username")}
               </label>
               <input
                 type="text"
@@ -387,7 +454,7 @@ export default function AccountPage() {
               {editLoading ? (
                 <span className="inline-block animate-spin">⏳</span>
               ) : (
-                <>{t(lang, "save") || "保存"}</>
+                <>{t(lang, "save")}</>
               )}
             </button>
             {editError && <p className="text-xs text-red-500 dark:text-red-400">{editError}</p>}
@@ -400,21 +467,21 @@ export default function AccountPage() {
           <div className="px-5 py-4 border-b border-[var(--color-border)]">
             <h3 className="text-sm font-semibold text-[var(--color-text)] flex items-center gap-2">
               <Key className="w-4 h-4" />
-              {t(lang, "changePassword") || "修改密码"}
+              {t(lang, "changePassword")}
             </h3>
           </div>
           <div className="p-5 space-y-4">
             {/* 验证码 */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "verificationCode") || "验证码"}
+                {t(lang, "verificationCode")}
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={pwCode}
                   onChange={(e) => setPwCode(e.target.value)}
-                  placeholder={t(lang, "enterCode") || "请输入验证码"}
+                  placeholder={t(lang, "enterCode")}
                   className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
                 <button
@@ -422,14 +489,14 @@ export default function AccountPage() {
                   disabled={pwLoading || pwCountdown > 0}
                   className="rounded-xl border border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 whitespace-nowrap"
                 >
-                  {pwCountdown > 0 ? `${pwCountdown}s` : (t(lang, "sendCode") || "发送验证码")}
+                  {pwCountdown > 0 ? `${pwCountdown}s` : (t(lang, "sendCode"))}
                 </button>
               </div>
             </div>
             {/* 新密码 */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "newPassword") || "新密码"}
+                {t(lang, "newPassword")}
               </label>
               <div className="relative">
                 <input
@@ -450,7 +517,7 @@ export default function AccountPage() {
             {/* 确认密码 */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "confirmPassword") || "确认密码"}
+                {t(lang, "confirmPassword")}
               </label>
               <div className="relative">
                 <input
@@ -474,68 +541,79 @@ export default function AccountPage() {
               disabled={pwLoading}
               className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:opacity-90 disabled:opacity-40"
             >
-              {pwLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "changePassword") || "修改密码")}
+              {pwLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "changePassword"))}
             </button>
             {pwError && <p className="text-xs text-red-500 dark:text-red-400">{pwError}</p>}
             {pwSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{pwSuccess}</p>}
           </div>
         </section>
 
-        {/* 3. 修改邮箱 */}
+        {/* 3. 修改邮箱（两步验证） */}
         <section className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--color-border)]">
             <h3 className="text-sm font-semibold text-[var(--color-text)] flex items-center gap-2">
               <Mail className="w-4 h-4" />
-              {t(lang, "changeEmail") || "修改邮箱"}
+              {t(lang, "changeEmail")}
             </h3>
           </div>
           <div className="p-5 space-y-4">
             <p className="text-xs text-[var(--color-text-secondary)]">
-              {t(lang, "currentEmail") || "当前邮箱"}: <span className="text-[var(--color-text)]">{user.email}</span>
+              {t(lang, "currentEmail")}: <span className="text-[var(--color-text)]">{user.email}</span>
             </p>
-            {/* 新邮箱 */}
-            <div>
-              <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "newEmail") || "新邮箱"}
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={emailNew}
-                  onChange={(e) => setEmailNew(e.target.value)}
-                  placeholder={t(lang, "emailPlaceholder") || "name@example.com"}
-                  className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
-                <button
-                  onClick={sendEmailCode}
-                  disabled={emailLoading || emailCountdown > 0}
-                  className="rounded-xl border border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 whitespace-nowrap"
-                >
-                  {emailCountdown > 0 ? `${emailCountdown}s` : (t(lang, "sendCode") || "发送验证码")}
+
+            {/* Step 1: 验证旧邮箱 */}
+            {!oldEmailVerified && (
+              <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3">
+                <p className="text-xs font-medium text-[var(--color-text)]">{t(lang, "verifyCurrentEmail")}</p>
+                <button onClick={handleSendOldEmailCode} disabled={oldEmailLoading || oldEmailCountdown > 0}
+                  className="rounded-xl border border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-40">
+                  {oldEmailCountdown > 0 ? `${oldEmailCountdown}s` : (t(lang, "sendCodeToCurrentEmail"))}
                 </button>
+                <div className="flex gap-2">
+                  <input type="text" value={oldEmailCode} onChange={(e) => setOldEmailCode(e.target.value)}
+                    placeholder={t(lang, "enterCode")}
+                    className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]" />
+                  <button onClick={handleVerifyOldEmail} disabled={oldEmailLoading || !oldEmailCode}
+                    className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-bg)] hover:opacity-90 disabled:opacity-40">
+                    {oldEmailLoading ? "..." : t(lang, "verify")}
+                  </button>
+                </div>
               </div>
-            </div>
-            {/* 验证码 */}
-            <div>
-              <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "verificationCode") || "验证码"}
-              </label>
-              <input
-                type="text"
-                value={emailCode}
-                onChange={(e) => setEmailCode(e.target.value)}
-                placeholder={t(lang, "enterCode") || "请输入验证码"}
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              />
-            </div>
-            {/* 提交按钮 */}
-            <button
-              onClick={submitEmailChange}
-              disabled={emailLoading}
-              className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:opacity-90 disabled:opacity-40"
-            >
-              {emailLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "confirmChange") || "确认修改")}
-            </button>
+            )}
+
+            {/* Step 2: 设置新邮箱（旧邮箱验证通过后显示） */}
+            {oldEmailVerified && (
+              <>
+                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-3">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">{t(lang, "oldEmailVerified")}</p>
+                </div>
+                {/* 新邮箱 */}
+                <div>
+                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">{t(lang, "newEmail")}</label>
+                  <div className="flex gap-2">
+                    <input type="email" value={emailNew} onChange={(e) => setEmailNew(e.target.value)}
+                      placeholder={t(lang, "emailPlaceholder") || "name@example.com"}
+                      className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]" />
+                    <button onClick={sendEmailCode} disabled={emailLoading || emailCountdown > 0}
+                      className="rounded-xl border border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 whitespace-nowrap">
+                      {emailCountdown > 0 ? `${emailCountdown}s` : (t(lang, "sendCode"))}
+                    </button>
+                  </div>
+                </div>
+                {/* 验证码 */}
+                <div>
+                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">{t(lang, "verificationCode")}</label>
+                  <input type="text" value={emailCode} onChange={(e) => setEmailCode(e.target.value)}
+                    placeholder={t(lang, "enterCode")}
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]" />
+                </div>
+                <button onClick={submitEmailChange} disabled={emailLoading}
+                  className="w-full rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-colors hover:opacity-90 disabled:opacity-40">
+                  {emailLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "confirmChange"))}
+                </button>
+              </>
+            )}
+
             {emailError && <p className="text-xs text-red-500 dark:text-red-400">{emailError}</p>}
             {emailSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{emailSuccess}</p>}
           </div>
@@ -546,13 +624,13 @@ export default function AccountPage() {
           <div className="px-5 py-4 border-b border-red-300 dark:border-red-700">
             <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
-              {t(lang, "deleteAccount") || "注销账号"}
+              {t(lang, "deleteAccount")}
             </h3>
           </div>
           <div className="p-5 space-y-4">
             <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-4">
               <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
-                {t(lang, "deleteAccountWarning") || "注销账号后，所有数据将无法恢复。此操作不可撤销，请谨慎操作。"}
+                {t(lang, "deleteAccountWarning")}
               </p>
             </div>
             {/* 发送验证码 */}
@@ -561,18 +639,18 @@ export default function AccountPage() {
               disabled={deleteLoading}
               className="w-full rounded-xl border border-red-300 dark:border-red-700 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40"
             >
-              {t(lang, "sendCodeToCurrentEmail") || "发送验证码到当前邮箱"}
+              {t(lang, "sendCodeToCurrentEmail")}
             </button>
             {/* 验证码 */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                {t(lang, "verificationCode") || "验证码"}
+                {t(lang, "verificationCode")}
               </label>
               <input
                 type="text"
                 value={deleteCode}
                 onChange={(e) => setDeleteCode(e.target.value)}
-                placeholder={t(lang, "enterCode") || "请输入验证码"}
+                placeholder={t(lang, "enterCode")}
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-text)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
               />
             </div>
@@ -580,9 +658,9 @@ export default function AccountPage() {
             <button
               onClick={submitDeleteAccount}
               disabled={deleteLoading}
-              className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-40"
+              className="w-full rounded-xl bg-red-600 dark:bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 dark:hover:bg-red-800 disabled:opacity-40"
             >
-              {deleteLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "confirmDeleteAccount") || "确认注销账号")}
+              {deleteLoading ? <span className="inline-block animate-spin">⏳</span> : (t(lang, "confirmDeleteAccount"))}
             </button>
             {deleteError && <p className="text-xs text-red-500 dark:text-red-400">{deleteError}</p>}
             {deleteSuccess && <p className="text-xs text-emerald-500 dark:text-emerald-400">{deleteSuccess}</p>}
@@ -595,7 +673,7 @@ export default function AccountPage() {
             onClick={() => { logout(); router.push("/"); }}
             className="w-full rounded-xl border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors"
           >
-            {t(lang, "logout") || "退出登录"}
+            {t(lang, "logout")}
           </button>
         </div>
       </div>

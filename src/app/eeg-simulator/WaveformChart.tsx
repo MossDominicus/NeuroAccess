@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
 
 interface WaveformChartProps {
@@ -26,15 +26,6 @@ export default function WaveformChart({ data, channelNames, channelColors }: Wav
           label={{ value: 'μV', angle: -90, position: 'insideLeft', fill: 'var(--color-text-secondary)', fontSize: 11 }}
           tick={{ fontSize: 10 }}
         />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            fontSize: '12px',
-          }}
-        />
-        <Legend wrapperStyle={{ fontSize: '10px' }} />
         {channelNames.map((ch: string, i: number) => (
           <Line
             key={ch}

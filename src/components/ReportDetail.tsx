@@ -5,21 +5,30 @@ import dynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
 import { StoredReport } from "@/lib/reports-storage";
 import AIExplanation from "@/components/AIExplanation";
-import FeedbackPanel from "@/components/FeedbackPanel";
+
 import {
   FileText, Activity, BarChart3, Brain, TrendingUp,
   Shield, AlertTriangle, CheckCircle, XCircle, Zap,
-  Download, Clock, Radio, Eye, User, GraduationCap, Microscope, Loader2,
+  Download, Clock, User, GraduationCap, Microscope, Loader2,
 } from "lucide-react";
 import {
-  getConfidenceLevelText, getConfidenceBadgeClass, getConfidenceReasons,
-  getLimitations, getCannotTell, normalizeLevel,
+  getLimitations, getCannotTell,
 } from "@/lib/report-i18n";
 
 const FrequencyChart = dynamic(() => import("@/components/FrequencyChart"), {
   ssr: false,
   loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-2xl h-64" />,
 });
+
+// ── HTML 转义 — 防止 XSS ────────────────────────────────
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 // ── 辅助：小进度条 ──────────────────────────────────────
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -76,21 +85,11 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
       pdf.save(`${report.fileName.replace(/\.[^.]+$/, "")}_NeuroAccess_Report.pdf`);
     } catch (err: any) {
       console.error("PDF export failed:", err);
-      alert("PDF export failed: " + (err?.message || "Unknown error"));
+      alert(t("pdfExportFailed") + ": " + (err?.message || t("unknownError")));
     } finally {
       setExporting(false);
     }
-  }, [report]);
-
-  // 质量卡片的注释文本（7 语言）
-  const qualityDesc = (key: string): string => {
-    const map: Record<string, string> = {
-      overallScore: t("signalQualityTooltip") || "",
-      noisyChannels: t("noiseArtifactTooltip") || "",
-      blinks: t("eogArtifactTooltip") || "",
-    };
-    return map[key] || "";
-  };
+  }, [report, t]);
 
   const handleExportHTML = useCallback(async () => {
     setExporting(true);
@@ -165,14 +164,14 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
 </body>
 </html>`;
 
-      // 替换占位符
+      // 替换占位符（使用 HTML 转义防止 XSS）
       let finalHtml = htmlContent
-        .replace("REPORT_FILE_NAME", report.fileName)
-        .replace("REPORT_DATE", report.date)
-        .replace("REPORT_MODE", report.mode)
+        .replace("REPORT_FILE_NAME", escapeHtml(report.fileName))
+        .replace("REPORT_DATE", escapeHtml(report.date))
+        .replace("REPORT_MODE", escapeHtml(report.mode))
         .replace("BASE64_DATA", base64Data)
-        .replace("REPORT_ID", report.id)
-        .replace("EXPORT_TIME", new Date().toISOString());
+        .replace("REPORT_ID", escapeHtml(report.id))
+        .replace("EXPORT_TIME", escapeHtml(new Date().toISOString()));
 
       // 下载 HTML 文件
       const blob = new Blob([finalHtml], { type: "text/html;charset=utf-8" });
@@ -202,6 +201,9 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
   const lims = getLimitations(lang as any);
   const cannotTellList = getCannotTell(lang as any);
   const sq = (signalQuality as any).signal_quality_score || (analysis as any).signal_quality_score || 0;
+  const sqColor = Number(sq) >= 70 ? "text-emerald-600 dark:text-emerald-400" :
+                  Number(sq) >= 50 ? "text-yellow-600 dark:text-yellow-400" :
+                  "text-red-600 dark:text-red-400";
   const bandpowerPercent = (analysis as any).bandpower_percent || (freqAnalysis as any).bandpower_percent || {};
 
   return (
@@ -213,18 +215,8 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
             {report.fileName}
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-[var(--color-text-secondary)]">
-            {report.date} · {report.mode}
+            {report.date}
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-            Number(sq) >= 70 ? "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400" :
-            Number(sq) >= 50 ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400" :
-            "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
-          }`}>
-            <Activity className="h-3.5 w-3.5" />
-            {t("signalQuality")}: {sq}
-          </span>
         </div>
       </div>
 
@@ -246,71 +238,69 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
 
       {/* ── Section 2: Signal Quality ───────────────── */}
       <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/30">
-            <Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/30">
+              <Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h2 className="text-base font-bold text-[var(--color-text)]">{t("signalQuality")}</h2>
           </div>
-          <h2 className="text-base font-bold text-[var(--color-text)]">{t("signalQuality")}</h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <QualityItem
-            icon={Activity}
-            label={t("signalQuality")}
-            value={`${sq}/100`}
-            color={sq >= 70 ? "text-green-600 dark:text-green-400" : sq >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}
-            comment={qualityDesc("overallScore")}
-          />
-          <QualityItem
-            icon={AlertTriangle}
-            label={t("noisyChannels")}
-            value={(signalQuality as any)?.noisy_channels?.length || (analysis as any).noisy_channels?.length || 0}
-            color="text-amber-600 dark:text-amber-400"
-            comment={qualityDesc("noisyChannels")}
-          />
-          <QualityItem
-            icon={Eye}
-            label={t("blinkArtifacts")}
-            value={((signalQuality as any)?.possible_artifacts || (analysis as any).possible_artifacts || []).length || 0}
-            color="text-amber-600 dark:text-amber-400"
-            comment={qualityDesc("blinks")}
-          />
+          <div className={`text-2xl font-bold tabular-nums ${sqColor}`}>{Number(sq).toFixed(0)}</div>
         </div>
 
+        {/* ── Score Breakdown ─────────────────────── */}
         {(() => {
           const qd = (signalQuality as any)?.quality_details || (analysis as any).quality_details || {};
-          const cs = qd.channel_scores || {};
-          const entries = Object.entries(cs) as [string, { score: number; reasons: string[] }][];
-          if (entries.length === 0) return null;
-          const sorted = entries.sort((a, b) => b[1].score - a[1].score);
-          const maxScore = Math.max(...sorted.map(([, s]) => s.score), 1);
+          const hasBreakdown = qd.snr_component !== undefined;
+          if (!hasBreakdown) return null;
+
+          // 真实算法分项满分（与后端 analysis.py 及“评分逻辑”弹窗完全一致）
+          const M_SNR = 25;    // 信噪比 0~25
+          const M_CONS = 20;   // 通道一致性 0~20
+          const M_SPEC = 10;   // 频谱特征 0~10
+          const M_BASE = 8;    // 基础分（固定）
+          const M_ART = 35;    // 伪影扣分 0~35
+          const M_INT = 25;    // 完整性扣分 0~25
+          const M_DRIFT = 8;   // 基线漂移 0~8
+
+          // 直接使用后端返回的真实分项分数，不再做 ×2.5 缩放，
+          // 每个分项都如实反映其在真实算法中的取值与满分。
+          const vSnr = Number(qd.snr_component) || 0;
+          const vCons = Number(qd.consistency_component) || 0;
+          const vSpec = Number(qd.spectral_component) || 0;
+          const vBase = Number(qd.base_score) || 0;
+          const vArt = Number(qd.artifact_penalty) || 0;
+          const vInt = Number(qd.integrity_penalty) || 0;
+          const vDrift = Number(qd.drift_penalty) || 0;
+
+          const items = [
+            { key: "snr", label: t("snrComponent"), value: Math.min(Math.round(vSnr), M_SNR), maxVal: M_SNR, color: "text-emerald-600 dark:text-emerald-400" },
+            { key: "consistency", label: t("consistencyComponent"), value: Math.min(Math.round(vCons), M_CONS), maxVal: M_CONS, color: "text-blue-600 dark:text-blue-400" },
+            { key: "spectral", label: t("spectralComponent"), value: Math.min(Math.round(vSpec), M_SPEC), maxVal: M_SPEC, color: "text-indigo-600 dark:text-indigo-400" },
+            { key: "base", label: t("baseScoreLabel"), value: Math.min(Math.round(vBase), M_BASE), maxVal: M_BASE, color: "text-teal-600 dark:text-teal-400" },
+            { key: "artifact", label: t("artifactPenalty"), value: Math.min(Math.round(vArt), M_ART), maxVal: M_ART, color: "text-red-600 dark:text-red-400", isPenalty: true },
+            { key: "integrity", label: t("integrityPenalty"), value: Math.min(Math.round(vInt), M_INT), maxVal: M_INT, color: "text-amber-600 dark:text-amber-400", isPenalty: true },
+            { key: "drift", label: t("driftPenalty"), value: Math.min(Math.round(vDrift), M_DRIFT), maxVal: M_DRIFT, color: "text-orange-600 dark:text-orange-400", isPenalty: true },
+          ];
+
           return (
             <div className="mt-6">
-              <h3 className="mb-3 text-sm font-semibold text-[var(--color-text)]">{t("channelQualityTitle")}</h3>
-              <div className="space-y-2">
-                {sorted.map(([ch, info]) => {
-                  const pct = Math.round((info.score / maxScore) * 100);
-                  const barColor = info.score >= 2 ? "bg-red-500" : info.score === 1 ? "bg-amber-500" : "bg-emerald-500";
-                  return (
-                    <div key={ch} className="flex items-center gap-3">
-                      <span className="w-28 truncate text-xs font-mono text-[var(--color-text-secondary)]" title={ch}>{ch}</span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-border)]">
-                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="w-6 text-right text-xs font-medium text-[var(--color-text)]">{info.score}/3</span>
-                      {info.reasons.length > 0 && (
-                        <span className="text-xs text-[var(--color-text-secondary)]/70" title={info.reasons.join(", ")}>
-                          {info.reasons.map(r => {
-                            const reasonMap: Record<string, string> = {
-                              high_variance: t("highVariance"),
-                              high_gradient: t("highGradient"),
-                            };
-                            return reasonMap[r] || r.replace("kurt=", "k=");
-                          }).join(", ")}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+              <h3 className="mb-3 text-sm font-semibold text-[var(--color-text)]">{t("scoreBreakdown")}</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {items.slice(0, 4).map((item) => (
+                  <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
+                    <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
+                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>{item.value}/{item.maxVal}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {items.slice(4).map((item) => (
+                  <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
+                    <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
+                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}/{(item as any).maxVal}</span>
+                  </div>
+                ))}
               </div>
             </div>
           );
@@ -373,52 +363,19 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         <AIExplanation data={analysis as any} />
       </section>
 
-      {/* ── Section 6: Confidence & Limitations ─────── */}
+      {/* ── Section 6: Signal Quality Hint ──────────── */}
       <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-        <div className="mb-4 flex items-center gap-3">
+        <div className="flex items-start gap-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/30">
-            <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           </div>
-          <h2 className="text-base font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</h2>
-        </div>
-        <div className="space-y-4">
-          {(() => {
-            const levelKey = normalizeLevel((confidence as any).level);
-            const badgeClass = getConfidenceBadgeClass(levelKey);
-            const levelText = getConfidenceLevelText(levelKey, lang as any);
-            const reasons = getConfidenceReasons(analysis as any, lang as any);
-            const lims2 = getLimitations(lang as any);
-            return (
-              <>
-                <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${badgeClass}`}>
-                  <TrendingUp className="h-4 w-4" />
-                  {levelText}
-                </div>
-                {reasons.length > 0 && (
-                  <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                    {reasons.join("\uff1b")}
-                  </p>
-                )}
-                {lims2.length > 0 && (
-                  <div>
-                    <h4 className="mb-2 text-sm font-medium text-[var(--color-text)]">{t("whatDataCannotTell")}</h4>
-                    <ul className="space-y-1">
-                      {lims2.map((item: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-text-secondary)]">
-                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
-            );
-          })()}
+          <div className="flex-1">
+            <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
+              {t("confidenceHint")}
+            </p>
+          </div>
         </div>
       </section>
-
-      {/* \u2580\u2014 Section 7: What This Data Cannot Tell You \u2580\u2014\u2014\u2014\u2014\u2014 */}
 
       {/* ── Section 7: What This Data Cannot Tell You ─ */}
       {cannotTellList.length > 0 && (
@@ -444,9 +401,6 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           </ul>
         </section>
       )}
-
-      {/* ── Section 9: Understanding Feedback ─────────── */}
-      <FeedbackPanel reportId={report.id} />
     </div>
   );
 }
@@ -461,16 +415,13 @@ function OverviewItem({ label, value }: { label: string; value: any }) {
   );
 }
 
-function QualityItem({ icon: Icon, label, value, color, comment }: { icon: any; label: string; value: any; color: string; comment?: string }) {
+function QualityItem({ icon: Icon, label, value, color }: { icon: any; label: string; value: any; color: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
       <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
       <div>
         <div className="text-[11px] font-medium text-[var(--color-text-secondary)]">{label}</div>
         <div className="text-sm font-bold text-[var(--color-text)]">{String(value)}</div>
-        {comment && (
-          <div className="mt-0.5 text-[10px] leading-tight text-[var(--color-text-secondary)]/60">{comment}</div>
-        )}
       </div>
     </div>
   );

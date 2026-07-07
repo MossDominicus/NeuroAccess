@@ -20,7 +20,6 @@ import {
 import { useLang } from "@/lib/language-context";
 import type { Lang } from "@/lib/translations";
 
-export const dynamic = "force-static";
 
 /* 案例数据类型（多语言） */
 type LangString = Partial<Record<Lang, string>>;

@@ -7,7 +7,6 @@ import { Info, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { EEGGenerationManager as gen } from "@/lib/eeg-generation-manager";
 
-export const dynamic = "force-static";
 
 const WaveformChart = nextDynamic(() => import("./WaveformChart"), {
   ssr: false,

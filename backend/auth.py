@@ -5,9 +5,10 @@ NeuroAccess Auth Module
 - JWT token authentication
 """
 import os
-import random
+import secrets as _secrets
 import sqlite3
-from datetime import datetime, timedelta
+import sys
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 from passlib.context import CryptContext
@@ -17,7 +18,15 @@ BASE_DIR = os.path.dirname(__file__)
 DB_PATH = os.path.join(BASE_DIR, "neuroaccess.db")
 
 # JWT settings
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "neuroaccess-jwt-secret-change-in-production")
+_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not _SECRET_KEY:
+    # Generate a secure random key if not set (dev mode)
+    _SECRET_KEY = _secrets.token_urlsafe(32)
+    print("⚠️  WARNING: JWT_SECRET_KEY not set. Using auto-generated key.", file=sys.stderr)
+    print("   All tokens will be invalidated on next restart.", file=sys.stderr)
+    if os.getenv("DEBUG") != "1":
+        print("   Set JWT_SECRET_KEY environment variable in production.", file=sys.stderr)
+SECRET_KEY = _SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
@@ -92,6 +101,23 @@ def init_db():
         conn.execute("ALTER TABLE verification_codes ADD COLUMN phone TEXT")
     except Exception:
         pass  # column already exists
+    # Add reports table for cross-device report sync
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reports (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            file_name TEXT NOT NULL,
+            date TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'Beginner',
+            quality REAL NOT NULL DEFAULT 0,
+            language TEXT DEFAULT 'zh',
+            data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
     # Add email column if not exists (for registration codes)
     try:
         conn.execute("ALTER TABLE verification_codes ADD COLUMN email TEXT")
@@ -108,6 +134,15 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_codes_user ON verification_codes(user_id, purpose, used)")
     except Exception:
         pass
+    # Add login_attempts and locked_until columns for brute force protection
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN login_attempts INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -122,7 +157,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: Dict[str, Any]) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -136,12 +171,12 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 def _has_special_symbol(s: str) -> bool:
-    """检查字符串是否包含特殊符号
-    允许：字母/数字/空格/中日韩/emoji/下划线/连字符
-    禁止：.@#$%^&*()+=[]{}|\;:'"`<>/?`~!,。
+    """Check if string contains special characters
+    Allowed: letters/numbers/spaces/CJK/emoji/underscore/hyphen
+    Banned: .@#$%^&*()+=[]{}|\\;:'"`<>/?`~!,。
     """
     import re as _re
-    return bool(_re.search(r"[!@#$%^&*()+\=\[\]{}|\\;:'\"`/<>?~.,。]", s))
+    return bool(_re.search(r"[!@#$%^&*()+\=\[\]{}|\\;:\'\"`/<>?~.,。]", s))
 
 
 def _visual_length(s: str) -> int:
@@ -166,8 +201,8 @@ def _visual_length(s: str) -> int:
 
 
 def _is_unicode_letter_start(s: str) -> bool:
-    """判断字符串首字符是否为 Unicode 字母（支持 CJK/拉丁/希腊/西里尔/阿拉伯/泰/天城文等所有语言的字母）
-    Python re 模块不支持 \p{L}，所以用 unicodedata.category 判断
+    """Check if first char is a Unicode letter (CJK/Latin/Greek/Cyrillic/Arabic/Thai/Devanagari etc.)
+    Python re module does not support \\p{L}, so use unicodedata.category
     """
     if not s:
         return False
@@ -181,20 +216,20 @@ def _is_unicode_letter_start(s: str) -> bool:
 def create_user(username: str, email: str, password: str) -> Dict[str, Any]:
     """Create a new user. Returns user dict or raises ValueError."""
     if not username or not username.strip():
-        raise ValueError("请填写用户名")
+        raise ValueError("Username is required")
     username = username.strip()
     vlen = _visual_length(username)
     if vlen < 1 or vlen > 20:
         raise ValueError("Username must be 1-20 characters")
-    # 名字必须以文字开头（Unicode 字母：CJK/拉丁/希腊/西里尔/阿拉伯/泰/天城文等）
+    # Must start with a letter (Unicode letters: CJK, Latin, Greek, Cyrillic, etc.)
     if not _is_unicode_letter_start(username):
-        raise ValueError("名字开头必须是文字（不能是数字、空格、符号）")
-    # 禁止特殊符号（数字/字母/空格/CJK/emoji/下划线/连字符/点/逗号 都允许）
+        raise ValueError("Username must start with a letter (not a number, space, or symbol)")
+    # No special symbols (numbers/letters/spaces/CJK/emoji/underscores/hyphens/dots/commas allowed)
     if _has_special_symbol(username):
-        raise ValueError("名字不能包含特殊符号（@#$%^&*()+=[]{}|\\;:'\"`<>/?`~!）")
+        raise ValueError("Username cannot contain special symbols (@#$%^&*()+=[]{}|\\;:'\"`<>/?`~!)")
     import re as _re
     if _re.search(r"\s{2,}", username):
-        raise ValueError("名字中不能有连续空格")
+        raise ValueError("Username cannot contain consecutive spaces")
     if len(password) < 6:
         raise ValueError("Password must be at least 6 characters")
     if "@" not in email or "." not in email:
@@ -214,7 +249,7 @@ def create_user(username: str, email: str, password: str) -> Dict[str, Any]:
             "email": email,
             "avatar_url": "",
             "avatar_color": "blue",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
     except sqlite3.IntegrityError as e:
         if "username" in str(e).lower():
@@ -225,27 +260,91 @@ def create_user(username: str, email: str, password: str) -> Dict[str, Any]:
 
 
 def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[str, Any]]:
-    """Authenticate user by username or email. Returns user dict or None."""
+    """Authenticate user by username or email. Returns user dict or None.
+    
+    Implements brute force protection: locks account for 15 minutes after 5
+    consecutive failed login attempts.
+    """
     conn = get_db()
+    MAX_ATTEMPTS = 5
+    LOCK_MINUTES = 15
+    now = datetime.now(timezone.utc)
+
     try:
         # Try username first
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, avatar_color, password_hash, created_at, terms_accepted FROM users WHERE username = ?",
+            "SELECT id, username, email, avatar_url, avatar_color, password_hash, "
+            "created_at, terms_accepted, login_attempts, locked_until "
+            "FROM users WHERE username = ?",
             (username_or_email,),
         ).fetchone()
 
         # If not found, try email
         if row is None:
             row = conn.execute(
-                "SELECT id, username, email, avatar_url, avatar_color, password_hash, created_at, terms_accepted FROM users WHERE email = ?",
+                "SELECT id, username, email, avatar_url, avatar_color, password_hash, "
+                "created_at, terms_accepted, login_attempts, locked_until "
+                "FROM users WHERE email = ?",
                 (username_or_email,),
             ).fetchone()
 
         if row is None:
+            # User not found — add a small constant delay to prevent timing-based
+            # user enumeration (mimics the time a failed password check takes)
+            import time
+            time.sleep(0.3)
             return None
 
+        # Check if account is locked
+        locked_until = row["locked_until"]
+        if locked_until:
+            locked_dt = datetime.fromisoformat(locked_until)
+            if locked_dt > now:
+                remaining = int((locked_dt - now).total_seconds())
+                conn.close()
+                raise PermissionError(
+                    f"Account temporarily locked due to too many failed attempts. "
+                    f"Please try again in {remaining} seconds."
+                )
+            # Lock period expired, clear lock and reset attempts
+            conn.execute(
+                "UPDATE users SET locked_until = NULL, login_attempts = 0 WHERE id = ?",
+                (row["id"],),
+            )
+            conn.commit()
+            row["login_attempts"] = 0
+
+        # Verify password
         if not verify_password(password, row["password_hash"]):
+            # Increment failed attempts
+            attempts = (row["login_attempts"] or 0) + 1
+            if attempts >= MAX_ATTEMPTS:
+                lock_time = now + timedelta(minutes=LOCK_MINUTES)
+                conn.execute(
+                    "UPDATE users SET login_attempts = ?, locked_until = ? WHERE id = ?",
+                    (attempts, lock_time, row["id"]),
+                )
+                conn.commit()
+                conn.close()
+                raise PermissionError(
+                    f"Account locked for {LOCK_MINUTES} minutes due to {MAX_ATTEMPTS} "
+                    f"consecutive failed login attempts."
+                )
+            else:
+                conn.execute(
+                    "UPDATE users SET login_attempts = ? WHERE id = ?",
+                    (attempts, row["id"]),
+                )
+                conn.commit()
             return None
+
+        # Successful login — reset attempts
+        if row["login_attempts"]:
+            conn.execute(
+                "UPDATE users SET login_attempts = 0, locked_until = NULL WHERE id = ?",
+                (row["id"],),
+            )
+            conn.commit()
 
         return {
             "id": row["id"],
@@ -275,12 +374,29 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
 
 
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Get user by email"""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, username, email, avatar_url, avatar_color, created_at, terms_accepted FROM users WHERE email = ?",
+            (email,),
+        ).fetchone()
+        if row:
+            return dict(row)
+        return None
+    finally:
+        conn.close()
+
+
 def generate_verification_code(user_id: Optional[int] = None, email: Optional[str] = None, purpose: str = "password_change") -> str:
-    """Generate a 6-digit verification code. Returns the code.
+    """Generate a 6-digit verification code. Returns the plaintext code (caller sends it).
+    The code is stored as a bcrypt hash in the database.
     For registration codes, pass email instead of user_id.
     """
-    code = f"{random.randint(100000, 999999)}"
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    code = f"{_secrets.randbelow(900000) + 100000}"
+    code_hash = pwd_context.hash(code)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     conn = get_db()
     try:
         # Invalidate any existing unused codes for this user/email + purpose
@@ -296,7 +412,7 @@ def generate_verification_code(user_id: Optional[int] = None, email: Optional[st
             )
         conn.execute(
             "INSERT INTO verification_codes (user_id, email, code, purpose, expires_at) VALUES (?, ?, ?, ?, ?)",
-            (user_id, email, code, purpose, expires_at.isoformat()),
+            (user_id, email, code_hash, purpose, expires_at.isoformat()),
         )
         conn.commit()
         return code
@@ -331,15 +447,15 @@ def verify_verification_code(user_id: Optional[int] = None, email: Optional[str]
                 ).fetchall()
             else:
                 return []
-            return [r for r in rows if _parse_expires(r["expires_at"]) > datetime.utcnow()]
+            return [r for r in rows if _parse_expires(r["expires_at"]) > datetime.now(timezone.utc)]
 
         # 1) 检查整个 purpose 下未过期且未使用次数超限的验证码，是否因为 attempts 已经被超限标记
         active = _all_active_codes()
         if not active:
             return False  # 全部过期或无验证码
 
-        # 2) 找到匹配的 code
-        matched = next((r for r in active if r["code"] == code), None)
+        # 2) 找到匹配的 code (stored as bcrypt hash, so use pwd_context.verify)
+        matched = next((r for r in active if pwd_context.verify(code, r["code"])), None)
         if not matched:
             # Code not found - increment attempts for all active codes
             if user_id:
@@ -496,7 +612,7 @@ def create_user_with_phone(username: str, phone: str, password: str) -> Dict[str
             "phone": phone.strip(),
             "avatar_url": "",
             "avatar_color": "blue",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
     except sqlite3.IntegrityError:
         raise ValueError("Phone number already exists")

@@ -23,6 +23,14 @@ import {
 } from "@/lib/reports-storage";
 
 
+/* 分数颜色 */
+function scoreColor(q: number | null | undefined): string {
+  if (q == null) return "text-[var(--color-text-secondary)]";
+  if (q >= 70) return "text-emerald-600 dark:text-emerald-400 font-bold";
+  if (q >= 50) return "text-yellow-600 dark:text-yellow-400 font-bold";
+  return "text-red-600 dark:text-red-400 font-bold";
+}
+
 /* 模式颜色 */
 const modeColor: Record<string, string> = {
   Beginner: "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400",
@@ -46,7 +54,7 @@ function OverviewCard({ analysis }: { analysis: any }) {
     { label: t("channelCount"), value: analysis.channel_count ?? "-" },
     { label: t("samplingRate"), value: analysis.sampling_rate ?? "-" },
     { label: t("duration"),     value: analysis.duration ?? "-" },
-    { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(2) : "-" },
+    { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(0) : "-" },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -127,7 +135,15 @@ function ExplanationCards({ analysis }: { analysis: any }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <div className="text-sm font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</div>
-          <div className="mt-2 text-sm text-[var(--color-text-secondary)]">{analysis.confidence?.level || "-"}</div>
+          <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            {(() => {
+              const lvl = analysis.confidence?.level;
+              if (!lvl) return "-";
+              const k = `confidence${lvl}`;
+              const l = t(k);
+              return l === k ? lvl : l;
+            })()}
+          </div>
           <div className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{analysis.confidence?.reason || ""}</div>
         </div>
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 lg:col-span-2">
@@ -295,7 +311,7 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
     ${expCards.map(c => `<div class="exp-card"><div class="exp-hint">${c.hint}</div><div class="exp-title">${c.label}</div><div class="exp-text">${explanations[c.key] || "-"}</div></div>`).join("")}
   </div>
   <div class="two-col">
-    <div class="confidence-box"><div class="box-title">${t("interpretationConfidence")}</div><div class="box-text">${a?.confidence?.level || "-"}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${a?.confidence?.reason || ""}</div></div>
+    <div class="confidence-box"><div class="box-title">${t("interpretationConfidence")}</div><div class="box-text">${a?.confidence?.level ? (() => { const k = `confidence${a.confidence.level}`; const l = t(k); return l === k ? a.confidence.level : l; })() : "-"}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${a?.confidence?.reason || ""}</div></div>
     <div class="limitations-box"><div class="box-title">${t("whatDataCannotTell")}</div><ul style="padding-left:18px;font-size:12px;color:#374151;line-height:1.7">${(a?.limitations || []).map((x: any)=>`<li>${x}</li>`).join("")}</ul></div>
   </div>` : ""}
 
@@ -324,6 +340,7 @@ export default function ReportsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<StoredReport | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [showFormula, setShowFormula] = useState(false);
   const [filter, setFilter] = useState<ReportFilter>("all");
   const { lang, t } = useLang();
   const { user, loading } = useAuth();
@@ -440,6 +457,9 @@ export default function ReportsPage() {
                 {t("batchDeleteCount").replace("{count}", String(selected.length))}
               </button>
             ) : null}
+            <button onClick={() => setShowFormula(true)} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]">
+              {t("scoringLogic")}
+            </button>
           </div>
         </div>
 
@@ -490,7 +510,7 @@ export default function ReportsPage() {
               </div>
               <div>{t("fileName")}</div>
               <div>{t("date")}</div>
-              <div>{t("quality")}</div>
+              <div className="text-center">{t("quality")}</div>
               <div className="text-right">{t("actions")}</div>
             </div>
 
@@ -519,10 +539,9 @@ export default function ReportsPage() {
                         <FileText className="h-4 w-4 flex-shrink-0 text-[var(--color-text-secondary)]" />
                         <span className="truncate text-sm font-mono">{report.fileName}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
-                        <span className={`text-xs font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                          {Number(report.quality).toFixed(0)}
+                      <div className="flex items-center justify-center flex-shrink-0">
+                        <span className={`text-sm ${scoreColor(report.quality)}`}>
+                          {report.quality != null ? Number(report.quality).toFixed(0) : "-"}
                         </span>
                       </div>
                     </div>
@@ -562,10 +581,9 @@ export default function ReportsPage() {
                     <Calendar className="h-3 w-3" />
                     {report.date}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
-                    <span className={`text-sm font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                      {Number(report.quality).toFixed(0)}
+                  <div className="flex items-center justify-center">
+                    <span className={`text-sm ${scoreColor(report.quality)}`}>
+                      {report.quality != null ? Number(report.quality).toFixed(0) : "-"}
                     </span>
                   </div>
                   <div className="flex items-center justify-end gap-1">
@@ -672,6 +690,48 @@ export default function ReportsPage() {
                   {t("confirm")}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Scoring Formula Modal */}
+      <AnimatePresence>
+        {showFormula && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowFormula(false)}
+          >
+            <motion.div
+              className="mx-4 w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-6 shadow-2xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="mb-4 text-lg font-bold text-[var(--color-text)]">{t("scoringLogic")}</h3>
+              <div className="space-y-3 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                <p className="font-mono text-[var(--color-text)]">{t("scoringFormulaDesc")}</p>
+                <p>{t("scoringNoiseDesc")}</p>
+                <p>{t("scoringArtifactDesc")}</p>
+                <p className="font-semibold text-[var(--color-text)]">{t("scoringRangeTitle")}</p>
+                <ul className="list-inside list-disc space-y-1">
+                  <li>{t("scoringRangeExcellent")}</li>
+                  <li>{t("scoringRangeGood")}</li>
+                  <li>{t("scoringRangeFair")}</li>
+                  <li>{t("scoringRangePoor")}</li>
+                  <li>{t("scoringRangeBad")}</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => setShowFormula(false)}
+                className="mt-5 w-full rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg)]"
+              >
+                {t("close")}
+              </button>
             </motion.div>
           </motion.div>
         )}

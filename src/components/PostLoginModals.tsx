@@ -47,16 +47,21 @@ export default function PostLoginModals() {
     try {
       const ok = await acceptTerms();
       if (ok) {
+        // 若用户在弹窗中已勾选"免责声明"，同步写入独立免责声明存储，
+        // 避免紧接着又弹出 DisclaimerModal 造成重复打扰。
+        if (agreedDisclaimer) {
+          try { localStorage.setItem("neuroaccess-disclaimer-accepted", "true"); } catch {}
+        }
         setShowTerms(false);
         // Check if needs username setup
         if (needsUsernameSetup) {
           setShowUsernameSetup(true);
         }
       } else {
-        setTermsError(t("networkError") || "请求失败，请重试");
+        setTermsError(t("networkError"));
       }
     } catch (e: any) {
-      setTermsError(e.message || t("networkError") || "网络错误，请重试");
+      setTermsError(e.message || t("networkError"));
     } finally {
       setTermsLoading(false);
     }
@@ -67,7 +72,7 @@ export default function PostLoginModals() {
     setUsernameError("");
     const trimmed = username.trim();
     if (!trimmed || trimmed === "User") {
-      setUsernameError(t("usernameInvalid") || "请输入有效的用户名");
+      setUsernameError(t("usernameInvalid"));
       return;
     }
     setUsernameLoading(true);
@@ -90,10 +95,10 @@ export default function PostLoginModals() {
           updateUser(data.user);
         }
       } else {
-        setUsernameError(data.error || t("failed") || "Failed");
+        setUsernameError(data.error || t("failed"));
       }
     } catch (e: any) {
-      setUsernameError(e.message || t("networkError") || "网络错误");
+      setUsernameError(e.message || t("networkError"));
     } finally {
       setUsernameLoading(false);
     }
@@ -115,10 +120,10 @@ export default function PostLoginModals() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-[var(--color-text)]">
-                    {t("termsTitle") || "使用条款确认"}
+                    {t("termsTitle")}
                   </h2>
                   <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                    {t("termsSubtitle") || "请阅读并同意以下条款以继续使用"}
+                    {t("termsSubtitle")}
                   </p>
                 </div>
               </div>
@@ -136,14 +141,14 @@ export default function PostLoginModals() {
                 />
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
-                    {t("agreePrivacy") || "我已阅读并同意"}{" "}
+                    {t("agreePrivacy")}{" "}
                     <Link
                       href="/privacy"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
-                      {t("privacyPolicy") || "隐私政策"}
+                      {t("privacyPolicy")}
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   </span>
@@ -160,14 +165,14 @@ export default function PostLoginModals() {
                 />
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
-                    {t("agreeTerms") || "我已阅读并同意"}{" "}
+                    {t("agreeTerms")}{" "}
                     <Link
                       href="/terms"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
-                      {t("termsOfService") || "服务条款"}
+                      {t("termsOfService")}
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   </span>
@@ -184,14 +189,14 @@ export default function PostLoginModals() {
                 />
                 <div className="flex-1">
                   <span className="text-sm text-[var(--color-text)]">
-                    {t("agreeDisclaimer") || "我已阅读并同意"}{" "}
+                    {t("agreeDisclaimer")}{" "}
                     <Link
                       href="/disclaimer"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                     >
-                      {t("disclaimer") || "免责声明"}
+                      {t("disclaimer")}
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   </span>
@@ -217,10 +222,10 @@ export default function PostLoginModals() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <span>{t("analyzing") || "处理中..."}</span>
+                    <span>{t("analyzing")}</span>
                   </>
                 ) : (
-                  t("acceptTermsBtn") || "同意并继续"
+                  t("acceptTermsBtn")
                 )}
               </button>
             </div>
@@ -241,10 +246,10 @@ export default function PostLoginModals() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-[var(--color-text)]">
-                    {t("setupUsername") || "设置用户名"}
+                    {t("setupUsername")}
                   </h2>
                   <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                    {t("setupUsernameHint") || "请设置一个用户名以继续使用"}
+                    {t("setupUsernameHint")}
                   </p>
                 </div>
               </div>
@@ -258,13 +263,13 @@ export default function PostLoginModals() {
               )}
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
-                  {t("username") || "用户名"}
+                  {t("username")}
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t("usernamePlaceholder") || "请输入用户名"}
+                  placeholder={t("usernamePlaceholder")}
                   className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
                   autoFocus
                   required
@@ -275,7 +280,7 @@ export default function PostLoginModals() {
                 disabled={usernameLoading}
                 className="w-full py-2.5 px-4 rounded-xl bg-[var(--color-primary)] text-[var(--color-bg)] text-sm font-semibold hover:opacity-90 disabled:opacity-40 transition-all"
               >
-                {usernameLoading ? "..." : (t("confirm") || "确认")}
+                {usernameLoading ? "..." : (t("confirm"))}
               </button>
             </form>
           </div>

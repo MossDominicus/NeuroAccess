@@ -1,23 +1,18 @@
 "use client";
 
 import { useLang } from "@/lib/language-context";
-import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { disclaimerSections } from "@/lib/legal-content";
 
-export const dynamic = "force-static";
 
 export default function DisclaimerPage() {
   const { t, lang } = useLang();
   const content = (disclaimerSections as any)[lang] || disclaimerSections.en;
 
   return (
-    <motion.div
+    <div
       className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.05 }}
     >
       <div className="max-w-3xl mx-auto px-6 py-10">
         {/* Back button */}
@@ -70,6 +65,6 @@ export default function DisclaimerPage() {
           {t("disclaimerAgreement")}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
