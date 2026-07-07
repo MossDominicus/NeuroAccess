@@ -646,22 +646,20 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     integrity_penalty = min(integrity_penalty, 25)
 
     # ── 组件 6: 基线稳定性 (0 ~ -8分扣分) ─────────────
-    # 慢漂移检测：逐通道计算漂移比，避免多通道均值正负抵消导致漏检；连续评分 0~8
+    # 慢漂移检测：逐通道计算绝对漂移量（μV），避免比值法被大幅信号掩盖
     drift_penalty = 0.0
     if n_samples > 500:
         seg_size = n_samples // 4
-        ch_drift_ratios = []
+        ch_drifts = []
         for i in range(n_ch):
             ch_data = data_uv[i]
             ch_seg_means = [float(np.mean(ch_data[j*seg_size:(j+1)*seg_size])) for j in range(4)]
-            ch_range = max(ch_seg_means) - min(ch_seg_means)
-            ch_overall = float(np.max(ch_data) - np.min(ch_data))
-            if ch_overall > 0:
-                ch_drift_ratios.append(ch_range / ch_overall)
-        if ch_drift_ratios:
-            mean_drift_ratio = float(np.mean(ch_drift_ratios))
-            # 连续映射：ratio 0.02→0, 0.12→4, 0.22→8（线性）
-            drift_penalty = max(0.0, min(8.0, (mean_drift_ratio - 0.02) * 40))
+            ch_drift = max(ch_seg_means) - min(ch_seg_means)  # 绝对漂移量 μV
+            ch_drifts.append(ch_drift)
+        if ch_drifts:
+            mean_drift = float(np.mean(ch_drifts))  # 所有通道平均漂移 μV
+            # 连续映射：0μV→0, 20μV→8（满分）。无门槛，微弱漂移也扣分。
+            drift_penalty = max(0.0, min(8.0, mean_drift / 20.0 * 8.0))
 
     # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
     # 0 = 平坦/全噪声；8 = 多数通道信号健康。使用逐通道方差连续度量，避免二值化。
