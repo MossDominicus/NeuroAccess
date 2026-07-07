@@ -491,9 +491,9 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射：指数逼近曲线。0 相关时由有限样本随机波动自然产生 ~2 raw。
+    # 相关性映射：指数逼近曲线，取绝对值处理负相关（反相但仍有关系）。
     # 0→2.0, 0.01→3.7, 0.05→9.1, 0.10→13.4, 0.20→17.6, 0.50→20.0 (raw)
-    component_consistency = max(0.0, min(20.0, 2.0 + 18.0 * (1.0 - np.exp(-avg_correlation / 0.10))))
+    component_consistency = max(0.0, min(20.0, 2.0 + 18.0 * (1.0 - np.exp(-abs(avg_correlation) / 0.10))))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
@@ -678,7 +678,32 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             else:
                 channel_strengths.append(1.0)
         avg_strength = float(np.mean(channel_strengths))
-        base_score = max(0.0, min(8.0, usable_ratio * 8.0 * avg_strength))
+
+        # ── 信号真实度因子 ────────────────────────────
+        # ① 峰度偏离高斯：纯噪声 kurt≈3，真实 EEG 各有偏差
+        avg_kurt = float(np.mean(kurt))
+        kurt_factor = min(1.0, abs(avg_kurt - 3.0) * 2.0)  # 0→0, ≥0.5→1
+
+        # ② 频谱平坦度：取代表性通道快速评估谱倾
+        flat_factor = 0.3  # 默认中等
+        try:
+            mid_ch = data_uv[n_ch // 2]
+            freqs_k = np.fft.rfftfreq(n_samples, d=1.0/sfreq)
+            if len(freqs_k) > 32:
+                fft_vals = np.abs(np.fft.rfft(mid_ch)) ** 2
+                lo = np.mean(fft_vals[freqs_k <= 10])
+                hi = np.mean(fft_vals[(freqs_k >= 30) & (freqs_k <= min(sfreq/2, 60))])
+                if hi > 0 and lo > 0:
+                    slope = lo / hi
+                    # 真实 EEG slope > 2（低频远强于高频）；噪声 slope ≈ 1
+                    flat_factor = min(1.0, max(0.0, (slope - 1.0) / 3.0))
+        except Exception:
+            flat_factor = 0.3
+
+        # 真实度综合：两项都差 = 不像脑电
+        eeg_likeness = max(kurt_factor, flat_factor)  # 至少有一项符合即可
+
+        base_score = max(0.0, min(8.0, usable_ratio * 8.0 * avg_strength * eeg_likeness))
 
     # ── 最终评分组装 ──────────────────────────────────
     # 每个分量乘 (新满分/原满分) 比例调至用户指定的满分范围
