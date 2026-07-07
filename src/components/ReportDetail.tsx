@@ -291,7 +291,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                 {items.slice(0, 4).map((item) => (
                   <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
                     <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>{item.value}/{item.maxVal}</span>
+                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>{item.value}</span>
                   </div>
                 ))}
               </div>
@@ -299,7 +299,11 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                 {items.slice(4).map((item) => (
                   <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
                     <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}/{(item as any).maxVal}</span>
+                    {item.value > 0 ? (
+                      <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ 无</span>
+                    )}
                   </div>
                 ))}
               </div>

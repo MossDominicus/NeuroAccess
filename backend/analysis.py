@@ -521,26 +521,25 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     grad_stds = np.std(diffs, axis=1)
     mean_grad = float(np.mean(grad_stds))
 
-    # 伪影扣分
+    # 伪影扣分（对真实噪声/伪影敏感，干净数据保持 0）
     artifact_penalty = 0.0
     noisy_channels_list = []
 
-    # 逐通道检测噪声通道
+    # 逐通道检测噪声通道（任一强异常指标即可标记，避免“需≥2项才触发”过弱）
     for i in range(n_ch):
         ch_issues = 0
-        if kurt[i] > 15 or (kurt[i] < 0.5 and kurt[i] > 0):
-            ch_issues += 1
-        if variances[i] > var_mean * 5 and var_mean > 0:
-            ch_issues += 1
-        if grad_stds[i] > mean_grad * 8 and mean_grad > 0:
-            ch_issues += 1
-        if ch_issues >= 2:
+        if kurt[i] > 8 or (0 < kurt[i] < 0.4):
+            ch_issues += 1                      # 峰度异常（尖峰/平坦）
+        if var_mean > 0 and variances[i] > var_mean * 3:
+            ch_issues += 1                       # 该通道方差远超平均（局部噪声）
+        if mean_grad > 0 and grad_stds[i] > mean_grad * 3:
+            ch_issues += 1                       # 高频梯度异常（肌电/工频）
+        if ch_issues >= 1:
             noisy_channels_list.append(ch_names[i])
 
-    # 伪影扣分（基于严重程度）
     noisy_ratio = len(noisy_channels_list) / max(1, n_ch)
-    artifact_penalty += min(noisy_ratio * 12, 12)  # 噪声通道占比: 0~12分
-    artifact_penalty += min(outlier_pct * 800, 8)    # 异常值比例: 0~8分
+    artifact_penalty += min(noisy_ratio * 15, 15)   # 噪声通道占比: 0~15分
+    artifact_penalty += min(outlier_pct * 800, 8)   # 异常值比例: 0~8分
 
     # 大幅度尖峰检测
     if np.any(np.abs(data_uv) > 500):
@@ -587,6 +586,17 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
                     spectral_score += 4.0
                 else:
                     spectral_score += 1.5
+
+        # 高频污染检测（肌电/工频噪声）：30–100Hz 功率相对 1–30Hz 过高 → 伪影
+        hf_mask = (r_freqs >= 30) & (r_freqs <= 100)
+        band_mask = (r_freqs >= 1) & (r_freqs <= 30)
+        if _trapz is not None and np.any(hf_mask) and np.any(band_mask):
+            hf_pow = _trapz(r_psd[hf_mask], dx=r_df)
+            band_pow = _trapz(r_psd[band_mask], dx=r_df)
+            if band_pow > 1e-12:
+                hf_ratio = hf_pow / band_pow
+                # 正常脑电 hf_ratio < 0.15；肌电伪影可达 0.3~1.0
+                artifact_penalty += min(max(0.0, hf_ratio - 0.12) * 40, 12)
     except Exception:
         spectral_score = 4.0  # 默认中等
 
@@ -635,12 +645,12 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         overall_range = float(np.max(data_uv) - np.min(data_uv))
         if overall_range > 0:
             drift_ratio = seg_range / overall_range
-            if drift_ratio > 0.4:
-                drift_penalty = 5.0
-            elif drift_ratio > 0.25:
-                drift_penalty = 3.0
-            elif drift_ratio > 0.12:
-                drift_penalty = 1.5
+            if drift_ratio > 0.3:
+                drift_penalty = 4.0
+            elif drift_ratio > 0.18:
+                drift_penalty = 2.5
+            elif drift_ratio > 0.08:
+                drift_penalty = 1.0
 
     # ── 组件 4: 基础分 (0~20) — 是否采集到真实、可用的脑电活动 ──
     # 0 = 平坦/全噪声（什么也检测不到）；20 = 多数通道信号健康
