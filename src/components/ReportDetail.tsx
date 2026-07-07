@@ -302,6 +302,26 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                   </div>
                 ))}
               </div>
+              {/* ── Calculation chain: raw sum → scaled total ── */}
+              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-xs text-[var(--color-text-secondary)]">
+                <span className="font-medium">{t("rawSubtotal") || "原始总分"}</span>
+                <span className="font-mono tabular-nums text-[var(--color-text)]">{vSnr.toFixed(1)} + {vCons.toFixed(1)} + {vSpec.toFixed(1)} + {vBase.toFixed(1)} − {vArt.toFixed(1)} − {vInt.toFixed(1)} − {vDrift.toFixed(1)}</span>
+                <span>=</span>
+                <span className="font-bold font-mono tabular-nums text-[var(--color-text)]">{(vSnr + vCons + vSpec + vBase - vArt - vInt - vDrift).toFixed(1)}</span>
+                <span className="mx-1 text-[var(--color-text-secondary)]">→</span>
+                <span className="rounded-md bg-violet-100 px-2 py-0.5 font-mono font-bold text-violet-700 dark:bg-violet-950/40 dark:text-violet-400">×2.5</span>
+                <span className="mx-1 text-[var(--color-text-secondary)]">→</span>
+                <span className={`text-sm font-bold tabular-nums ${sqColor}`}>{Number(sq).toFixed(1)}</span>
+                {(() => {
+                  const raw = vSnr + vCons + vSpec + vBase - vArt - vInt - vDrift;
+                  const scaled = Math.max(5, Math.min(100, raw * 2.5));
+                  return (
+                    <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${Math.abs(scaled - Number(sq)) < 0.5 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400'}`}>
+                      {Math.abs(scaled - Number(sq)) < 0.5 ? '✓' : '⚠'}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           );
         })()}
