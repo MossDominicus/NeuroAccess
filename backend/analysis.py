@@ -510,10 +510,10 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     m4 = np.mean(data_centered ** 4, axis=1)
     kurt = np.where(m2 > 0, m4 / (m2 ** 2), 0)
 
-    # 3b. 幅度异常值比例 (>±150μV 或 >±5倍标准差)
+    # 3b. 幅度异常值比例 (>±150μV 或 >±4倍标准差)
     safe_stds = np.where(stds > 0, stds, 1.0)
-    large_amp_mask = np.abs(data_uv - means) > 5 * safe_stds
-    extreme_amp_mask = np.abs(data_uv) > 200  # μV
+    large_amp_mask = np.abs(data_uv - means) > 4 * safe_stds
+    extreme_amp_mask = np.abs(data_uv) > 150  # μV
     outlier_total = int(np.sum(large_amp_mask)) + int(np.sum(extreme_amp_mask))
     outlier_pct = outlier_total / max(1, n_ch * n_samples)
 
@@ -529,23 +529,23 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     # 逐通道检测噪声通道（任一强异常指标即可标记，避免“需≥2项才触发”过弱）
     for i in range(n_ch):
         ch_issues = 0
-        if kurt[i] > 8 or (0 < kurt[i] < 0.4):
+        if kurt[i] > 5 or (0 < kurt[i] < 0.5):
             ch_issues += 1                      # 峰度异常（尖峰/平坦）
-        if var_mean > 0 and variances[i] > var_mean * 3:
+        if var_mean > 0 and variances[i] > var_mean * 2:
             ch_issues += 1                       # 该通道方差远超平均（局部噪声）
-        if mean_grad > 0 and grad_stds[i] > mean_grad * 3:
+        if mean_grad > 0 and grad_stds[i] > mean_grad * 2:
             ch_issues += 1                       # 高频梯度异常（肌电/工频）
         if ch_issues >= 1:
             noisy_channels_list.append(ch_names[i])
 
     noisy_ratio = len(noisy_channels_list) / max(1, n_ch)
-    artifact_penalty += min(noisy_ratio * 15, 15)   # 噪声通道占比: 0~15分
-    artifact_penalty += min(outlier_pct * 800, 8)   # 异常值比例: 0~8分
+    artifact_penalty += min(noisy_ratio * 20, 20)   # 噪声通道占比: 0~20分
+    artifact_penalty += min(outlier_pct * 600, 10)  # 异常值比例: 0~10分
 
-    # 大幅度尖峰检测
-    if np.any(np.abs(data_uv) > 500):
+    # 大幅度尖峰检测（250μV 以上即记分，真实 EEG 极少超过 150μV）
+    if np.any(np.abs(data_uv) > 250):
         artifact_penalty += 3
-    if np.any(np.abs(data_uv) > 1000):
+    if np.any(np.abs(data_uv) > 600):
         artifact_penalty += 2
 
     artifact_penalty = min(artifact_penalty, 35)
@@ -596,8 +596,8 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             band_pow = _trapz(r_psd[band_mask], dx=r_df)
             if band_pow > 1e-12:
                 hf_ratio = hf_pow / band_pow
-                # 正常脑电 hf_ratio < 0.15；肌电伪影可达 0.3~1.0
-                artifact_penalty += min(max(0.0, hf_ratio - 0.12) * 40, 12)
+                # 正常脑电 hf_ratio < 0.10；肌电伪影可达 0.3~1.0
+                artifact_penalty += min(max(0.0, hf_ratio - 0.08) * 35, 15)
     except Exception:
         spectral_score = 4.0  # 默认中等
 
@@ -627,15 +627,15 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
     # 5c. 平坦通道（方差极低，可能是断连）
     if var_mean > 0:
-        flat_threshold = var_mean * 0.001
+        flat_threshold = var_mean * 0.0005
         n_flat = int(np.sum(variances < flat_threshold))
         if n_flat > 0:
-            integrity_penalty += min(n_flat * 2, 6)
+            integrity_penalty += min(n_flat * 4, 12)
             flat_channels = [ch_names[i] for i in range(n_ch) if variances[i] < flat_threshold]
 
     integrity_penalty = min(integrity_penalty, 25)
 
-    # ── 组件 6: 基线稳定性 (0 ~ -5分扣分) ─────────────
+    # ── 组件 6: 基线稳定性 (0 ~ -8分扣分) ─────────────
     # 慢漂移检测：数据均值随时间的变化率
     drift_penalty = 0.0
     if n_samples > 500:
@@ -646,11 +646,11 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         overall_range = float(np.max(data_uv) - np.min(data_uv))
         if overall_range > 0:
             drift_ratio = seg_range / overall_range
-            if drift_ratio > 0.3:
+            if drift_ratio > 0.25:
                 drift_penalty = 8.0
-            elif drift_ratio > 0.18:
+            elif drift_ratio > 0.14:
                 drift_penalty = 4.0
-            elif drift_ratio > 0.08:
+            elif drift_ratio > 0.06:
                 drift_penalty = 2.0
 
     # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
@@ -686,7 +686,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     possible_artifacts = []
     if len(noisy_channels_list) > n_ch * 0.15:
         possible_artifacts.append(i18n.get_artifact_text(lang, "many_noisy_channels"))
-    if np.any(np.abs(data_uv) > 500):
+    if np.any(np.abs(data_uv) > 250):
         possible_artifacts.append(i18n.get_artifact_text(lang, "large_values"))
     if outlier_pct > 0.02:
         possible_artifacts.append(i18n.get_artifact_text(lang, "many_outliers"))

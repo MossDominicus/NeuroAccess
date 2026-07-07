@@ -302,7 +302,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                     {item.value > 0 ? (
                       <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}/{item.maxVal}</span>
                     ) : (
-                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {item.value}/{item.maxVal}</span>
+                      <span className="text-sm font-semibold tabular-nums text-[var(--color-text-secondary)]">{item.value}/{item.maxVal}</span>
                     )}
                   </div>
                 ))}
