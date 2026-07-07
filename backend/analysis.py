@@ -449,9 +449,9 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
             # 映射到 0~25 分
             if snr_db >= 30:
-                s = 22.0
+                s = 25.0
             elif snr_db >= 20:
-                s = 15.0 + (snr_db - 20) * 0.7
+                s = 15.0 + (snr_db - 20) * 1.0
             elif snr_db >= 10:
                 s = 8.0 + (snr_db - 10) * 0.7
             elif snr_db >= 0:

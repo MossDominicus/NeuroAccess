@@ -693,10 +693,10 @@ def auth_send_login_code(email: str = Form(...)):
         code = generate_verification_code(email=email, purpose="login")
         email_sent = send_verification_email(email, code, purpose="login")
         result = {"success": True, "expires_in": 600}
-        if email_sent:
+        if email_sent == "sent":
             result["message"] = "Verification code sent"
         else:
-            result["message"] = "Verification code (email not configured)"
+            result["message"] = "Verification code (email not configured)" if email_sent == "not_configured" else "Verification code (email send failed, please retry)"
             if os.getenv("DEBUG", "").lower() in ("1", "true", "yes"):
                 result["dev_code"] = code
         return result
@@ -759,7 +759,8 @@ def auth_accept_terms(credentials: HTTPAuthorizationCredentials = Depends(securi
         return {"success": True, "message": "Terms accepted"}
     return {"success": False, "error": "Failed to accept terms"}
 
-def send_verification_email(to_email: str, code: str, purpose: str = "password_change") -> bool:
+def send_verification_email(to_email: str, code: str, purpose: str = "password_change") -> str:
+    """Send verification email. Returns 'sent' | 'not_configured' | 'failed'."""
     import os as _os, smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
@@ -782,26 +783,25 @@ def send_verification_email(to_email: str, code: str, purpose: str = "password_c
         html = f"""<html><body style="font-family:Arial,sans-serif"><h2 style="color:#3B82F6">NeuroAccess 验证码</h2><p>您的验证码是：</p><div style="background:#f0f9ff;border:2px solid #3B82F6;border-radius:8px;padding:20px;text-align:center;margin:20px 0"><span style="font-size:32px;font-weight:bold;color:#3B82F6;letter-spacing:8px">{code}</span></div><p>10分钟后过期。</p></body></html>"""
     if os.getenv("DEBUG", "").lower() in ("1", "true", "yes"):
         print(f"[Email] SMTP: host={smtp_host!r} port={smtp_port} user={smtp_username!r}")
-    if smtp_host and smtp_username and smtp_password:
-        try:
-            msg = MIMEMultipart()
-            msg["From"] = smtp_from
-            msg["To"] = to_email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(html, "html", "utf-8"))
-            server = smtplib.SMTP(smtp_host, smtp_port)
-            server.starttls()
-            server.login(smtp_username, smtp_password)
-            server.sendmail(smtp_from, [to_email], msg.as_string())
-            server.quit()
-            print(f"[Email] SMTP success: {to_email}")
-            return True
-        except Exception as e:
-            print(f"[Email] SMTP failed: {e}")
-    # Only print code in debug environment
-    if os.environ.get("DEBUG", "").lower() in ("1", "true", "yes"):
-        print(f"[Email] Would send code {code} to {to_email}")
-    return False
+    if not (smtp_host and smtp_username and smtp_password):
+        print("[Email] SMTP not configured (missing env)")
+        return "not_configured"
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = smtp_from
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.sendmail(smtp_from, [to_email], msg.as_string())
+        server.quit()
+        print(f"[Email] SMTP success: {to_email}")
+        return "sent"
+    except Exception as e:
+        print(f"[Email] SMTP failed: {e}")
+        return "failed"
 
 def _has_active_code(conn, user_id=None, email=None, purpose=None):
     from datetime import datetime as _dt, timezone as _tz
@@ -860,10 +860,10 @@ def auth_register_verification_code(email: str = Form(...)):
         return {"success": False, "error": f"生成验证码失败: {e}"}
     email_sent = send_verification_email(email, code, purpose="register")
     result = {"success": True, "expires_in": 600}
-    if email_sent:
+    if email_sent == "sent":
         result["message"] = "Verification code sent"
     else:
-        result["message"] = "Verification code (email not configured)"
+        result["message"] = "Verification code (email not configured)" if email_sent == "not_configured" else "Verification code (email send failed, please retry)"
         if os.getenv("DEBUG", "").lower() in ("1", "true", "yes"):
             result["dev_code"] = code
     return result
@@ -906,7 +906,7 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
     code = generate_verification_code(user_id, purpose="password_change")
     email_sent = send_verification_email(user["email"], code)
     result = {"success": True, "expires_in": 600}
-    if email_sent:
+    if email_sent == "sent":
         result["message"] = "Verification code sent"
     else:
         result["message"] = "Verification code generated"
@@ -958,10 +958,10 @@ def auth_send_old_email_code(credentials: HTTPAuthorizationCredentials = Depends
     code = generate_verification_code(user_id, purpose="old_email_verify")
     email_sent = send_verification_email(user["email"], code, purpose="old_email_verify")
     result = {"success": True, "expires_in": 600}
-    if email_sent:
+    if email_sent == "sent":
         result["message"] = "Verification code sent to current email"
     else:
-        result["message"] = "Verification code (email not configured)"
+        result["message"] = "Verification code (email not configured)" if email_sent == "not_configured" else "Verification code (email send failed, please retry)"
         if os.getenv("DEBUG", "").lower() in ("1", "true", "yes"):
             result["dev_code"] = code
     return result
@@ -1029,7 +1029,7 @@ def auth_send_email_change_code(credentials: HTTPAuthorizationCredentials = Depe
     code = generate_verification_code(user_id, purpose=f"email_change:{new_email}")
     email_sent = send_verification_email(new_email, code, purpose="email_change")
     result = {"success": True, "expires_in": 600}
-    if email_sent:
+    if email_sent == "sent":
         result["message"] = "Verification code sent"
     else:
         result["message"] = "Verification code generated"
@@ -1093,7 +1093,7 @@ def auth_send_delete_account_code(credentials: HTTPAuthorizationCredentials = De
     code = generate_verification_code(user_id, purpose="delete_account")
     email_sent = send_verification_email(user["email"], code, purpose="delete_account")
     result = {"success": True, "expires_in": 600}
-    if email_sent:
+    if email_sent == "sent":
         result["message"] = "Verification code sent"
     else:
         result["message"] = "Verification code generated"
