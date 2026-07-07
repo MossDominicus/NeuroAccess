@@ -671,15 +671,28 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         base_score = max(0.0, min(8.0, usable_ratio * 8.0 * strength))
 
     # ── 最终评分组装 ──────────────────────────────────
-    quality_score = (
-        component_snr +           # 0~25
-        component_consistency +   # 0~20
-        spectral_score +          # 0~10
-        base_score                # 0~8 基础分（动态）
-    )
-    quality_score -= (artifact_penalty + integrity_penalty + drift_penalty)
+    # 每个分量乘 (新满分/原满分) 比例调至用户指定的满分范围
+    factor_snr = 15.0 / 25.0
+    factor_cons = 10.0 / 20.0
+    factor_spec = 15.0 / 10.0
+    factor_base = 25.0 / 8.0
+    factor_art = 10.0 / 35.0
+    factor_int = 15.0 / 25.0
+    factor_drift = 10.0 / 8.0
 
-    # 线性重映射：原始分量之和(约 0~63) ×2.5 → 0~100 显示尺度（保底 5 分，避免极端 0 分误读）
+    quality_score = (
+        component_snr * factor_snr +           # 0~15
+        component_consistency * factor_cons +  # 0~10
+        spectral_score * factor_spec +         # 0~15
+        base_score * factor_base               # 0~25
+    )
+    quality_score -= (
+        artifact_penalty * factor_art +        # 0~10
+        integrity_penalty * factor_int +       # 0~15
+        drift_penalty * factor_drift           # 0~10
+    )
+
+    # 线性重映射：原始分量之和(最大 65) ×2.5 → 0~100（保底 5 分）
     quality_score = max(5.0, min(100.0, quality_score * 2.5))
 
     # ── 伪影描述文本 ──────────────────────────────────

@@ -254,15 +254,15 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           const hasBreakdown = qd.snr_component !== undefined;
           if (!hasBreakdown) return null;
 
-          // 真实算法分项满分（与后端 analysis.py 及“评分逻辑”弹窗完全一致）
-          // 原始分量之和 ×2.5 线性重映射到 0~100（保底 5 分），满分 SNR 25 / 一致性 20 / 频谱 10 / 基础 8
-          const M_SNR = 25;    // 信噪比 0~25
-          const M_CONS = 20;   // 通道一致性 0~20
-          const M_SPEC = 10;   // 频谱特征 0~10
-          const M_BASE = 8;    // 基础分 0~8（动态）
-          const M_ART = 35;    // 伪影扣分 0~35
-          const M_INT = 25;    // 完整性扣分 0~25
-          const M_DRIFT = 8;   // 基线漂移 0~8
+          // 真实算法分项满分（与后端 analysis.py 及"评分逻辑"弹窗完全一致）
+          // 原始分量之和 ×2.5 线性重映射到 0~100（保底 5 分），满分 SNR 15 / 一致性 10 / 频谱 15 / 基础 25
+          const M_SNR = 15;    // 信噪比 0~15
+          const M_CONS = 10;   // 通道一致性 0~10
+          const M_SPEC = 15;   // 频谱特征 0~15
+          const M_BASE = 25;   // 基础分 0~25（动态）
+          const M_ART = 10;    // 伪影扣分 0~10
+          const M_INT = 15;    // 完整性扣分 0~15
+          const M_DRIFT = 10;  // 基线漂移 0~10
 
           // 直接使用后端返回的真实分项分数（每个分项已是原始分量，未缩放），
           // 每个分项都如实反映其在真实算法中的取值与满分。总分在后端 = 分量之和 ×2.5。
