@@ -682,15 +682,13 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         component_snr * factor_snr +           # 0~15
         component_consistency * factor_cons +  # 0~10
         spectral_score * factor_spec +         # 0~15
-        base_score * factor_base               # 0~25
-    )
-    quality_score -= (
-        artifact_penalty * factor_art +        # 0~10
-        integrity_penalty * factor_int +       # 0~15
-        drift_penalty * factor_drift           # 0~10
+        base_score * factor_base +             # 0~25
+        (10.0 - artifact_penalty * factor_art) +   # 10 → 0（无伪影→10, 满伪影→0）
+        (15.0 - integrity_penalty * factor_int) +  # 15 → 0
+        (10.0 - drift_penalty * factor_drift)      # 10 → 0
     )
 
-    # 直接 clamp，不做 ×2.5 缩放。满分 = 15+10+15+25 = 65（无扣分时）。
+    # 七项全加 = 满分 100。不做 ×2.5，clamp 到 0~100。
     quality_score = max(0.0, min(100.0, quality_score))
 
     # ── 伪影描述文本 ──────────────────────────────────
