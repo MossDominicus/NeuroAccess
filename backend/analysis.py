@@ -370,22 +370,19 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
 
 
 def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "zh", sfreq: float = 250.0) -> Dict[str, Any]:
-    """多维度信号质量评估 — 真实评分（典型范围 10~75）
+    """多维度信号质量评估 — 真实评分（原始分直接落在 0~100，无倍数缩放）
 
-    评分体系（6个独立组件加权）：
-      SNR 信噪比     : 0~25 分（EEG频段功率 vs 高频噪声）
-      通道一致性     : 0~15 分（相邻通道空间相关性）
+    评分体系（7个独立组件，原始分直接累加 = 总分）：
+      SNR 信噪比     : 0~40 分（EEG频段功率 vs 高频噪声）
+      通道一致性     : 0~25 分（相邻通道空间相关性）
+      频谱特征质量   : 0~15 分（alpha峰 + 1/f 衰减）
+      基础分         : 0~20 分（是否采集到真实可用脑电活动；0=平坦/全噪声什么也没检测到）
       伪影水平       : 0~-35 分（峰度/幅度异常值）
-      频谱特征质量   : 0~10 分（alpha峰 + 1/f 衰减）
       数据完整性     : 0~-25 分（削波/平坦/缺失）
-      基线稳定性     : 0~-10 分（慢漂移/DC偏移）
+      基线稳定性     : 0~-8 分（慢漂移/DC偏移）
 
-    典型分数区间：
-      55~75 : 实验室级优质数据
-      35~55  : 临床/研究可用数据
-      20~35  : 可用但有明显噪声
-      10~20  : 质量较差，分析结果需谨慎参考
-      < 10   : 数据质量问题严重，建议重新采集
+    总分 = SNR + 通道一致性 + 频谱特征 + 基础分 − 伪影 − 完整性 − 漂移，直接 clamp 到 0~100。
+    最低 0 分（什么也检测不到，如全平坦/全噪声），最高 100 分（全部组件满分且无扣分）。
     """
     import i18n
 
@@ -393,13 +390,16 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
     if n_samples < 100:
         return {
-            "signal_quality_score": 35.0,
+            "signal_quality_score": 0.0,
             "noisy_channels": [],
             "possible_artifacts": ["数据过短"],
             "missing_data": False,
             "clipping_detected": False,
             "high_frequency_noise": False,
-            "quality_details": {"average_variance": 0, "max_variance": 0, "outlier_percentage": 0},
+            "quality_details": {"average_variance": 0, "max_variance": 0, "outlier_percentage": 0,
+                                "snr_component": 0.0, "consistency_component": 0.0,
+                                "spectral_component": 0.0, "base_score": 0.0,
+                                "artifact_penalty": 0.0, "integrity_penalty": 0.0, "drift_penalty": 0.0},
         }
 
     # ── 预计算 ──────────────────────────────────────
@@ -442,31 +442,32 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             else:
                 noise_power = float(np.sum(psd[freqs > max(50, len(freqs) // 4)]) * df) if len(freqs) > 50 else 1e-10
 
-            if noise_power > 1e-12:
-                snr_db = 10 * np.log10(max(eeg_power, 1e-12) / noise_power)
-            else:
-                snr_db = 60.0  # 极低噪声
+            # 用安全下限避免 0/0：平坦/无信号(eeg≈0)时 snr_db≈0，而非误判为"极干净"
+            snr_db = 10 * np.log10(max(eeg_power, 1e-12) / max(noise_power, 1e-12))
 
-            # 映射到 0~25 分
-            if snr_db >= 30:
-                s = 25.0
+            # 映射到 0~40 分（高 SNR 满分，低/负 SNR 趋近 0，不保底）
+            if snr_db >= 35:
+                s = 40.0
             elif snr_db >= 20:
-                s = 15.0 + (snr_db - 20) * 1.0
+                s = 20.0 + (snr_db - 20) * 1.333  # 20~35 dB → 20~40
             elif snr_db >= 10:
-                s = 8.0 + (snr_db - 10) * 0.7
+                s = 10.0 + (snr_db - 10) * 1.0     # 10~20 dB → 10~20
             elif snr_db >= 0:
-                s = max(3, 4.0 + snr_db * 0.4)
+                s = max(0.0, snr_db * 1.0)          # 0~10 dB → 0~10
             else:
-                s = max(0, 5.0 + snr_db * 1.5)
+                s = max(0.0, 5.0 + snr_db * 1.5)     # 负 dB → 0
             snr_scores.append(s)
         except Exception:
-            snr_scores.append(15.0)  # 中等默认值
+            snr_scores.append(20.0)  # 中等默认值
 
-    component_snr = float(np.mean(snr_scores)) if snr_scores else 15.0
+    component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
 
     # ── 组件 2: 通道一致性 (0~20分) ───────────────────
     # 计算相邻通道间的 Pearson 相关系数（取所有通道对的均值）
-    if n_ch >= 2:
+    if var_mean <= 1e-6:
+        # 全平坦/无信号：通道间无任何有意义的差异，一致性视为 0
+        avg_correlation = 0.0
+    elif n_ch >= 2:
         # 为效率只取前 5000 个样本点做相关
         corr_n = min(5000, n_samples)
         corr_data = data_uv[:, :corr_n]
@@ -488,16 +489,16 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射：太高(>0.90)可能短路，太低说明各通道独立噪声
-    # 即使相关性低，多数真实 EEG 仍包含有用信号，故设最小保底分
-    if 0.15 <= avg_correlation <= 0.80:
-        component_consistency = 6.0 + (avg_correlation - 0.15) * 16  # 6~16.4
-    elif avg_correlation > 0.80:
-        component_consistency = 16.4 - (avg_correlation - 0.80) * 20  # 可能短路
+    # 相关性映射：0.10 以下趋近 0（各通道独立噪声/断连），0.85 附近满分 25，
+    # 过高(>0.90)可能短路故回落。整体随相关性自然爬升。
+    if avg_correlation < 0.10:
+        component_consistency = max(0.0, avg_correlation * 50.0)        # 0.10→5, 0→0
+    elif avg_correlation <= 0.85:
+        component_consistency = (avg_correlation - 0.10) / 0.75 * 25.0  # 0.10→0, 0.85→25
     else:
-        component_consistency = max(3, avg_correlation * 20)  # 低相关性→保底3分
+        component_consistency = max(8.0, 25.0 - (avg_correlation - 0.85) * 70.0)  # 可能短路→回落
 
-    component_consistency = max(0, min(20, component_consistency))
+    component_consistency = max(0.0, min(25.0, component_consistency))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
@@ -564,11 +565,11 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         if len(alpha_psd) > 2:
             alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
             if alpha_max_ratio > 2.5:
-                spectral_score += 5   # 明显 alpha 峰（更严格）
+                spectral_score += 7.5   # 明显 alpha 峰
             elif alpha_max_ratio > 1.5:
-                spectral_score += 1
+                spectral_score += 3.0
             elif alpha_max_ratio > 1.2:
-                spectral_score += 3
+                spectral_score += 1.5
 
         # 频谱斜率（低频应比高频强 — 1/f 特征）
         low_mask = (r_freqs >= 2) & (r_freqs <= 10)
@@ -579,16 +580,17 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if high_pow > 1e-12:
                 ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
                 if ratio_db > 15:
-                    spectral_score += 3   # 正常 1/f 衰减（更严格）
+                    spectral_score += 7.5   # 正常 1/f 衰减
                 elif ratio_db > 8:
-                    spectral_score += 1.5
+                    spectral_score += 4.0
     except Exception:
-        spectral_score = 2.0  # 默认中等（降低）
+        spectral_score = 3.0  # 默认中等
 
-    spectral_score = min(10, max(0, spectral_score))
+    spectral_score = min(15, max(0, spectral_score))
 
-    # ── 组件 5: 数据完整性 (0 ~ -15分扣分) ─────────────
+    # ── 组件 5: 数据完整性 (0 ~ -25分扣分) ─────────────
     integrity_penalty = 0.0
+    n_flat = 0
 
     # 5a. 缺失数据
     has_missing = bool(np.any(~np.isfinite(data_uv)))
@@ -636,17 +638,34 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             elif drift_ratio > 0.05:
                 drift_penalty = 2.0
 
+    # ── 组件 4: 基础分 (0~20) — 是否采集到真实、可用的脑电活动 ──
+    # 0 = 平坦/全噪声（什么也检测不到）；20 = 多数通道信号健康
+    usable_ch = n_ch - n_flat - len(noisy_channels_list)
+    usable_ratio = max(0.0, usable_ch) / max(1, n_ch)
+    if usable_ratio <= 0:
+        base_score = 0.0
+    else:
+        med_var = float(np.median(variances))
+        # 真实脑电通道方差通常在数百 μV² 量级；过低(平坦/断连)→接近0，正常→1.0
+        if med_var < 1:
+            strength = 0.0
+        elif med_var < 10:
+            strength = med_var / 10.0                # 1~10 μV² → 0.1~1.0
+        else:
+            strength = 1.0                           # 真实脑电信号，正常方差
+        base_score = max(0.0, min(20.0, usable_ratio * 20.0 * strength))
+
     # ── 最终评分组装 ──────────────────────────────────
     quality_score = (
-        component_snr +           # 0~25
-        component_consistency +   # 0~20
-        spectral_score +          # 0~10
-        8.0                       # 基础分
+        component_snr +           # 0~40
+        component_consistency +   # 0~25
+        spectral_score +          # 0~15
+        base_score                # 0~20 基础分（动态）
     )
     quality_score -= (artifact_penalty + integrity_penalty + drift_penalty)
 
-    # 线性映射到 0~100 显示尺度
-    quality_score = max(5, min(100, quality_score * 2.5))
+    # 直接 clamp 到 0~100，不做任何倍数缩放
+    quality_score = max(0.0, min(100.0, quality_score))
 
     # ── 伪影描述文本 ──────────────────────────────────
     possible_artifacts = []
@@ -681,7 +700,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             "artifact_penalty": round(artifact_penalty, 2),
             "integrity_penalty": round(integrity_penalty, 2),
             "drift_penalty": round(drift_penalty, 2),
-            "base_score": 8.0,
+            "base_score": round(base_score, 2),
         },
     }
 

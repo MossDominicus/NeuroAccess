@@ -193,32 +193,30 @@ for i, ch_data in enumerate(data_uv):
         else:
             noise_power = float(np.sum(psd[freqs > max(50, len(freqs) // 4)]) * df) if len(freqs) > 50 else 1e-10
 
-        if noise_power > 1e-12:
-            snr_db = 10 * np.log10(max(eeg_power, 1e-12) / noise_power)
-        else:
-            snr_db = 60.0
+        # 安全下限避免 0/0：平坦/无信号时 snr_db≈0，而非误判为"极干净"
+        snr_db = 10 * np.log10(max(eeg_power, 1e-12) / max(noise_power, 1e-12))
 
-        # Mapping to score
-        if snr_db >= 30:
-            s = 22.0
+        # Mapping to score (0~40, new scale — no artificial floor)
+        if snr_db >= 35:
+            s = 40.0
         elif snr_db >= 20:
-            s = 15.0 + (snr_db - 20) * 0.7
+            s = 20.0 + (snr_db - 20) * 1.333
         elif snr_db >= 10:
-            s = 8.0 + (snr_db - 10) * 0.7
+            s = 10.0 + (snr_db - 10) * 1.0
         elif snr_db >= 0:
-            s = max(3, 4.0 + snr_db * 0.4)
+            s = max(0.0, snr_db * 1.0)
         else:
-            s = max(0, 5.0 + snr_db * 1.5)
+            s = max(0.0, 5.0 + snr_db * 1.5)
         snr_scores.append(s)
 
         if i < 8 or i == len(ch_names) - 1:  # Show first 8 and last
             print(f"       [{ch_names[i]:<20}]  EEG_power={eeg_power:>12.2f}  Noise_power={noise_power:>12.2f}  SNR={snr_db:>6.2f}dB → score={s:>5.1f}")
     except Exception as e:
         print(f"       [{ch_names[i]:<20}]  SNR calculation FAILED: {e}")
-        snr_scores.append(15.0)
+        snr_scores.append(20.0)
 
-component_snr = float(np.mean(snr_scores)) if snr_scores else 15.0
-print(f"\n       → SNR component (mean across channels): {component_snr:.2f} / 25")
+component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
+print(f"\n       → SNR component (mean across channels): {component_snr:.2f} / 40")
 
 # ── 5c: Channel Consistency (0~20) ─────────────────────────
 print(f"\n  5c. Channel Consistency (0~20 points):")
@@ -253,15 +251,15 @@ for i in range(min(6, n_corr_ch)):
             print(f"         corr({ch_names[i]:<20},{ch_names[j]:<20}) = {corr_matrix[i][j]:.4f}")
             shown += 1
 
-if 0.15 <= avg_correlation <= 0.80:
-    component_consistency = 6.0 + (avg_correlation - 0.15) * 16
-elif avg_correlation > 0.80:
-    component_consistency = 16.4 - (avg_correlation - 0.80) * 20
+if avg_correlation < 0.10:
+    component_consistency = max(0.0, avg_correlation * 50.0)
+elif avg_correlation <= 0.85:
+    component_consistency = (avg_correlation - 0.10) / 0.75 * 25.0
 else:
-    component_consistency = max(3, avg_correlation * 20)
-component_consistency = max(0, min(20, component_consistency))
+    component_consistency = max(8.0, 25.0 - (avg_correlation - 0.85) * 70.0)
+component_consistency = max(0.0, min(25.0, component_consistency))
 
-print(f"       → Consistency score: {component_consistency:.2f} / 20")
+print(f"       → Consistency score: {component_consistency:.2f} / 25")
 
 # ── 5d: Artifact Detection (0 ~ -35) ──────────────────────────
 print(f"\n  5d. Artifact Detection (0 ~ -35 penalty):")
@@ -333,16 +331,16 @@ try:
     alpha_psd = r_psd[alpha_mask] if np.any(alpha_mask) else np.array([0])
     if len(alpha_psd) > 2:
         alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
-        print(f"       Alpha peak ratio: {alpha_max_ratio:.2f} (thresholds: >2.5→5pts, >1.5→1pt, >1.2→3pts)")
+        print(f"       Alpha peak ratio: {alpha_max_ratio:.2f} (thresholds: >2.5→+7.5, >1.5→+3, >1.2→+1.5)")
         if alpha_max_ratio > 2.5:
-            spectral_score += 5
-            print(f"         → +5 (clear alpha peak)")
+            spectral_score += 7.5
+            print(f"         → +7.5 (clear alpha peak)")
         elif alpha_max_ratio > 1.5:
-            spectral_score += 1
-            print(f"         → +1 (weak alpha peak)")
+            spectral_score += 3.0
+            print(f"         → +3.0 (weak alpha peak)")
         elif alpha_max_ratio > 1.2:
-            spectral_score += 3
-            print(f"         → +3 (subtle alpha peak)")
+            spectral_score += 1.5
+            print(f"         → +1.5 (subtle alpha peak)")
         else:
             print(f"         → +0 (no alpha peak detected)")
 
@@ -354,21 +352,21 @@ try:
         high_pow = _trapz(r_psd[high_mask], dx=r_df)
         if high_pow > 1e-12:
             ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
-            print(f"       1/f slope ratio: {ratio_db:.2f} dB (thresholds: >15→+3, >8→+1.5)")
+            print(f"       1/f slope ratio: {ratio_db:.2f} dB (thresholds: >15→+7.5, >8→+4)")
             if ratio_db > 15:
-                spectral_score += 3
-                print(f"         → +3 (normal 1/f decay)")
+                spectral_score += 7.5
+                print(f"         → +7.5 (normal 1/f decay)")
             elif ratio_db > 8:
-                spectral_score += 1.5
-                print(f"         → +1.5 (weak 1/f decay)")
+                spectral_score += 4.0
+                print(f"         → +4.0 (weak 1/f decay)")
             else:
                 print(f"         → +0 (no 1/f decay)")
 except Exception as e:
     print(f"       SPECTRAL ANALYSIS FAILED: {e}")
-    spectral_score = 2.0
+    spectral_score = 3.0
 
-spectral_score = min(10, max(0, spectral_score))
-print(f"\n       → Spectral score: {spectral_score:.2f} / 10")
+spectral_score = min(15, max(0, spectral_score))
+print(f"\n       → Spectral score: {spectral_score:.2f} / 15")
 
 # ── 5f: Data Integrity (0 ~ -25) ──────────────────────────
 print(f"\n  5f. Data Integrity (0 ~ -25 penalty):")
@@ -429,7 +427,7 @@ if n_samples_data > 500:
         else:
             print(f"         → -0 (stable baseline)")
 
-print(f"       → Drift penalty: {drift_penalty:.1f} / 5")
+print(f"       → Drift penalty: {drift_penalty:.1f} / 8")
 
 # ═══════════════════════════════════════════════════════════════════
 # STEP 6: FINAL SCORE CALCULATION
@@ -438,28 +436,40 @@ print("\n" + "━" * 75)
 print("STEP 6: FINAL SCORE CALCULATION")
 print("━" * 75)
 
-BASE_SCORE = 8.0
+# Dynamic base score (0~20): fraction of usable channels × signal-strength factor
+BASE_SCORE = 0.0
+usable_ch = n_ch - n_flat - len(noisy_channels_list)
+usable_ratio = max(0.0, usable_ch) / max(1, n_ch)
+if usable_ratio > 0:
+    med_var = float(np.median(variances))
+    if med_var < 1:
+        strength = 0.0
+    elif med_var < 10:
+        strength = med_var / 10.0
+    else:
+        strength = 1.0
+    BASE_SCORE = max(0.0, min(20.0, usable_ratio * 20.0 * strength))
+
 raw_score_before_penalties = component_snr + component_consistency + spectral_score + BASE_SCORE
 raw_score_after_penalties = raw_score_before_penalties - (artifact_penalty + integrity_penalty + drift_penalty)
-final_score = max(5, min(100, round(raw_score_after_penalties * 2.5, 1)))
+final_score = max(0, min(100, round(raw_score_after_penalties, 1)))
 
 print(f"""
   SCORE BREAKDOWN:
   ─────────────────────────────────────────────
-  SNR component:           {component_snr:>8.2f}  / 25
-  Channel consistency:     {component_consistency:>8.2f}  / 20
-  Spectral features:       {spectral_score:>8.2f}  / 10
-  Base score:              {BASE_SCORE:>8.1f}  / 8
+  SNR component:           {component_snr:>8.2f}  / 40
+  Channel consistency:     {component_consistency:>8.2f}  / 25
+  Spectral features:       {spectral_score:>8.2f}  / 15
+  Base score:              {BASE_SCORE:>8.1f}  / 20
   ─────────────────────────────────────────────
-  Subtotal (pre-penalty):  {raw_score_before_penalties:>8.2f}  / 63
+  Subtotal (pre-penalty):  {raw_score_before_penalties:>8.2f}  / 100
   ─────────────────────────────────────────────
   Artifact penalty:       -{artifact_penalty:>6.2f}
   Integrity penalty:      -{integrity_penalty:>6.2f}
   Drift penalty:          -{drift_penalty:>6.2f}
   ─────────────────────────────────────────────
   Raw quality score:       {raw_score_after_penalties:>8.2f}
-  × 2.5 scaling:           {raw_score_after_penalties * 2.5:>8.2f}
-  Clamped [5, 100]:        {final_score:>8.1f}
+  Clamped [0, 100]:        {final_score:>8.1f}
   ═════════════════════════════════════════════
   FINAL DISPLAY SCORE:     {final_score:>8.1f}  / 100
   ═════════════════════════════════════════════

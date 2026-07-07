@@ -133,17 +133,18 @@ def _compute_literacy_scores(data: Dict, quality: Dict, bp: Dict) -> Dict[str, A
     snr_c = safe_float(qd.get("snr_component"), 0)
     cons_c = safe_float(qd.get("consistency_component"), 0)
     spec_c = safe_float(qd.get("spectral_component"), 0)
-    base_c = safe_float(qd.get("base_score"), 8)
+    base_c = safe_float(qd.get("base_score"), 0)
     art_c = safe_float(qd.get("artifact_penalty"), 0)
     int_c = safe_float(qd.get("integrity_penalty"), 0)
     drift_c = safe_float(qd.get("drift_penalty"), 0)
 
-    # Each score uses a distinct combination of components → all values differ
-    reliability = max(5, min(100, cons_c * 3.5 + base_c * 1.5 - int_c - drift_c * 0.8))   # 可靠性评估
-    clarity = max(3, min(100, snr_c * 3.8 - art_c * 2.5 - (15 if snr_c < 10 else 0)))    # 信号清晰度
-    beginner = max(5, min(100, base_c * 3 + cons_c * 2 - art_c - int_c * 0.6))           # 入口友好度
-    research = max(5, min(100, snr_c * 2.2 + spec_c * 2 + cons_c * 1.2 - drift_c))       # 研究可用性
-    noise_complexity = max(0, min(100, art_c * 3 + int_c * 2 + drift_c * 2.5))           # 噪声复杂度
+    # Each score uses a distinct combination of components → all values differ.
+    # Component ranges after scoring redesign: snr 0~40, cons 0~25, spec 0~15, base 0~20.
+    reliability = max(0, min(100, cons_c * 2.5 + base_c * 1.2 - int_c - drift_c * 0.8))   # 可靠性评估
+    clarity = max(0, min(100, snr_c * 1.8 - art_c * 2.5 - (10 if snr_c < 10 else 0)))    # 信号清晰度
+    beginner = max(0, min(100, base_c * 1.8 + cons_c * 1.8 - art_c - int_c * 0.6))       # 入口友好度
+    research = max(0, min(100, snr_c * 1.0 + spec_c * 1.5 + cons_c * 0.8 - drift_c))     # 研究可用性
+    noise_complexity = max(0, min(100, art_c * 1.5 + int_c * 1.2 + drift_c * 1.5))       # 噪声复杂度
 
     return {
         "learning_readability_score": round(reliability, 1),
