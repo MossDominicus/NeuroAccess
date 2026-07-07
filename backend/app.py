@@ -139,12 +139,14 @@ def _compute_literacy_scores(data: Dict, quality: Dict, bp: Dict) -> Dict[str, A
     drift_c = safe_float(qd.get("drift_penalty"), 0)
 
     # Each score uses a distinct combination of components → all values differ.
-    # Component ranges after scoring redesign: snr 0~40, cons 0~25, spec 0~15, base 0~20.
-    reliability = max(0, min(100, cons_c * 2.5 + base_c * 1.2 - int_c - drift_c * 0.8))   # 可靠性评估
-    clarity = max(0, min(100, snr_c * 1.8 - art_c * 2.5 - (10 if snr_c < 10 else 0)))    # 信号清晰度
-    beginner = max(0, min(100, base_c * 1.8 + cons_c * 1.8 - art_c - int_c * 0.6))       # 入口友好度
-    research = max(0, min(100, snr_c * 1.0 + spec_c * 1.5 + cons_c * 0.8 - drift_c))     # 研究可用性
-    noise_complexity = max(0, min(100, art_c * 1.5 + int_c * 1.2 + drift_c * 1.5))       # 噪声复杂度
+    # Component ranges (restored): snr 0~25, cons 0~20, spec 0~10, base 0~8,
+    #   artifact 0~35, integrity 0~25, drift 0~8. Multipliers tuned so a clean
+    #   file scores ~85-100 and a noisy file drops clearly.
+    reliability = max(0, min(100, cons_c * 4.0 + base_c * 2.5 - int_c * 2.0 - drift_c * 2.0))   # 可靠性评估
+    clarity = max(0, min(100, snr_c * 4.0 - art_c * 2.0 - (15 if snr_c < 8 else 0)))            # 信号清晰度
+    beginner = max(0, min(100, base_c * 5.0 + cons_c * 3.0 - art_c * 1.5 - int_c * 0.8))        # 入口友好度
+    research = max(0, min(100, snr_c * 2.0 + spec_c * 2.5 + cons_c * 1.0 - drift_c * 2.0))      # 研究可用性
+    noise_complexity = max(0, min(100, art_c * 1.5 + int_c * 1.2 + drift_c * 1.5))              # 噪声复杂度
 
     return {
         "learning_readability_score": round(reliability, 1),

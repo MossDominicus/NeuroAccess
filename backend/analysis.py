@@ -370,19 +370,20 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
 
 
 def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "zh", sfreq: float = 250.0) -> Dict[str, Any]:
-    """多维度信号质量评估 — 真实评分（原始分直接落在 0~100，无倍数缩放）
+    """多维度信号质量评估 — 真实评分（原始分量之和 ×2.5 线性重映射到 0~100）
 
-    评分体系（7个独立组件，原始分直接累加 = 总分）：
-      SNR 信噪比     : 0~40 分（EEG频段功率 vs 高频噪声）
-      通道一致性     : 0~25 分（相邻通道空间相关性）
-      频谱特征质量   : 0~15 分（alpha峰 + 1/f 衰减）
-      基础分         : 0~20 分（是否采集到真实可用脑电活动；0=平坦/全噪声什么也没检测到）
-      伪影水平       : 0~-35 分（峰度/幅度异常值）
+    评分体系（7个独立组件，原始分量之和 0~63，最终 ×2.5 映射到 0~100）：
+      SNR 信噪比     : 0~25 分（EEG频段功率 vs 高频噪声）
+      通道一致性     : 0~20 分（相邻通道空间相关性）
+      频谱特征质量   : 0~10 分（alpha峰 + 1/f 衰减）
+      基础分         : 0~8 分（是否采集到真实可用脑电活动；0=平坦/全噪声什么也没检测到）
+      伪影水平       : 0~-35 分（峰度/幅度异常值 + 高频污染）
       数据完整性     : 0~-25 分（削波/平坦/缺失）
-      基线稳定性     : 0~-5 分（慢漂移/DC偏移）
+      基线稳定性     : 0~-8 分（慢漂移/DC偏移）
 
-    总分 = SNR + 通道一致性 + 频谱特征 + 基础分 − 伪影 − 完整性 − 漂移，直接 clamp 到 0~100。
-    最低 0 分（什么也检测不到，如全平坦/全噪声），最高 100 分（全部组件满分且无扣分）。
+    原始总和 = SNR + 通道一致性 + 频谱特征 + 基础分 − 伪影 − 完整性 − 漂移（范围约 -68~63）
+    最终总分 = max(5, min(100, 原始总和 × 2.5))，保底 5 分避免极端 0 分误读。
+    真实伪影/噪声一定会被检测并扣分（任一强异常指标即标记噪声通道 + 高频污染检测），不再出现全零误判。
     """
     import i18n
 
@@ -409,7 +410,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     stds = np.std(data_uv, axis=1, keepdims=True)
     means = np.mean(data_uv, axis=1, keepdims=True)
 
-    # ── 组件 1: SNR 信噪比 (0~40分) ─────────────────
+    # ── 组件 1: SNR 信噪比 (0~25分) ─────────────────
     # Welch PSD 每通道
     nperseg = min(int(4.0 * min(sfreq, n_samples // 30)), 1024, n_samples)
     nperseg = max(nperseg, 16)
@@ -447,24 +448,24 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if eeg_power < 1e-6:
                 snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~40 分（按真实脑电标定：典型 ~10dB 即 38~40，低/负 SNR 自然趋低）
-            if snr_db >= 10:
-                s = 40.0
-            elif snr_db >= 5:
-                s = 28.0 + (snr_db - 5) * 2.4       # 5~10 dB → 28~40
+            # 映射到 0~25 分（原始标定：SNR 越高越接近满分；平坦/断连 snr_db 极低 → 0）
+            if snr_db >= 30:
+                s = 25.0
+            elif snr_db >= 20:
+                s = 15.0 + (snr_db - 20) * 1.0
+            elif snr_db >= 10:
+                s = 8.0 + (snr_db - 10) * 0.7
             elif snr_db >= 0:
-                s = 14.0 + snr_db * 2.8             # 0~5 dB → 14~28
-            elif snr_db >= -5:
-                s = 5.0 + (snr_db + 5) * 1.8        # -5~0 dB → 5~14
+                s = max(3.0, 4.0 + snr_db * 0.4)
             else:
-                s = max(0.0, snr_db + 9.0)           # 负 dB → 趋近 0
+                s = max(0.0, 5.0 + snr_db * 1.5)
             snr_scores.append(s)
         except Exception:
             snr_scores.append(20.0)  # 中等默认值
 
     component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
 
-    # ── 组件 2: 通道一致性 (0~25分) ───────────────────
+    # ── 组件 2: 通道一致性 (0~20分) ───────────────────
     # 计算相邻通道间的 Pearson 相关系数（取所有通道对的均值）
     if var_mean <= 1e-6:
         # 全平坦/无信号：通道间无任何有意义的差异，一致性视为 0
@@ -491,16 +492,16 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射（宽松）：0.06 以下趋近 0（断连/独立噪声），0.60 即满分 25，
+    # 相关性映射（宽松）：0.06 以下趋近 0（断连/独立噪声），0.60 即满分 20，
     # 极高相关(>0.60)仅极轻微回落（疑似短路才扣），整体随相关性自然爬升。
     if avg_correlation < 0.06:
-        component_consistency = max(0.0, avg_correlation * 45.0)        # 0.06→2.7, 0→0
+        component_consistency = max(0.0, avg_correlation * 40.0)        # 0.06→2.4, 0→0
     elif avg_correlation <= 0.60:
-        component_consistency = (avg_correlation - 0.06) / 0.54 * 25.0  # 0.06→0, 0.60→25
+        component_consistency = (avg_correlation - 0.06) / 0.54 * 20.0  # 0.06→0, 0.60→20
     else:
-        component_consistency = max(18.0, 25.0 - (avg_correlation - 0.60) * 30.0)  # 疑似短路极轻回落
+        component_consistency = max(15.0, 20.0 - (avg_correlation - 0.60) * 25.0)  # 疑似短路极轻回落
 
-    component_consistency = max(0.0, min(25.0, component_consistency))
+    component_consistency = max(0.0, min(20.0, component_consistency))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
@@ -549,7 +550,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
     artifact_penalty = min(artifact_penalty, 35)
 
-    # ── 组件 4: 频谱特征质量 (0~15分) ─────────────────
+    # ── 组件 4: 频谱特征质量 (0~10分) ─────────────────
     spectral_score = 0.0
     try:
         # 取一个代表性通道（方差最接近中位数的）
@@ -600,7 +601,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     except Exception:
         spectral_score = 4.0  # 默认中等
 
-    spectral_score = min(15, max(0, spectral_score))
+    spectral_score = min(10, max(0, spectral_score))
 
     # ── 组件 5: 数据完整性 (0 ~ -25分扣分) ─────────────
     integrity_penalty = 0.0
@@ -646,14 +647,14 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         if overall_range > 0:
             drift_ratio = seg_range / overall_range
             if drift_ratio > 0.3:
-                drift_penalty = 4.0
+                drift_penalty = 8.0
             elif drift_ratio > 0.18:
-                drift_penalty = 2.5
+                drift_penalty = 4.0
             elif drift_ratio > 0.08:
-                drift_penalty = 1.0
+                drift_penalty = 2.0
 
-    # ── 组件 4: 基础分 (0~20) — 是否采集到真实、可用的脑电活动 ──
-    # 0 = 平坦/全噪声（什么也检测不到）；20 = 多数通道信号健康
+    # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
+    # 0 = 平坦/全噪声（什么也检测不到）；8 = 多数通道信号健康
     usable_ch = n_ch - n_flat - len(noisy_channels_list)
     usable_ratio = max(0.0, usable_ch) / max(1, n_ch)
     if usable_ratio <= 0:
@@ -667,19 +668,19 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             strength = med_var / 10.0                # 1~10 μV² → 0.1~1.0
         else:
             strength = 1.0                           # 真实脑电信号，正常方差
-        base_score = max(0.0, min(20.0, usable_ratio * 20.0 * strength))
+        base_score = max(0.0, min(8.0, usable_ratio * 8.0 * strength))
 
     # ── 最终评分组装 ──────────────────────────────────
     quality_score = (
-        component_snr +           # 0~40
-        component_consistency +   # 0~25
-        spectral_score +          # 0~15
-        base_score                # 0~20 基础分（动态）
+        component_snr +           # 0~25
+        component_consistency +   # 0~20
+        spectral_score +          # 0~10
+        base_score                # 0~8 基础分（动态）
     )
     quality_score -= (artifact_penalty + integrity_penalty + drift_penalty)
 
-    # 直接 clamp 到 0~100，不做任何倍数缩放
-    quality_score = max(0.0, min(100.0, quality_score))
+    # 线性重映射：原始分量之和(约 0~63) ×2.5 → 0~100 显示尺度（保底 5 分，避免极端 0 分误读）
+    quality_score = max(5.0, min(100.0, quality_score * 2.5))
 
     # ── 伪影描述文本 ──────────────────────────────────
     possible_artifacts = []

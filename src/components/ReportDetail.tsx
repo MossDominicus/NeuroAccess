@@ -255,17 +255,17 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           if (!hasBreakdown) return null;
 
           // 真实算法分项满分（与后端 analysis.py 及“评分逻辑”弹窗完全一致）
-          // 新版：原始分直接累加 = 总分（无 ×2.5 缩放），满分 SNR 40 / 一致性 25 / 频谱 15 / 基础 20
-          const M_SNR = 40;    // 信噪比 0~40
-          const M_CONS = 25;   // 通道一致性 0~25
-          const M_SPEC = 15;   // 频谱特征 0~15
-          const M_BASE = 20;   // 基础分 0~20（动态）
+          // 原始分量之和 ×2.5 线性重映射到 0~100（保底 5 分），满分 SNR 25 / 一致性 20 / 频谱 10 / 基础 8
+          const M_SNR = 25;    // 信噪比 0~25
+          const M_CONS = 20;   // 通道一致性 0~20
+          const M_SPEC = 10;   // 频谱特征 0~10
+          const M_BASE = 8;    // 基础分 0~8（动态）
           const M_ART = 35;    // 伪影扣分 0~35
           const M_INT = 25;    // 完整性扣分 0~25
           const M_DRIFT = 8;   // 基线漂移 0~8
 
-          // 直接使用后端返回的真实分项分数，不再做 ×2.5 缩放，
-          // 每个分项都如实反映其在真实算法中的取值与满分。
+          // 直接使用后端返回的真实分项分数（每个分项已是原始分量，未缩放），
+          // 每个分项都如实反映其在真实算法中的取值与满分。总分在后端 = 分量之和 ×2.5。
           const vSnr = Number(qd.snr_component) || 0;
           const vCons = Number(qd.consistency_component) || 0;
           const vSpec = Number(qd.spectral_component) || 0;
@@ -291,7 +291,7 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                 {items.slice(0, 4).map((item) => (
                   <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
                     <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>{item.value}</span>
+                    <span className={`text-sm font-bold tabular-nums ${item.color}`}>{item.value}/{item.maxVal}</span>
                   </div>
                 ))}
               </div>
@@ -300,9 +300,9 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
                   <div key={item.key} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
                     <span className="text-xs text-[var(--color-text-secondary)]">{item.label}</span>
                     {item.value > 0 ? (
-                      <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}</span>
+                      <span className={`text-sm font-bold tabular-nums ${item.color}`}>-{item.value}/{item.maxVal}</span>
                     ) : (
-                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ 无</span>
+                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {item.value}/{item.maxVal}</span>
                     )}
                   </div>
                 ))}
