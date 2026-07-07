@@ -596,24 +596,27 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     # ── 组件 5: 数据完整性 (0 ~ -25分扣分) ─────────────
     integrity_penalty = 0.0
     n_flat = 0
+    flat_channels = []
 
     # 5a. 缺失数据
     has_missing = bool(np.any(~np.isfinite(data_uv)))
     if has_missing:
         integrity_penalty += 8
 
-    # 5b. 削波检测
+    # 5b. 削波检测（连续评分：轻微削波扣少，严重扣多）
     clipping_detected = False
-    flat_channels = []
+    clip_scores = []
     for i in range(n_ch):
         max_abs = float(np.max(np.abs(data_uv[i])))
         if max_abs > 0:
-            # 检查是否有大量样本在最大值的 99% 以上
             near_max_count = int(np.sum(np.abs(data_uv[i]) > 0.99 * max_abs))
-            if near_max_count > n_samples * 0.01:  # 超1%样本在峰值附近
+            clip_ratio = near_max_count / n_samples
+            # 连续评分：0.2% 样本在峰值→约0.4分, 5%→10分
+            if clip_ratio > 0.002:
                 clipping_detected = True
-                integrity_penalty += 4
-                break
+                clip_scores.append(min(10, clip_ratio * 200))
+    if clip_scores:
+        integrity_penalty += float(np.mean(clip_scores))
 
     # 5c. 平坦通道（方差极低，可能是断连）
     if var_mean > 0:
@@ -626,7 +629,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     integrity_penalty = min(integrity_penalty, 25)
 
     # ── 组件 6: 基线稳定性 (0 ~ -8分扣分) ─────────────
-    # 慢漂移检测：逐通道计算漂移比，避免多通道均值正负抵消导致漏检
+    # 慢漂移检测：逐通道计算漂移比，避免多通道均值正负抵消导致漏检；连续评分 0~8
     drift_penalty = 0.0
     if n_samples > 500:
         seg_size = n_samples // 4
@@ -640,14 +643,8 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
                 ch_drift_ratios.append(ch_range / ch_overall)
         if ch_drift_ratios:
             mean_drift_ratio = float(np.mean(ch_drift_ratios))
-            if mean_drift_ratio > 0.25:
-                drift_penalty = 8.0
-            elif mean_drift_ratio > 0.14:
-                drift_penalty = 4.0
-            elif mean_drift_ratio > 0.06:
-                drift_penalty = 2.0
-            elif mean_drift_ratio > 0.025:
-                drift_penalty = 1.0   # 新增：极轻微漂移
+            # 连续映射：ratio 0.02→0, 0.12→4, 0.22→8（线性）
+            drift_penalty = max(0.0, min(8.0, (mean_drift_ratio - 0.02) * 40))
 
     # ── 基础分 (0~8) — 是否采集到真实、可用的脑电活动 ──
     # 0 = 平坦/全噪声；8 = 多数通道信号健康。使用逐通道方差连续度量，避免二值化。
