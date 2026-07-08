@@ -332,7 +332,6 @@ function DashboardInner() {
             <span className="mt-1 block text-xs sm:text-sm text-[var(--color-text-secondary)]">{t("supportedFormats")}</span>
             <input
               type="file"
-              accept=".edf,.bdf,.gdf"
               multiple
               className="sr-only"
               onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}

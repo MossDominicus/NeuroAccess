@@ -120,18 +120,16 @@ export default function EEGViewerPage() {
 
       {/* 上传区域 */}
       <div className="bg-[var(--color-surface)] rounded-2xl p-6 shadow-sm border border-[var(--color-border)] mb-8">
-        <div
+        <label
           onDrop={handleDrop}
           onDragOver={e => e.preventDefault()}
-          className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
-          onClick={() => document.getElementById("eeg-file-input")?.click()}
+          className="block border-2 border-dashed border-[var(--color-border)] rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
         >
           <input
             id="eeg-file-input"
             type="file"
-            accept=".edf,.bdf,.gdf"
             onChange={handleFileChange}
-            className="hidden"
+            className="sr-only"
           />
           <div className="text-[var(--color-text-secondary)]/70 mb-2">
             <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +142,7 @@ export default function EEGViewerPage() {
           <p className="text-[var(--color-text-secondary)]/70 text-sm mt-1">
             {t("supportedFormats")}
           </p>
-        </div>
+        </label>
 
         {/* 参数设置 */}
         <div className="mt-4 flex items-center gap-4">
