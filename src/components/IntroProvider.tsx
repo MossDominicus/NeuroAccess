@@ -15,16 +15,22 @@ const IntroAnimation = nextDynamic(() => import("@/components/IntroAnimation"), 
  * 初始化时立即检查 sessionStorage，避免首次渲染闪白
  */
 export default function IntroProvider({ children }: { children: ReactNode }) {
-  const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === "undefined") return false;
+  // 初始化必须使用确定性值，避免 SSR 与客户端 hydration 不一致导致整页 hydration 失败（React #418）。
+  // sessionStorage 的读取改到挂载后的 useEffect 中进行。
+  const [showIntro, setShowIntro] = useState(false);
+  const { setReplayIntro } = useAppEvents();
+
+  useEffect(() => {
     const forced = new URLSearchParams(window.location.search).get("intro");
     if (forced === "1") {
       window.sessionStorage.removeItem("neuroaccess-intro-played");
-      return true;
+      setShowIntro(true);
+      return;
     }
-    return window.sessionStorage.getItem("neuroaccess-intro-played") !== "true";
-  });
-  const { setReplayIntro } = useAppEvents();
+    if (window.sessionStorage.getItem("neuroaccess-intro-played") !== "true") {
+      setShowIntro(true);
+    }
+  }, []);
 
   const handleIntroComplete = useCallback(() => {
     window.sessionStorage.setItem("neuroaccess-intro-played", "true");

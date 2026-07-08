@@ -239,7 +239,6 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 
 function DashboardInner() {
   const { t } = useLang();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const { user } = useAuth();
   const {
     files, running, paused, expandId, setExpandId,
@@ -323,27 +322,22 @@ function DashboardInner() {
       <div className="space-y-6">
         {/* Upload area */}
         {!hasActiveAnalysis ? (
-          <div
+          <label
             className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-8 sm:p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] active:border-[var(--color-primary)] cursor-pointer min-h-[160px] flex flex-col items-center justify-center"
             onDragOver={(e) => { e.preventDefault(); }}
             onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
-            onClick={() => inputRef.current?.click()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
           >
             <UploadCloud className="mx-auto mb-3 sm:mb-4 h-8 w-8 sm:h-10 sm:w-10 text-[var(--color-text-secondary)]" />
-            <p className="text-sm sm:text-base font-medium text-[var(--color-text)]">{t("dragOrClick")}</p>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--color-text-secondary)]">{t("supportedFormats")}</p>
+            <span className="block text-sm sm:text-base font-medium text-[var(--color-text)]">{t("dragOrClick")}</span>
+            <span className="mt-1 block text-xs sm:text-sm text-[var(--color-text-secondary)]">{t("supportedFormats")}</span>
             <input
-              ref={inputRef}
               type="file"
               accept=".edf,.bdf,.gdf"
               multiple
-              className="hidden"
+              className="sr-only"
               onChange={(e) => { handleFileSelect(e.target.files); if (e.target) e.target.value = ""; }}
             />
-          </div>
+          </label>
         ) : (
           <div
             className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 p-10 text-center opacity-60"
