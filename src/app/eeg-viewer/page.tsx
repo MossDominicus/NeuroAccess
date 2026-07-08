@@ -37,7 +37,7 @@ export default function EEGViewerPage() {
     }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     const f = e.dataTransfer.files?.[0];
     if (f) {

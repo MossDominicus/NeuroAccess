@@ -190,17 +190,16 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   }, [lang]);
 
   // ── 文件选择 ─────────────────────────────────────────────────
+  // 注意：不再在客户端按扩展名静默过滤文件。任何被选文件都先进入列表，
+  // 格式是否合法交由后端分析时判定并回报错误。静默过滤会导致“选完文件完全没反应”
+  // （例如文件实际为双扩展名或系统隐藏了真实后缀时），故此处接受全部文件。
   const handleFileSelect = useCallback((selected: FileList | null) => {
     if (!selected || selected.length === 0) return;
-    const valid = Array.from(selected).filter((f) => {
-      const ext = f.name.split(".").pop()?.toLowerCase();
-      // 支持 .edf / .bdf / .gdf
-      return ext === "edf" || ext === "bdf" || ext === "gdf";
-    });
-    if (valid.length === 0) return;
+    const filesArr = Array.from(selected);
+    if (filesArr.length === 0) return;
     setFiles((prev) => [
       ...prev,
-      ...valid.map((file) => ({
+      ...filesArr.map((file) => ({
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${Math.random().toString(36).slice(2, 8)}`,
         file,
         name: file.name,
