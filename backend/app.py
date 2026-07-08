@@ -88,12 +88,12 @@ MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
 # =================================================================
 
 def save_upload(file: UploadFile) -> Dict[str, Any]:
-    """保存上传文件（接受 .edf / .bdf / .gdf）"""
+    """保存上传文件（仅接受 .edf）"""
     if not file or not file.filename:
         return {"success": False, "error": "未提供文件"}
     ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in (".edf", ".bdf", ".gdf"):
-        return {"success": False, "error": f"Unsupported file format: {ext}. Supported formats: .edf, .bdf, .gdf"}
+    if ext != ".edf":
+        return {"success": False, "error": f"Unsupported file format: {ext}. Supported format: .edf"}
     import uuid
     stored_name = f"{uuid.uuid4().hex[:10]}_{safe_name(file.filename)}"
     path = os.path.join(UPLOAD_DIR, stored_name)

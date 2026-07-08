@@ -172,7 +172,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: "支持 .edf / .bdf / .gdf 格式",
     chooseFiles: "选择文件",
     dragOrClick: "点击或拖拽上传文件",
-    supportedFormats: "格式：.edf / .bdf / .gdf",
+    supportedFormats: "格式：.edf",
     uploadDisabledDuringAnalysis: "分析中，请等待",
 
     // 分析按钮
@@ -879,7 +879,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: "Supports .edf / .bdf / .gdf formats",
     chooseFiles: "Choose Files",
     dragOrClick: "Click or drag to upload files",
-    supportedFormats: "Formats: .edf / .bdf / .gdf",
+    supportedFormats: "Formats: .edf",
     uploadDisabledDuringAnalysis: "Analyzing, please wait",
 
     // Analysis buttons
@@ -1647,7 +1647,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: "Formatos admitidos: .edf / .bdf / .gdf",
     chooseFiles: "Elegir Archivos",
     dragOrClick: "Haz clic o arrastra para subir archivos",
-    supportedFormats: "Formatos: .edf / .bdf / .gdf",
+    supportedFormats: "Formatos: .edf",
     uploadDisabledDuringAnalysis: "Analizando, espere por favor",
 
     startAnalysis: "Iniciar Análisis",
@@ -2394,7 +2394,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: "Formats pris en charge : .edf / .bdf / .gdf",
     chooseFiles: "Choisir les Fichiers",
     dragOrClick: "Cliquez ou glissez pour télécharger les fichiers",
-    supportedFormats: "Formats : .edf / .bdf / .gdf",
+    supportedFormats: "Formats : .edf",
     uploadDisabledDuringAnalysis: "Analyse en cours, veuillez patienter",
 
     startAnalysis: "Commencer l'Analyse",
@@ -3141,7 +3141,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: "Unterstützte Formate: .edf / .bdf / .gdf",
     chooseFiles: "Dateien Auswählen",
     dragOrClick: "Klicken oder ziehen Sie, um Dateien hochzuladen",
-    supportedFormats: "Formate: .edf / .bdf / .gdf",
+    supportedFormats: "Formate: .edf",
     uploadDisabledDuringAnalysis: "Analyse läuft, bitte warten",
 
     startAnalysis: "Analyse Starten",
@@ -3888,7 +3888,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: ".edf / .bdf / .gdf フォーマット対応",
     chooseFiles: "ファイルを選択",
     dragOrClick: "クリックまたはドラッグしてファイルをアップロード",
-    supportedFormats: "フォーマット：.edf / .bdf / .gdf",
+    supportedFormats: "フォーマット：.edf",
     uploadDisabledDuringAnalysis: "分析中、お待ちください",
 
     startAnalysis: "分析開始",
@@ -4635,7 +4635,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     uploadAreaSubtitle: ".edf / .bdf / .gdf 형식 지원",
     chooseFiles: "파일 선택",
     dragOrClick: "클릭하거나 드래그하여 파일 업로드",
-    supportedFormats: "형식: .edf / .bdf / .gdf",
+    supportedFormats: "형식: .edf",
     uploadDisabledDuringAnalysis: "분석 중입니다. 기다려 주세요",
 
     startAnalysis: "분석 시작",

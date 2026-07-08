@@ -32,7 +32,7 @@ BANDS = {
 }
 
 # ── 文件格式支持 ──────────────────────────────────────
-SUPPORTED_FORMATS = {".edf", ".bdf", ".gdf"}
+SUPPORTED_FORMATS = {".edf"}
 
 
 def _load_raw_any(file_path: str, preload: bool = False):
