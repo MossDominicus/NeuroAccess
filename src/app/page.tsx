@@ -41,14 +41,15 @@ function ProgressBar({ status }: { status: Status }) {
   const isRunning = status === "reading" || status === "computing" || status === "explaining";
 
   return (
-    <div className="flex items-center gap-2 min-w-[120px]">
-      <div className="flex-1 h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden">
+    <div className="flex items-center gap-2">
+      {/* 进度条固定宽度，不随语言文本长度变化 */}
+      <div className="w-24 h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden shrink-0">
         <div
           className={`h-full rounded-full transition-all duration-700 ease-out ${color} ${isRunning ? "animate-pulse" : ""}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
+      <span className="text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap shrink-0">
         {t(label)}
       </span>
     </div>
