@@ -116,68 +116,100 @@ def template_beginner(a: Dict, lang: str) -> str:
 
 def template_student(a: Dict, lang: str) -> str:
     bp   = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
-    bp_s = ", ".join(f"{k}: {v}" for k, v in list(bp.items())[:4])
-    ch_s = ", ".join((a.get("channel_names") or [])[:10]) or ("not available" if lang == "en" else "暂无")
+    # 主导频段（百分比最高的频段）
+    dom_band = max(bp.items(), key=lambda kv: kv[1])[0] if bp else None
     ns   = a.get("noisy_channels") or []
-    n_s  = ", ".join(ns[:8]) or ("none highlighted" if lang == "en" else "未明显标出")
+    n_n  = len(ns)
+    n_s  = ", ".join(ns[:3]) if ns else ("none" if lang == "en" else ("无" if lang == "zh" else "none"))
     q    = _quality_level(a.get("signal_quality_score"), lang)
+    ch_n = a.get("channel_count")
+    sr   = a.get("sampling_rate")
+    dur  = a.get("duration")
+    bp_s = ", ".join(f"{k}: {v}%" for k, v in list(bp.items())[:4])
+    dom_str = (f"alpha/theta/beta range" if not dom_band else f"{dom_band} band") if lang == "en" else (f"{dom_band} 频段" if dom_band else "未知频段")
     if lang == "en":
         return (
-            f"Learning-level summary: {a.get('channel_count')} channels, "
-            f"SR={a.get('sampling_rate')}, duration={a.get('duration')}. Channels: {ch_s}.\n\n"
-            f"Signal quality is {q}. Noisier channels: {n_s}.\n\n"
-            f"Band overview (percent): {bp_s}. Delta/theta/alpha/beta are broad frequency ranges used in EEG education."
+            f"Recording overview: {ch_n} channels, SR={sr} Hz, duration={dur}. "
+            f"Overall signal readability: {q}.\n\n"
+            f"Spectral distribution across the recording (percent): {bp_s}. "
+            f"The dominant band is the {dom_str}. "
+            f"About {n_n} channel(s) appear noisier than the rest"
+            + (f" (e.g., {n_s})" if ns else "")
+            + ", which can affect local readings.\n\n"
+            f"Note: This summary describes the recording as a whole, not individual sensors."
         )
     if lang == "zh":
         return (
-            f"学习者摘要：{a.get('channel_count')} 个通道，"
-            f"采样率 {a.get('sampling_rate')}，时长 {a.get('duration')}。通道：{ch_s}。\n\n"
-            f"信号质量：{q}。噪声通道：{n_s}。\n\n"
-            f"频段概览（百分比）：{bp_s}。delta/theta/alpha/beta 是 EEG 学习中常用的宽频段。"
+            f"这份记录共有 {ch_n} 个通道，采样率 {sr} Hz，时长 {dur}。"
+            f"整体信号可读性：{q}。\n\n"
+            f"频段功率分布（百分比）：{bp_s}。"
+            f"主导频段是 {dom_str}。"
+            f"约 {n_n} 个通道信号偏弱"
+            + (f"（如 {n_s}）" if ns else "")
+            + "，可能影响局部数据的可信度。\n\n"
+            f"提示：以上是对整段记录的总体描述，不是对单个传感器的逐一解读。"
         )
     # fallback English
     return (
-        f"Learning-level summary: {a.get('channel_count')} channels, "
-        f"SR={a.get('sampling_rate')}, duration={a.get('duration')}. Channels: {ch_s}.\n\n"
-        f"Signal quality is {q}. Noisier channels: {n_s}.\n\n"
-        f"Band overview (percent): {bp_s}. Delta/theta/alpha/beta are broad frequency ranges used in EEG education."
+        f"Recording overview: {ch_n} channels, SR={sr} Hz, duration={dur}. "
+        f"Overall signal readability: {q}.\n\n"
+        f"Spectral distribution across the recording (percent): {bp_s}. "
+        f"The dominant band is the {dom_str}. "
+        f"About {n_n} channel(s) appear noisier than the rest"
+        + (f" (e.g., {n_s})" if ns else "")
+        + ", which can affect local readings.\n\n"
+        f"Note: This summary describes the recording as a whole, not individual sensors."
     )
 
 
 def template_research(a: Dict, lang: str) -> str:
     bp   = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
-    bp_s = ", ".join(f"{k}: {v}" for k, v in list(bp.items())[:4])
-    dom  = a.get("dominant_frequency") or a.get("frequency_analysis", {}).get("dominant_frequency")
+    dom_band = max(bp.items(), key=lambda kv: kv[1])[0] if bp else None
     ns   = a.get("noisy_channels") or []
-    n_s  = ", ".join(ns[:10]) or ("none highlighted" if lang == "en" else "未明显标出")
+    n_s  = ", ".join(ns[:3]) if ns else ("none" if lang == "en" else ("无" if lang == "zh" else "none"))
     n_n  = len(ns)
     ch_n = a.get("channel_count")
     sr   = a.get("sampling_rate")
     dur  = a.get("duration")
     sq   = a.get("signal_quality_score")
+    bp_s = ", ".join(f"{k}: {v}%" for k, v in list(bp.items())[:4])
+    dom_str = f"{dom_band}" if dom_band else ("unknown" if lang == "en" else ("未知" if lang == "zh" else "unknown"))
+    q_label = _quality_level(sq, lang)
     if lang == "en":
         return (
-            f"Dataset metadata: {ch_n} channels at SR={sr} Hz, duration={dur}. "
-            f"Signal quality score: {sq}/100.\n\n"
-            f"Spectral summary (bandpower percent): {bp_s}. "
-            f"Dominant frequency: {dom} Hz. "
-            f"Noisy channels flagged: {n_n} ({n_s})."
+            f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq}/100 ({q_label}).\n\n"
+            f"Spectral profile: {bp_s}. Dominant band: {dom_str}. "
+            f"Noisy-channel count: {n_n}"
+            + (f" (e.g., {n_s})" if ns else "")
+            + ".\n\n"
+            f"Interpretation guidance: the relative bandpower distribution describes the spectral balance, "
+            f"not cognitive state. With {n_n} channel(s) below noise tolerance, "
+            f"any per-channel analysis should treat those channels as unreliable. "
+            f"Overall quality ({q_label}) supports whole-dataset summaries but limits fine-grained inference."
         )
     if lang == "zh":
         return (
-            f"数据集概览：{ch_n} 个通道，采样率 {sr} Hz，时长 {dur}。"
-            f"信号质量评分：{sq}/100。\n\n"
-            f"频段功率（百分比）：{bp_s}。"
-            f"主导频率：{dom} Hz。"
-            f"噪声通道数：{n_n}（{n_s}）。"
+            f"数据集概览：{ch_n} 个通道，采样率 {sr} Hz，时长 {dur}；"
+            f"信号质量评分 {sq}/100（{q_label}）。\n\n"
+            f"频谱概貌：{bp_s}。主导频段：{dom_str}。"
+            f"噪声通道数：{n_n}"
+            + (f"（如 {n_s}）" if ns else "")
+            + "。\n\n"
+            f"解读提示：频段功率的相对分布描述的是频谱平衡，不代表认知状态。"
+            f"有 {n_n} 个通道低于噪声容忍度，针对这些通道的逐通道分析应视为不可靠。"
+            f"整体质量（{q_label}）足以支撑数据集级结论，但限制细粒度推断。"
         )
     # fallback English
     return (
-        f"Dataset metadata: {ch_n} channels at SR={sr} Hz, duration={dur}. "
-        f"Signal quality score: {sq}/100.\n\n"
-        f"Spectral summary (bandpower percent): {bp_s}. "
-        f"Dominant frequency: {dom} Hz. "
-        f"Noisy channels flagged: {n_n} ({n_s})."
+        f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq}/100 ({q_label}).\n\n"
+        f"Spectral profile: {bp_s}. Dominant band: {dom_str}. "
+        f"Noisy-channel count: {n_n}"
+        + (f" (e.g., {n_s})" if ns else "")
+        + ".\n\n"
+        f"Interpretation guidance: the relative bandpower distribution describes the spectral balance, "
+        f"not cognitive state. With {n_n} channel(s) below noise tolerance, "
+        f"any per-channel analysis should treat those channels as unreliable. "
+        f"Overall quality ({q_label}) supports whole-dataset summaries but limits fine-grained inference."
     )
 
 
@@ -190,23 +222,24 @@ def _summarize_for_ai(a: Dict) -> Dict:
     sq       = a.get("signal_quality") or {}
     fa       = a.get("frequency_analysis") or {}
     overview = a.get("overview") or {}
-    literacy = a.get("literacy_scores") or {}
+    literacy = a.get("literacy_scores") or a.get("eeg_literacy_scores") or {}
     return {
-        "channel_count":            overview.get("channel_count"),
-        "sampling_rate":            overview.get("sampling_rate"),
-        "duration":                 overview.get("duration"),
-        "duration_seconds":         overview.get("recording_duration_seconds"),
-        "signal_quality_score":     sq.get("signal_quality_score"),
+        "channel_count":            overview.get("channel_count") or a.get("channel_count"),
+        "sampling_rate":            overview.get("sampling_rate") or a.get("sampling_rate"),
+        "duration":                 overview.get("duration") or a.get("duration"),
+        "duration_seconds":         overview.get("recording_duration_seconds") or a.get("recording_duration_seconds") or a.get("duration_seconds"),
+        "signal_quality_score":     sq.get("signal_quality_score") or a.get("signal_quality_score"),
         # 只保留前若干项，避免超长通道列表
-        "noisy_channels":           (sq.get("noisy_channels") or [])[:20],
-        "possible_artifacts":       (sq.get("possible_artifacts") or [])[:10],
-        "clipping_detected":        sq.get("clipping_detected"),
-        "missing_data":             sq.get("missing_data"),
-        "high_frequency_noise":     sq.get("high_frequency_noise"),
+        "noisy_channels":           (sq.get("noisy_channels") or a.get("noisy_channels") or [])[:20],
+        "possible_artifacts":       (sq.get("possible_artifacts") or a.get("possible_artifacts") or [])[:10],
+        "clipping_detected":        sq.get("clipping_detected") or a.get("clipping_detected"),
+        "missing_data":             sq.get("missing_data") or a.get("missing_data"),
+        "high_frequency_noise":     sq.get("high_frequency_noise") or a.get("high_frequency_noise"),
         # 频段只用聚合百分比 / 均值（已经是 5 个 key 的字典），丢弃逐通道 bandpower 数组
-        "bandpower_percent":        fa.get("bandpower_percent") or {},
-        "average_bandpower":        fa.get("average_bandpower") or {},
-        "dominant_frequency":       fa.get("dominant_frequency"),
+        "bandpower_percent":        fa.get("bandpower_percent") or a.get("bandpower_percent") or {},
+        "average_bandpower":        fa.get("average_bandpower") or a.get("average_bandpower") or {},
+        "dominant_frequency":       fa.get("dominant_frequency") or a.get("dominant_frequency"),
+        "dominant_band":            fa.get("dominant_band") or a.get("dominant_band"),
         "literacy_scores":          literacy,
         "file_size_mb":             a.get("file_size_mb"),
         "what_this_data_cannot_tell": a.get("what_this_data_cannot_tell"),
@@ -232,7 +265,9 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         "4. NEVER claim to detect emotions, attention levels, cognitive states, personality traits, or intelligence.\n"
         "5. ALWAYS use cautious language (e.g., 'may be associated with', 'could reflect', 'might indicate') when describing patterns.\n"
         "6. This is for EEG literacy, education, and accessibility ONLY.\n"
-        "7. Do NOT add a general disclaimer at the end of every explanation; the website already displays limitation notices separately."
+        "7. Do NOT add a general disclaimer at the end of every explanation; the website already displays limitation notices separately.\n"
+        "8. NEVER list individual channel names (e.g., 'EEG 001, EEG 002, ...'). Refer to them collectively as 'the channels' or 'the recording'.\n"
+        "9. NEVER pad the explanation with channel lists, sampling-rate restatements, or parameter dumps. Focus on INTERPRETATION and ANALYSIS.\n"
     )
     sq = safe_float(a.get("signal_quality_score", 100), 100)
     uncertainty = ""
@@ -246,28 +281,80 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
     if level == "beginner":
         return (
             f"You are writing ONLY the Beginner explanation for an EEG literacy website.\n"
-            f"Output language: {output_lang}.\nAudience: ordinary non-expert users.\nRules:\n"
-            "- 4 to 6 short sentences.\n- Do NOT use technical jargon "
-            "(alpha, beta, theta, delta, PSD, bandpower, artifact, sampling rate, channel, electrode).\n"
+            f"Output language: {output_lang}.\n"
+            f"Audience: ordinary non-expert users who know nothing about EEG.\n\n"
+            f"TASK: Write a warm, plain-language explanation of what this brainwave recording shows, "
+            f"as if talking to a curious friend. 5-8 short sentences, ONE paragraph.\n\n"
+            f"STYLE RULES:\n"
+            f"- Do NOT use technical jargon (no alpha, beta, theta, delta, PSD, bandpower, artifact, sampling rate, channel, electrode, frequency).\n"
+            f"- Use everyday analogies (e.g., brain waves like ripples on water, slow waves vs fast waves).\n"
+            f"- Describe the overall impression: is the recording calm, active, steady, or mixed? "
+            f"Which kind of wave is most noticeable? Is the recording clean or hard to read?\n"
+            f"- Reference the real numbers naturally in words (e.g., about 3 out of 4 of the wave types were slow waves), "
+            f"but never dump raw numbers or parameter lists.\n"
+            f"- NEVER mention individual channel names or channel 1, channel 2, etc.\n"
+            f"- Keep it friendly and concrete, NOT generic filler. Every sentence should teach or describe something real from the data.\n"
             f"{uncertainty}"
-            f"- {boundary}\nEEG analysis JSON:\n{payload}\n"
+            f"{boundary}\nEEG analysis JSON:\n{payload}\n"
         )
     if level == "student":
         return (
-            f"You are writing ONLY the Student explanation.\nOutput language: {output_lang}.\n"
-            f"Audience: neuroscience beginners.\nRules:\n- 2 short paragraphs.\n"
-            f"- Explain alpha/beta/theta/delta if useful.\n- Mention signal quality.\n"
-            f"- DO NOT list all channel names individually; refer to them collectively as 'the channels'.\n"
+            f"You are writing ONLY the Student explanation for an EEG literacy website.\n"
+            f"Output language: {output_lang}.\n"
+            f"Audience: neuroscience beginners taking their first EEG course.\n\n"
+            f"TASK: Write a teaching-style explanation in 3 short paragraphs. "
+            f"Each paragraph must teach a specific concept AND relate it to THIS recording's real numbers.\n\n"
+            f"PARAGRAPH 1 — The recording and its quality: "
+            f"Describe the recording setup in one line (number of channels, sampling rate, duration) and explain "
+            f"what the signal quality score means for how much we can trust this data. "
+            f"Connect the quality level to the actual score in the JSON.\n\n"
+            f"PARAGRAPH 2 — Brainwave bands: "
+            f"Briefly explain what delta/theta/alpha/beta waves are and what frequency range each covers. "
+            f"Then point to this recording's bandpower_percent distribution: which band dominates, "
+            f"what that pattern suggests about the recording (with cautious wording such as may reflect, could indicate), "
+            f"and compare the bands against each other using the real percentages.\n\n"
+            f"PARAGRAPH 3 — Noise, artifacts and what to learn from this file: "
+            f"Explain in simple terms what EEG artifacts and noisy channels are. "
+            f"State how many channels were flagged noisy in THIS recording (or that none were) and "
+            f"whether possible_artifacts/clipping/high_frequency_noise were detected. "
+            f"End with one sentence on what a beginner can learn from this particular file.\n\n"
+            f"STYLE RULES:\n"
+            f"- You MAY use the terms alpha/beta/theta/delta, bandpower, artifact, sampling rate, channel — but define each briefly the first time.\n"
+            f"- NEVER list individual channel names; refer to them collectively.\n"
+            f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
+            f"- 3 paragraphs, each 3-4 sentences. Substantive, not padded.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
         )
+    # research
     return (
-        f"You are writing ONLY the Research explanation.\nOutput language: {output_lang}.\n"
-        f"Audience: researchers/technicians.\nRules:\n- 2-3 concise technical paragraphs.\n"
-        f"- DO NOT list individual channel names; refer to them collectively.\n"
-        f"- Focus on technical INTERPRETATION: dominant frequency, bandpower distribution, "
-        f"any artifacts or noise patterns, data quality implications for analysis.\n"
-        f"- Mention what can/cannot be reliably concluded from this recording.\n"
-        f"- You MAY use PSD, bandpower, artifacts, sampling rate, montage terminology.\n"
+        f"You are writing ONLY the Research explanation for an EEG literacy website.\n"
+        f"Output language: {output_lang}.\n"
+        f"Audience: researchers, EEG technicians, and data analysts.\n\n"
+        f"TASK: Write a rigorous technical analysis in 4 paragraphs. "
+        f"Be specific and data-driven; every claim must reference a value from the JSON. "
+        f"This is a technical report, NOT marketing text — prioritize precision over readability.\n\n"
+        f"PARAGRAPH 1 — Acquisition and methodological context: "
+        f"Report channel count, sampling rate, and duration, then evaluate their implications: "
+        f"sampling rate vs Nyquist frequency (does it support the band range of interest?), "
+        f"duration vs frequency resolution of any spectral estimates, montage/capacity considerations. "
+        f"Note file size if available.\n\n"
+        f"PARAGRAPH 2 — Spectral characterization: "
+        f"Analyze bandpower_percent and average_bandpower: the shape of the spectral distribution, "
+        f"the dominant band and its share relative to the others, whether the distribution looks "
+        f"physiological (1/f-like falloff) or atypical. Use the real percentages.\n\n"
+        f"PARAGRAPH 3 — Signal quality, artifacts and threats to validity: "
+        f"Evaluate the signal quality score, the number and type of noisy channels "
+        f"(refer to them by category, not full names), possible_artifacts, clipping_detected, "
+        f"high_frequency_noise, missing_data. Explain how each threatens specific downstream analyses "
+        f"(spectral estimates, per-channel statistics, connectivity work).\n\n"
+        f"PARAGRAPH 4 — Conclusions and limitations: "
+        f"State clearly what this dataset can and cannot support. "
+        f"Mention what_this_data_cannot_tell explicitly. Close with a practical recommendation "
+        f"for how a researcher should treat this data (preprocessing steps to consider, analyses to avoid).\n\n"
+        f"STYLE RULES:\n"
+        f"- You MAY and SHOULD use technical terminology: PSD, bandpower, artifacts, Nyquist, montage, SNR.\n"
+        f"- NEVER list individual channel names; refer to them collectively or by count.\n"
+        f"- 4 paragraphs, each 3-5 sentences. Dense, precise, zero filler.\n"
         f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
     )
 
