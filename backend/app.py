@@ -1285,12 +1285,14 @@ async def auth_update_profile(request: Request, credentials: HTTPAuthorizationCr
     username = body.get("username", "").strip()
     avatar_url = body.get("avatar_url", "").strip()
     avatar_color = body.get("avatar_color", "").strip()
+    # 头像颜色白名单（与前端 src/app/account/page.tsx AVATAR_COLORS 保持一致）
+    ALLOWED_AVATAR_COLORS = {"#EF4444", "#F97316", "#EAB308", "#22C55E", "#3B82F6", "#8B5CF6", "#EC4899", "#14B8A6"}
     if username is not None and username != "":
         sys.path.insert(0, BASE_DIR)
         from auth import _visual_length, _is_unicode_letter_start, _has_special_symbol
         vlen = _visual_length(username)
-        if vlen < 1 or vlen > 20:
-            return {"success": False, "error": "名字长度必须在1-20个字符之间"}
+        if vlen < 2 or vlen > 20:
+            return {"success": False, "error": "名字长度必须在2-20个字符之间"}
         if not _is_unicode_letter_start(username):
             return {"success": False, "error": "名字开头必须是文字"}
         if _has_special_symbol(username):
@@ -1298,6 +1300,8 @@ async def auth_update_profile(request: Request, credentials: HTTPAuthorizationCr
         import re as _re
         if _re.search(r"\s{2,}", username):
             return {"success": False, "error": "名字中不能有连续空格"}
+    if avatar_color and avatar_color not in ALLOWED_AVATAR_COLORS:
+        return {"success": False, "error": "头像颜色无效"}
     conn = get_db()
     try:
         if username and username != user["username"]:
