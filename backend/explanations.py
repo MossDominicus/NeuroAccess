@@ -99,15 +99,47 @@ def _band_plain_name(band: str | None, lang: str) -> str:
     return {"delta": "慢波", "theta": "慢波", "alpha": "中速波", "beta": "快波"}.get(band, f"{band}波")
 
 
+def _pct(v) -> float | None:
+    """把 bandpower_percent 的值（可能是 '58.1%'、'58.1'、数字、None）统一转成 float；失败返回 None"""
+    if v is None: return None
+    try:
+        s = str(v).strip().rstrip('%').strip()
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def _dominant_band_from_percent(bp: Dict[str, Any]) -> str | None:
+    """从 bandpower_percent 字典找主导频段（数值最高），自动处理 '%' 字符串"""
+    best, best_v = None, -1.0
+    for k, v in bp.items():
+        pv = _pct(v)
+        if pv is not None and pv > best_v:
+            best_v, best = pv, k
+    return best
+
+
+def _band_pct_display(bp: Dict[str, Any]) -> str:
+    """把 bandpower_percent 渲染成 'delta: 12.1%, beta: 58.1%'，自动剥 % 防双 %"""
+    items = []
+    for k, v in list(bp.items())[:4]:
+        p = _pct(v)
+        if p is None:
+            items.append(f"{k}: {v}")
+        else:
+            items.append(f"{k}: {p:.1f}%")
+    return ", ".join(items)
+
+
 def template_beginner(a: Dict, lang: str) -> str:
     q     = _quality_level(a.get("signal_quality_score"), lang)
     n     = len(a.get("noisy_channels") or [])
     bp    = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
-    dom   = max(bp.items(), key=lambda kv: kv[1])[0] if bp else None
+    dom   = _dominant_band_from_percent(bp) if bp else None
     ch_n  = a.get("channel_count")
     dur   = a.get("duration")
     dom_plain = _band_plain_name(dom, lang)
-    pct_num   = round(float(bp[dom])) if dom and bp.get(dom) is not None else None
+    pct_num   = round(_pct(bp[dom])) if dom and bp.get(dom) is not None else None
     n_s   = ("没有明显不清晰的区域" if lang == "zh" else "no noticeably unclear areas") if n == 0 else (
         f"有 {n} 个区域读数较不清晰" if lang == "zh" else f"{n} area(s) are harder to read")
     if lang == "en":
@@ -144,8 +176,8 @@ def template_beginner(a: Dict, lang: str) -> str:
 
 def template_student(a: Dict, lang: str) -> str:
     bp   = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
-    # 主导频段（百分比最高的频段）
-    dom_band = max(bp.items(), key=lambda kv: kv[1])[0] if bp else None
+    # 主导频段（百分比最高的频段，自动处理 '%' 字符串）
+    dom_band = _dominant_band_from_percent(bp) if bp else None
     ns   = a.get("noisy_channels") or []
     n_n  = len(ns)
     n_s  = ", ".join(ns[:3]) if ns else ("none" if lang == "en" else ("无" if lang == "zh" else "none"))
@@ -153,7 +185,7 @@ def template_student(a: Dict, lang: str) -> str:
     ch_n = a.get("channel_count")
     sr   = a.get("sampling_rate")
     dur  = a.get("duration")
-    bp_s = ", ".join(f"{k}: {v}%" for k, v in list(bp.items())[:4])
+    bp_s = _band_pct_display(bp)
     dom_str = (f"alpha/theta/beta range" if not dom_band else f"{dom_band} band") if lang == "en" else (f"{dom_band} 频段" if dom_band else "未知频段")
     if lang == "en":
         return (
@@ -192,7 +224,7 @@ def template_student(a: Dict, lang: str) -> str:
 
 def template_research(a: Dict, lang: str) -> str:
     bp   = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
-    dom_band = max(bp.items(), key=lambda kv: kv[1])[0] if bp else None
+    dom_band = _dominant_band_from_percent(bp) if bp else None
     ns   = a.get("noisy_channels") or []
     n_s  = ", ".join(ns[:3]) if ns else ("none" if lang == "en" else ("无" if lang == "zh" else "none"))
     n_n  = len(ns)
@@ -200,7 +232,7 @@ def template_research(a: Dict, lang: str) -> str:
     sr   = a.get("sampling_rate")
     dur  = a.get("duration")
     sq   = a.get("signal_quality_score")
-    bp_s = ", ".join(f"{k}: {v}%" for k, v in list(bp.items())[:4])
+    bp_s = _band_pct_display(bp)
     dom_str = f"{dom_band}" if dom_band else ("unknown" if lang == "en" else ("未知" if lang == "zh" else "unknown"))
     q_label = _quality_level(sq, lang)
     if lang == "en":
