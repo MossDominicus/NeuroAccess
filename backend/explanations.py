@@ -26,18 +26,17 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen-2.5-7b-instruct")
 OPENROUTER_URL   = "https://openrouter.ai/api/v1/chat/completions"
 
-# Beginner 禁止术语（中英文）
+# Beginner 禁止术语（中英文）——只禁真正深奥的术语；
+# 允许 channel/电极/采样率/frequency/alpha/beta 等描述性词（AI 需要它们描述数据本身）
 FORBIDDEN = [
-    "alpha", "beta", "theta", "delta", "gamma", "psd", "bandpower",
-    "artifact", "sampling rate", "electrode", "channel", "montage",
-    "frequency", "oscillation", "rhythm", "amplitude", "spectrum",
-    "noise", "signal quality", "filtering", "impedance",
-    "阿尔法", "贝塔", "西塔", "德尔塔", "频段", "功率谱", "通道", "电极", "伪迹", "采样率",
+    "psd", "bandpower", "montage", "artifact", "amplitude", "impedance",
+    "oscillation", "rhythm", "spectrum", "filtering", "nyquist",
+    "功率谱", "伪迹", "阻抗", "振幅", "振荡", "节律", "频谱", "滤波", "奈奎斯特",
 ]
 
 
 def contains_beginner_jargon(text: str) -> bool:
-    """检查 beginner 解释是否包含过多技术术语；只有出现 >= 3 个禁用词才认为是 jargon"""
+    """检查 beginner 解释是否包含过多深奥术语；出现 >= 3 个禁用词才认为是 jargon"""
     text_lower = str(text).lower()
     count = sum(1 for t in FORBIDDEN if t in text_lower)
     return count >= 3
@@ -91,26 +90,55 @@ def _quality_level(score: Any, lang: str) -> str:
     return "unknown" if lang == "en" else ("暂不确定" if lang == "zh" else "unknown")
 
 
+def _band_plain_name(band: str | None, lang: str) -> str:
+    """把频段名转成入门级通俗名称"""
+    if lang != "zh":
+        if not band: return "an unknown wave type"
+        return {"delta": "slow waves", "theta": "slow waves", "alpha": "mid-speed waves", "beta": "fast waves"}.get(band, f"{band} waves")
+    if not band: return "一种未知波型"
+    return {"delta": "慢波", "theta": "慢波", "alpha": "中速波", "beta": "快波"}.get(band, f"{band}波")
+
+
 def template_beginner(a: Dict, lang: str) -> str:
-    q = _quality_level(a.get("signal_quality_score"), lang)
-    n = len(a.get("noisy_channels") or [])
+    q     = _quality_level(a.get("signal_quality_score"), lang)
+    n     = len(a.get("noisy_channels") or [])
+    bp    = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
+    dom   = max(bp.items(), key=lambda kv: kv[1])[0] if bp else None
+    ch_n  = a.get("channel_count")
+    dur   = a.get("duration")
+    dom_plain = _band_plain_name(dom, lang)
+    pct_num   = round(float(bp[dom])) if dom and bp.get(dom) is not None else None
+    n_s   = ("没有明显不清晰的区域" if lang == "zh" else "no noticeably unclear areas") if n == 0 else (
+        f"有 {n} 个区域读数较不清晰" if lang == "zh" else f"{n} area(s) are harder to read")
     if lang == "en":
         return (
-            f"This file can be opened and read. It contains brainwave recordings from several sensors.\n\n"
-            f"Overall readability: {q}. {n} sensor area(s) may be harder to read.\n\n"
-            "This report helps you understand whether the file is clear enough for learning."
+            f"This recording contains brainwave signals from {ch_n or 'multiple'} sensors "
+            f"over {dur or 'a short'} period of time.\n\n"
+            f"The most prominent activity is {dom_plain}"
+            + (f" (about {pct_num}% of total activity)" if pct_num is not None else "")
+            + f". {n_s}.\n\n"
+            f"Overall, the recording is {q} — it is clear enough to study how brainwaves behave, "
+            f"but it reflects only this particular moment of recording."
         )
     if lang == "zh":
         return (
-            f"这份文件可以被正常读取。它记录的是一段时间内的脑电波形。\n\n"
-            f"整体可读性：{q}。系统发现 {n} 个可能较难阅读的传感区域。\n\n"
-            "这份报告主要帮助你判断这份数据是否清楚、是否适合学习。"
+            f"这份记录包含了来自 {ch_n or '多个'} 个传感位置的脑电信号，"
+            f"记录了 {dur or '一小段时间'} 的脑电活动。\n\n"
+            f"其中最主要的是{dom_plain}，"
+            + (f"约占全部活动的 {pct_num}%" if pct_num is not None else "占了较大比例")
+            + f"。{n_s}。\n\n"
+            f"总体来看，这份记录的清晰度属于「{q}」，足以用来观察和了解脑电波的基本样子；"
+            f"但请注意，它只反映这一小段记录时间内的情况。"
         )
     # fallback English for unsupported languages
     return (
-        f"This file can be opened and read. It contains brainwave recordings from several sensors.\n\n"
-        f"Overall readability: {q}. {n} sensor area(s) may be harder to read.\n\n"
-        "This report helps you understand whether the file is clear enough for learning."
+        f"This recording contains brainwave signals from {ch_n or 'multiple'} sensors "
+        f"over {dur or 'a short'} period of time.\n\n"
+        f"The most prominent activity is {dom_plain}"
+        + (f" (about {pct_num}% of total activity)" if pct_num is not None else "")
+        + f". {n_s}.\n\n"
+        f"Overall, the recording is {q} — it is clear enough to study how brainwaves behave, "
+        f"but it reflects only this particular moment of recording."
     )
 
 
