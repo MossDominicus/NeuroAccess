@@ -216,11 +216,6 @@ export default function GuidePage() {
           ))
         )}
       </div>
-
-      {/* 免责声明 */}
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-900/30 p-5">
-        <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-400">{t("guideDisclaimer")}</p>
-      </div>
     </div>
   );
 }

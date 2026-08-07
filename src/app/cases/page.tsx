@@ -9,7 +9,6 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  AlertTriangle,
   User,
   GraduationCap,
   Microscope,
@@ -1030,8 +1029,6 @@ export default function CasesPage() {
             const beginnerExp = c.beginner_explanation[lang] || c.beginner_explanation.en || c.beginner_explanation.zh || "";
             const studentExp = c.student_explanation[lang] || c.student_explanation.en || c.student_explanation.zh || "";
             const researchExp = c.research_explanation[lang] || c.research_explanation.en || c.research_explanation.zh || "";
-            const limitations = c.limitations[lang] || c.limitations.en || c.limitations.zh || [];
-            const cannotTell = c.what_this_data_cannot_tell[lang] || c.what_this_data_cannot_tell.en || c.what_this_data_cannot_tell.zh || [];
 
             return (
               <motion.div
@@ -1141,34 +1138,6 @@ export default function CasesPage() {
                               <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{researchExp}</p>
                             </div>
                           </div>
-                        </div>
-
-                        {/* Limitations */}
-                        {limitations.length > 0 && (
-                          <div>
-                            <h4 className="text-xs font-bold text-[var(--color-text-secondary)] mb-2">{t("dataLimitations")}</h4>
-                            <ul className="space-y-1">
-                              {limitations.map((lim, j) => (
-                                <li key={j} className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)]">
-                                  <AlertTriangle className="w-3 h-3 text-yellow-500 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                                  {lim}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* What this data cannot tell */}
-                        <div>
-                          <h4 className="text-xs font-bold text-[var(--color-text-secondary)] mb-2">{t("whatDataCannotTell")}</h4>
-                          <ul className="space-y-1">
-                            {cannotTell.map((item, j) => (
-                              <li key={j} className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)]">
-                                <span className="text-[var(--color-text-secondary)]">•</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
                         </div>
 
                         {/* 标签 */}
