@@ -81,7 +81,7 @@ export default function TurnstileModal({ siteKey, open, onVerify, onClose }: Pro
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-primary)]"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
         </div>
         <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">人机验证</h3>
-        <div ref={containerRef} className="cf-turnstile flex justify-center" data-theme="auto" />
+        <div ref={containerRef} className="flex justify-center" />
         {onClose && (
           <button onClick={onClose} className="mt-4 px-4 py-2 rounded-xl text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">取消</button>
         )}
