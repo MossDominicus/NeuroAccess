@@ -459,11 +459,14 @@ def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str,
             "research": template_research(analysis, primary_lang),
         }
 
-    # 英文：只用模板（避免额外 API 开销，分析加速 ~15s）
-    results["en"] = {
-        "beginner": template_beginner(analysis, "en"),
-        "student": template_student(analysis, "en"),
-        "research": template_research(analysis, "en"),
-    }
+    # 其余语言：只用模板填充（避免额外 API 开销；用户切换语言时仍能看到对应语言的解释）
+    for _lang in LANG_NAME_MAP.keys():
+        if _lang in results:
+            continue
+        results[_lang] = {
+            "beginner": template_beginner(analysis, _lang),
+            "student": template_student(analysis, _lang),
+            "research": template_research(analysis, _lang),
+        }
 
     return results

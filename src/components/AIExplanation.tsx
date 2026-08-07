@@ -36,6 +36,11 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
     // 嵌套格式：{zh: {...}, en: {...}}
     const langLayer = ((rawExplanations as any)[lang]) || {};
     Object.assign(explanations, langLayer);
+    // 当前语言缺失时，用 en 层回退（避免显示"该报告解释生成失败"）
+    const enLayer = ((rawExplanations as any)["en"]) || {};
+    for (const k of ["beginner", "student", "research"]) {
+      if (!explanations[k] && enLayer[k]) explanations[k] = enLayer[k];
+    }
   }
 
   // disclaimer 兼容字符串和对象
