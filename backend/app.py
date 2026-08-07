@@ -1654,27 +1654,49 @@ async def eeg_simulator_generate(request: Request, _uid: int = Depends(require_u
             body = {}
         if not EEG_SIMULATOR_AVAILABLE:
             return {"success": False, "error": f"EEG simulator module not available: {EEG_SIMULATOR_ERROR}"}
+
+        # ── 参数范围校验（避免把非法值传给底层 numpy，暴露技术性错误）──
+        def _f(name: str, default: float, lo: float, hi: float) -> float:
+            try:
+                v = float(body.get(name, default))
+            except (TypeError, ValueError):
+                v = default
+            if v < lo or v > hi:
+                raise ValueError(f"参数 {name} 必须在 {lo:g}~{hi:g} 之间")
+            return v
+
+        def _i(name: str, default: int, lo: int, hi: int) -> int:
+            try:
+                v = int(body.get(name, default))
+            except (TypeError, ValueError):
+                v = default
+            if v < lo or v > hi:
+                raise ValueError(f"参数 {name} 必须在 {lo}~{hi} 之间")
+            return v
+
         result = generate_synthetic_eeg(
-            duration_sec=float(body.get("duration_sec", 10.0)),
-            sampling_rate=int(body.get("sampling_rate", 250)),
-            n_channels=int(body.get("n_channels", 8)),
-            alpha_power=float(body.get("alpha_power", 1.0)),
-            beta_power=float(body.get("beta_power", 0.5)),
-            theta_power=float(body.get("theta_power", 0.3)),
-            delta_power=float(body.get("delta_power", 0.8)),
-            alpha_freq=float(body.get("alpha_freq", 10.0)),
-            beta_freq=float(body.get("beta_freq", 20.0)),
-            theta_freq=float(body.get("theta_freq", 6.0)),
-            delta_freq=float(body.get("delta_freq", 3.0)),
-            noise_level=float(body.get("noise_level", 0.1)),
+            duration_sec=_f("duration_sec", 10.0, 1.0, 300.0),
+            sampling_rate=_i("sampling_rate", 250, 16, 4096),
+            n_channels=_i("n_channels", 8, 1, 256),
+            alpha_power=_f("alpha_power", 1.0, 0.0, 10.0),
+            beta_power=_f("beta_power", 0.5, 0.0, 10.0),
+            theta_power=_f("theta_power", 0.3, 0.0, 10.0),
+            delta_power=_f("delta_power", 0.8, 0.0, 10.0),
+            alpha_freq=_f("alpha_freq", 10.0, 1.0, 50.0),
+            beta_freq=_f("beta_freq", 20.0, 5.0, 80.0),
+            theta_freq=_f("theta_freq", 6.0, 1.0, 30.0),
+            delta_freq=_f("delta_freq", 3.0, 0.1, 10.0),
+            noise_level=_f("noise_level", 0.1, 0.0, 2.0),
             artifact_blink=bool(body.get("artifact_blink", False)),
             artifact_muscle=bool(body.get("artifact_muscle", False)),
             artifact_powerline=bool(body.get("artifact_powerline", False)),
         )
         return result
+    except ValueError as ve:
+        return {"success": False, "error": str(ve)}
     except Exception as e:
         import traceback
-        return {"success": False, "error": str(e),
+        return {"success": False, "error": "参数无效，请检查后重试",
                 "detail": traceback.format_exc() if os.getenv("DEBUG") else "Enable DEBUG=1 for details"}
 
 @app.get("/api/eeg-simulator/presets")
