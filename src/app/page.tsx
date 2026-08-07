@@ -394,7 +394,7 @@ function DashboardInner() {
             className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 active:bg-yellow-500 text-yellow-800 font-semibold text-sm px-5 py-3 shadow-md transition-colors"
           >
             <DownloadCloud className="h-5 w-5" />
-            <span>下载测试脑电图 (.edf)</span>
+            <span>{t("downloadTestEEG")}</span>
           </a>
         )}
 

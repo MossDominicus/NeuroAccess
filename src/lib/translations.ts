@@ -175,6 +175,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "格式：.edf",
     uploadDisabledDuringAnalysis: "分析中，请等待",
 
+    downloadTestEEG: "下载测试脑电图 (.edf)",
     // 分析按钮
     startAnalysis: "开始分析",
     pleaseLogin: "请先登录以进行分析",
@@ -898,6 +899,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "Formats: .edf",
     uploadDisabledDuringAnalysis: "Analyzing, please wait",
 
+    downloadTestEEG: "Download test EEG (.edf)",
     // Analysis buttons
     startAnalysis: "Start Analysis",
     pleaseLogin: "Please login to analyze",
@@ -1681,6 +1683,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "Formatos: .edf",
     uploadDisabledDuringAnalysis: "Analizando, espere por favor",
 
+    downloadTestEEG: "Descargar EEG de prueba (.edf)",
     startAnalysis: "Iniciar Análisis",
     pleaseLogin: "Inicie sesión para analizar",
     analyzing: "Analizando...",
@@ -2443,6 +2446,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "Formats : .edf",
     uploadDisabledDuringAnalysis: "Analyse en cours, veuillez patienter",
 
+    downloadTestEEG: "Télécharger l'EEG de test (.edf)",
     startAnalysis: "Commencer l'Analyse",
     pleaseLogin: "Veuillez vous connecter pour analyser",
     analyzing: "Analyse en cours...",
@@ -3205,6 +3209,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "Formate: .edf",
     uploadDisabledDuringAnalysis: "Analyse läuft, bitte warten",
 
+    downloadTestEEG: "Test-EEG herunterladen (.edf)",
     startAnalysis: "Analyse Starten",
     pleaseLogin: "Bitte einloggen zum Analysieren",
     analyzing: "Analysiere...",
@@ -3967,6 +3972,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "フォーマット：.edf",
     uploadDisabledDuringAnalysis: "分析中、お待ちください",
 
+    downloadTestEEG: "テストEEGをダウンロード (.edf)",
     startAnalysis: "分析開始",
     pleaseLogin: "分析するにはログインしてください",
     analyzing: "分析中...",
@@ -4729,6 +4735,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     supportedFormats: "형식: .edf",
     uploadDisabledDuringAnalysis: "분석 중입니다. 기다려 주세요",
 
+    downloadTestEEG: "테스트 EEG 다운로드 (.edf)",
     startAnalysis: "분석 시작",
     pleaseLogin: "분석하려면 로그인하세요",
     analyzing: "분석 중...",
