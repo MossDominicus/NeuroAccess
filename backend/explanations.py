@@ -283,17 +283,19 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"You are writing ONLY the Beginner explanation for an EEG literacy website.\n"
             f"Output language: {output_lang}.\n"
             f"Audience: ordinary non-expert users who know nothing about EEG.\n\n"
-            f"TASK: Write a warm, plain-language explanation of what this brainwave recording shows, "
-            f"as if talking to a curious friend. 5-8 short sentences, ONE paragraph.\n\n"
+            f"TASK: Write a clear, plain, but scientifically RIGOROUS explanation of what this brainwave recording shows. "
+            f"5-8 short sentences, ONE paragraph.\n\n"
             f"STYLE RULES:\n"
-            f"- Do NOT use technical jargon (no alpha, beta, theta, delta, PSD, bandpower, artifact, sampling rate, channel, electrode, frequency).\n"
-            f"- Use everyday analogies (e.g., brain waves like ripples on water, slow waves vs fast waves).\n"
-            f"- Describe the overall impression: is the recording calm, active, steady, or mixed? "
-            f"Which kind of wave is most noticeable? Is the recording clean or hard to read?\n"
-            f"- Reference the real numbers naturally in words (e.g., about 3 out of 4 of the wave types were slow waves), "
+            f"- Use simple, precise scientific language. Do NOT use metaphors, analogies, or poetic comparisons.\n"
+            f"- Avoid technical jargon where possible: instead of alpha/beta/theta/delta say 'slow brainwaves (delta/theta range)' "
+            f"or 'fast brainwaves (beta range)' — or simply describe the frequency activity in plain words. "
+            f"If you must use a technical term, define it briefly in parentheses.\n"
+            f"- State facts only: the recording's duration, whether slow or fast activity dominates, how clean or noisy the signal is. "
+            f"Do NOT speculate about mental states, emotions, attention, or what the person was doing.\n"
+            f"- Reference the real numbers naturally in words (e.g., 'fast brainwaves accounted for roughly half of the activity'), "
             f"but never dump raw numbers or parameter lists.\n"
             f"- NEVER mention individual channel names or channel 1, channel 2, etc.\n"
-            f"- Keep it friendly and concrete, NOT generic filler. Every sentence should teach or describe something real from the data.\n"
+            f"- Keep it concise and factual — every sentence should convey accurate information from the data. No generic filler.\n"
             f"{uncertainty}"
             f"{boundary}\nEEG analysis JSON:\n{payload}\n"
         )
@@ -422,7 +424,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
     def _call_level(level: str) -> str:
         try:
             prompt = _build_prompt(a, level, lang)
-            ollama = call_ollama(prompt, timeout=30)
+            ollama = call_ollama(prompt, timeout=75)
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
