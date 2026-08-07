@@ -473,7 +473,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                     : f
                 );
               });
-              addNotification(`分析完成: ${item.name}`, "success");
+              addNotification(`${t("analysisCompleted")}: ${item.name}`, "success");
             }
 
           } catch (err: any) {
@@ -487,7 +487,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                   : f
               );
             });
-            addNotification(`分析失败: ${item.name}`, "error");
+            addNotification(`${t("analysisFailed")}: ${item.name}`, "error");
           }
         }
       } catch (unexpectedErr) {

@@ -195,6 +195,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     completed: "已完成",
     failed: "失败",
     analysisFailed: "分析失败",
+
+    analysisCompleted: "分析完成",
     allCompleted: "全部完成",
     hasFailures: "个失败",
 
@@ -919,6 +921,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     completed: "Completed",
     failed: "Failed",
     analysisFailed: "Analysis failed",
+
+    analysisCompleted: "Analysis completed",
     allCompleted: "All Completed",
     hasFailures: "failed",
 
@@ -1701,6 +1705,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     completed: "Completado",
     failed: "Fallido",
     analysisFailed: "Análisis fallido",
+
+    analysisCompleted: "Análisis completado",
     allCompleted: "Todo Completado",
     hasFailures: "fallaron",
 
@@ -2464,6 +2470,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     completed: "Terminé",
     failed: "Échoué",
     analysisFailed: "Analyse échouée",
+
+    analysisCompleted: "Analyse terminée",
     allCompleted: "Tout Terminé",
     hasFailures: "ont échoué",
 
@@ -3227,6 +3235,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     completed: "Abgeschlossen",
     failed: "Fehlgeschlagen",
     analysisFailed: "Analyse fehlgeschlagen",
+
+    analysisCompleted: "Analyse abgeschlossen",
     allCompleted: "Alles Abgeschlossen",
     hasFailures: "fehlgeschlagen",
 
@@ -3990,6 +4000,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     completed: "完了",
     failed: "失敗",
     analysisFailed: "分析失敗",
+
+    analysisCompleted: "分析が完了しました",
     allCompleted: "すべて完了",
     hasFailures: "件失敗",
 
@@ -4754,6 +4766,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     failed: "실패",
     unknownError: "알 수 없는 오류",
     analysisFailed: "분석 실패",
+
+    analysisCompleted: "분석 완료",
     allCompleted: "모두 완료",
     hasFailures: "개 실패",
 
