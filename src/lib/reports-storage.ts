@@ -235,3 +235,24 @@ export async function clearServerReports(): Promise<boolean> {
   const result = await apiPost("/api/reports/delete-all", {});
   return result.success === true;
 }
+
+// ── 收藏功能（localStorage）────────────────────────────────
+const FAVORITES_KEY = "neuroaccess-favorites";
+
+export function getFavorites(): string[] {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(FAVORITES_KEY) : null;
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+export function isFavorite(reportId: string): boolean {
+  return getFavorites().includes(reportId);
+}
+
+export function toggleFavorite(reportId: string): boolean {
+  const list = getFavorites();
+  const next = list.includes(reportId) ? list.filter((x) => x !== reportId) : [...list, reportId];
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(next)); } catch {}
+  return next.includes(reportId);
+}

@@ -115,7 +115,7 @@ export default function IntroAnimation({ onComplete }: { onComplete: () => void 
   }, [phase]);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: "#0a0e1a" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center pointer-events-none" style={{ background: "#0a0e1a" }}>
       <div
         className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center bg-[#0f172a]"
         style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? "scale(1)" : "scale(0.85) translateY(8px)", transition: "all 0.7s cubic-bezier(0.16,1,0.3,1)" }}

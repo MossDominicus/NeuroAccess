@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from "react";
 import { useLang } from "@/lib/language-context";
 import { addReport, syncReportToServer, type StoredReport } from "@/lib/reports-storage";
+import { addNotification } from "@/components/NotificationToast";
 
 // ── Types ───────────────────────────────────────────────────────────
 export type Status = "pending" | "reading" | "computing" | "analysisReady" | "explaining" | "completed" | "failed";
@@ -20,7 +21,7 @@ export interface FileJob {
 
 // ── safeJsonFetch ───────────────────────────────────────────────────
 const API_BASE = "";
-const ANALYZE_TIMEOUT = 120_000;   // 120s for /analyze (64ch files need more time)
+const ANALYZE_TIMEOUT = 300_000;   // 300s for /analyze (匹配 Nginx 超时，大文件如3MB+ 19ch需要)
 const EXPLAIN_TIMEOUT = 180_000;  // 180s for /explain (AI may be slow)
 
 // Lazy cache key to avoid SSR access to sessionStorage
@@ -94,6 +95,7 @@ interface AnalysisContextValue {
   setExpandId: (id: string | null) => void;
   handleFileSelect: (selected: FileList | null) => void;
   removeFile: (id: string) => void;
+  retryFile: (id: string) => void;
   clearAll: () => void;
   startAnalysis: () => void;
   pauseAnalysis: () => void;
@@ -242,6 +244,17 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const resumeAnalysis = useCallback(() => {
     shouldPauseRef.current = false;
     setPaused(false);
+    runIdRef.current++;
+    runningRef.current = false;
+    if (startAnalysisRef.current) startAnalysisRef.current();
+  }, []);
+
+  // ── 重试单个失败文件 ────────────────────────────────────────
+  const retryFile = useCallback((id: string) => {
+    setFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, status: "pending" as Status, error: undefined } : f))
+    );
+    // Reset running state so startAnalysis can pick it up
     runIdRef.current++;
     runningRef.current = false;
     if (startAnalysisRef.current) startAnalysisRef.current();
@@ -460,6 +473,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                     : f
                 );
               });
+              addNotification(`分析完成: ${item.name}`, "success");
             }
 
           } catch (err: any) {
@@ -473,6 +487,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                   : f
               );
             });
+            addNotification(`分析失败: ${item.name}`, "error");
           }
         }
       } catch (unexpectedErr) {
@@ -513,7 +528,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 
   return (
     <AnalysisContext.Provider
-      value={{ files, running, paused, expandId, setExpandId, handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis }}
+      value={{ files, running, paused, expandId, setExpandId, handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis, retryFile }}
     >
       {children}
     </AnalysisContext.Provider>

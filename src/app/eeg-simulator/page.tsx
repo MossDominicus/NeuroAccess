@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from "react";
 import nextDynamic from "next/dynamic";
 import { useLang } from "@/lib/language-context";
-import { Info, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Info, Loader2, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { EEGGenerationManager as gen } from "@/lib/eeg-generation-manager";
 
@@ -55,6 +56,7 @@ function saveParams(p: any) {
 
 export default function EegSimulatorPage() {
   const { t } = useLang();
+  const { user, loading } = useAuth();
 
   // ── 生成状态（从 EEGGenerationManager 订阅，独立于组件生命周期）────
   const genState = useSyncExternalStore(
@@ -76,12 +78,13 @@ export default function EegSimulatorPage() {
   const resultData = genResult?.data || null;
 
   // ── 滑块参数 ───────────────────────────────────────────────────────
-  const [params, setParams] = useState(() => {
-    const saved = loadParams();
-    return saved || { ...DEFAULT_PARAMS };
-  });
+  const [params, setParams] = useState<any>(() => ({ ...DEFAULT_PARAMS }));
   const [hydrated, setHydrated] = useState(false);
-  useEffect(() => { setHydrated(true); }, []);
+  useEffect(() => {
+    const saved = loadParams();
+    if (saved) setParams(saved);
+    setHydrated(true);
+  }, []);
   useEffect(() => {
     if (hydrated) saveParams(params);
   }, [params, hydrated]);
@@ -202,6 +205,28 @@ export default function EegSimulatorPage() {
       </div>
     );
   };
+
+  // ── 未登录：先转圈校验会话，再提示登录 ──────────────────────────
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+      </div>
+    );
+  }
+  if (!user) {
+    return (
+      <motion.div
+        className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] text-[var(--color-text)]"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
+      >
+        <div className="text-center">
+          <FileText className="mx-auto mb-4 h-12 w-12 text-[var(--color-text-secondary)]/50" />
+          <p className="text-lg font-medium text-[var(--color-text)]">{t("pleaseLogin")}</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div className="min-h-screen bg-[var(--color-bg)]"

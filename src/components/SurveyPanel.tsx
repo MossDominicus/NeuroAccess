@@ -47,9 +47,15 @@ export default function SurveyPanel() {
   const [q6Reason, setQ6Reason] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  // Check if already submitted
+  // Check if already submitted (local + server)
   useEffect(() => {
-    if (loadSurvey()) setSubmitted(true);
+    if (loadSurvey()) { setSubmitted(true); return; }
+    const token = typeof window !== "undefined" ? localStorage.getItem("neuroaccess-token") : null;
+    if (!token) return;
+    fetch("/api/survey/status", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { if (d?.completed) setSubmitted(true); })
+      .catch(() => {});
   }, []);
 
   const q1Options = [
@@ -91,11 +97,21 @@ export default function SurveyPanel() {
       submittedAt: new Date().toISOString(),
     };
     saveSurvey(data);
+    const token = typeof window !== "undefined" ? localStorage.getItem("neuroaccess-token") : null;
     fetch("/api/survey/submit", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(data),
-    }).catch((e) => console.warn("[Survey] submit failed:", e));
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (!d?.success) console.warn("[Survey] submit:", d?.error);
+        else console.log("[Survey] saved");
+      })
+      .catch((e) => console.warn("[Survey] submit failed:", e));
     setSubmitted(true);
   };
 

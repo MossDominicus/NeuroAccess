@@ -16,7 +16,7 @@ import time as _time
 from typing import Any, Optional, List, Dict
 
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi import FastAPI, UploadFile, File, Form, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils import safe_float, to_jsonable, safe_name, normalize_language
@@ -87,13 +87,29 @@ MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
 # File upload
 # =================================================================
 
-def save_upload(file: UploadFile) -> Dict[str, Any]:
+def save_upload(file: UploadFile, lang: str = "zh") -> Dict[str, Any]:
     """保存上传文件（仅接受 .edf）"""
+    # 格式错误时适配 7 种语言的错误提示
+    _EXT_ERR = {
+        "zh": "不支持的文件格式: {}，仅支持 .edf 格式",
+        "en": "Unsupported file format: {}. Only .edf is supported",
+        "es": "Formato no compatible: {}. Solo se admite .edf",
+        "fr": "Format non pris en charge: {}. Seul .edf est accepté",
+        "de": "Nicht unterstütztes Format: {}. Nur .edf wird unterstützt",
+        "ja": "サポートされていない形式: {}。.edf のみ対応しています",
+        "ko": "지원되지 않는 형식: {}。.edf만 지원됩니다",
+    }
+    _EMPTY_ERR = {
+        "zh": "未提供文件", "en": "No file provided",
+        "es": "No se proporcionó ningún archivo", "fr": "Aucun fichier fourni",
+        "de": "Keine Datei bereitgestellt", "ja": "ファイルが提供されていません",
+        "ko": "파일이 제공되지 않았습니다",
+    }
     if not file or not file.filename:
-        return {"success": False, "error": "未提供文件"}
+        return {"success": False, "error": _EMPTY_ERR.get(lang, _EMPTY_ERR["en"])}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext != ".edf":
-        return {"success": False, "error": f"Unsupported file format: {ext}. Supported format: .edf"}
+        return {"success": False, "error": _EXT_ERR.get(lang, _EXT_ERR["en"]).format(ext)}
     import uuid
     stored_name = f"{uuid.uuid4().hex[:10]}_{safe_name(file.filename)}"
     path = os.path.join(UPLOAD_DIR, stored_name)
@@ -142,10 +158,10 @@ def _compute_literacy_scores(data: Dict, quality: Dict, bp: Dict) -> Dict[str, A
     # Component ranges (user-specified): snr 0~15, cons 0~10, spec 0~15, base 0~25,
     #   artifact 0~10, integrity 0~15, drift 0~10. Multipliers adjusted to preserve
     #   score range (~0-100) via old_max/new_max ratio.
-    reliability = max(0, min(100, cons_c * 8.0 + base_c * 0.8 - int_c * 3.333 - drift_c * 1.6))          # 可靠性评估
-    clarity = max(0, min(100, snr_c * 6.667 - art_c * 5.0))                                              # 信号清晰度（降低伪影权重，避免正常噪声直接压到0）
-    beginner = max(0, min(100, base_c * 1.6 + cons_c * 6.0 - art_c * 5.25 - int_c * 1.333))              # 入口友好度
-    research = max(0, min(100, snr_c * 3.333 + spec_c * 1.667 + cons_c * 2.0 - drift_c * 1.6))           # 研究可用性
+    reliability = max(5, min(100, cons_c * 8.0 + base_c * 0.8 - int_c * 3.333 - drift_c * 1.6))          # 可靠性评估
+    clarity = max(5, min(100, snr_c * 6.667 - art_c * 5.0 + 5.0))                                              # 信号清晰度（降低伪影权重，避免正常噪声直接压到0）
+    beginner = max(0, min(100, base_c * 2.0 + cons_c * 5.0 - art_c * 3.0 - int_c * 0.8))              # 入口友好度：保底 8，减少伪影/完整性惩罚
+    research = max(5, min(100, snr_c * 3.333 + spec_c * 1.667 + cons_c * 2.0 - drift_c * 1.6))           # 研究可用性
     noise_complexity = max(0, min(100, art_c * 5.25 + int_c * 2.0 + drift_c * 1.2))                      # 噪声复杂度
 
     return {
@@ -182,11 +198,21 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
                     break
     bp_total = sum(bp_normalized.values())
     bp_percent = {k: f"{v/bp_total*100:.1f}%" for k, v in bp_normalized.items()} if bp_total > 0 else {k: "0%" for k in bp_normalized}
+    # 频率分布：优先使用后端原始全频谱列表（[{frequency,power}]）；
+    # 若该列表缺失/为空，则按频段功率合成（delta/theta/alpha/beta 中心频率），
+    # 确保频率分布图始终有数据，不会因旧报告或字段缺失而显示空白。
+    _raw_fd = data.get("frequency_analysis", {}).get("frequency_distribution")
+    if not isinstance(_raw_fd, list) or len(_raw_fd) == 0:
+        _band_centers = {"delta": 2.5, "theta": 6.5, "alpha": 10.0, "beta": 22.0}
+        _raw_fd = [
+            {"frequency": float(fc), "power": float(safe_float(bp_normalized.get(b, 0.0)))}
+            for b, fc in _band_centers.items() if b in bp_normalized
+        ]
     frequency_analysis = to_jsonable({
         "bandpower": bp_normalized, "bandpower_percent": bp_percent,
         "dominant_band": _dominant_band(bp_normalized),
-        "frequency_distribution": _freq_distribution(bp_normalized),
-        "frequency_distribution_array": to_jsonable(data.get("frequency_analysis", {}).get("frequency_distribution") or []),
+        "frequency_distribution": to_jsonable(_raw_fd),
+        "frequency_distribution_array": to_jsonable(_raw_fd),
         "average_bandpower": to_jsonable(data.get("frequency_analysis", {}).get("average_bandpower") or bp_normalized),
     })
     literacy_scores = _compute_literacy_scores(data, quality, bp_normalized)
@@ -248,12 +274,51 @@ def health():
             "analysis_available": analyze_edf is not None}
 
 
+# 临时：下载样本 EEG 文件（仅 /tmp/eeg_samples/*.edf 和 /tmp/natural_samples.tar.gz）
+@app.get("/api/sample-file")
+async def sample_file(name: str = "natural_samples.tar.gz"):
+    import os
+    from fastapi.responses import FileResponse
+    # 只允许 /tmp/ 下的文件
+    allowed = {"/tmp/natural_samples.tar.gz", "/tmp/eeg_samples/natural_v7.edf", "/tmp/eeg_samples/natural_v9.edf",
+               "/tmp/eeg_samples/natural_v10.edf", "/tmp/eeg_samples/natural_v11.edf"}
+    for p in allowed:
+        if p.endswith(name) and os.path.exists(p):
+            return FileResponse(p, filename=os.path.basename(p))
+    return {"error": "File not found"}
+
+
 # =================================================================
 # v2.0: /analyze — 快速基础分析（无AI/无PDF/无PNG）
 # =================================================================
 
+def require_user_id(request: Request):
+    """FastAPI 依赖：认证启用时校验 Bearer token 并返回 user_id；禁用时返回 None（游客可访问）。
+
+    作为依赖注入时会在解析请求体（Form/File/JSON）之前执行，保证未登录请求直接 401。
+    采用 request: Request 读取 Authorization 头（而非 Depends(security)），以便在本文件靠前位置定义，
+    避免 analyze 端点（定义较早）引用到尚未定义的依赖。
+    """
+    if not AUTH_AVAILABLE:
+        return None
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录后再操作")
+    token = auth_header.split(" ", 1)[1]
+    payload = verify_token(token)
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    try:
+        uid = int(payload["sub"])
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    if not get_user_by_id(uid):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账号不存在或已注销")
+    return uid
+
+
 @app.post("/api/analyze")
-async def analyze(request: Request, file: UploadFile = File(...), language: str = Form("zh")):
+async def analyze(file: UploadFile = File(...), language: str = Form("zh"), current_user_id: int = Depends(require_user_id)):
     """
     快速分析 EDF 文件（v2.0）
     - 不调用 Ollama AI
@@ -261,23 +326,15 @@ async def analyze(request: Request, file: UploadFile = File(...), language: str 
     - 不生成 PNG 波形图
     - 只用前 60s 数据做分析
     - 超时：60s（ThreadPoolExecutor）
-    
+
     返回：overview + signal_quality + frequency_analysis + waveform_preview
     """
-    # ── Auth（可选——游客也能分析）────────────────────────────
-    auth_header = request.headers.get("Authorization")
-    current_user_id = None
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ", 1)[1]
-        if AUTH_AVAILABLE:
-            payload = verify_token(token)
-            if payload:
-                try: current_user_id = int(payload["sub"])
-                except: pass
+    # ── Auth（AUTH 启用时必须登录；关闭时游客可分析，便于本地开发）──
+    # 鉴权由 Depends(require_user_id) 在解析请求体（Form/File）之前完成：无 token/账号已注销 → 401
     
     # ── 保存文件 ─────────────────────────────────────────────────
     lang = normalize_language(language)
-    saved = save_upload(file)
+    saved = save_upload(file, lang)
     file_path = saved.get("path")
     file_name = saved.get("file_name", "unknown")
     
@@ -521,37 +578,39 @@ async def eeg_viewer(request: Request, file: UploadFile = File(...), duration: f
         if not payload:
             return {"success": False, "error": "登录凭证已过期，请重新登录"}
 
-        saved = save_upload(file)
+        saved = save_upload(file, lang)
         if not saved.get("success"):
             return {"success": False, "error": saved.get("error", "文件上传失败")}
         file_path = saved["path"]
         file_name = saved.get("file_name", "unknown")
 
-        import mne
-        raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
-        
-        # Select EEG channels
-        from analysis import _pick_eeg_channels
-        picks = _pick_eeg_channels(raw)
+        # 格式无关加载（EDF/BDF/GDF），统一转为 μV
+        from analysis import _load_raw_any, _raw_to_uv, _pick_eeg_channels, MAX_PREVIEW_CHANNELS
+        raw = _load_raw_any(file_path, preload=True)
+
+        # Select EEG channels（支持 256 导联帽）
+        picks = _pick_eeg_channels(raw, max_channels=MAX_PREVIEW_CHANNELS)
         raw.pick(picks)
         ch_names = [raw.ch_names[i] for i in range(len(raw.ch_names))]
-        
-        sfreq = raw.info['sfreq']
+        n_ch = len(ch_names)
+
+        sfreq = float(raw.info['sfreq'])
         total_duration = raw.times[-1] if len(raw.times) > 0 else 0
         n_samples = min(int(sfreq * duration), raw.n_times)
-        
-        data = raw.get_data(start=0, stop=n_samples)[0] * 1e6
+
+        # 统一转 μV（GDF 已为 μV，MNE EDF/BDF 为 V → ×1e6 已在 _raw_to_uv 内处理）
+        data_uv = _raw_to_uv(raw, start=0, stop=n_samples)  # shape (n_ch, n_samples)
         times = raw.times[:n_samples]
-        
+
         max_points = 8000
         if len(times) > max_points:
             step = len(times) // max_points
-            data = data[:, ::step]
+            data_uv = data_uv[:, ::step]
             times = times[::step]
-        
+
         channels_data = {}
         for i, ch_name in enumerate(ch_names):
-            channels_data[ch_name] = data[i].tolist()
+            channels_data[ch_name] = data_uv[i].tolist()
         
         return to_jsonable({
             "success": True, "file_name": file_name,
@@ -637,14 +696,94 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
 
+# ── 简单数学验证码（替换 Cloudflare Turnstile）─────────────────
+import random as _random, secrets as _secrets, time as _time_captcha
+
+_CAPTCHA_STORE: Dict[str, dict] = {}  # qid -> {answer, created}
+
+@app.post("/api/auth/captcha")
+def captcha_generate():
+    """生成数学验证码问题"""
+    a, b = _random.randint(1, 20), _random.randint(1, 20)
+    ops = ["+", "-", "×"]
+    op = _random.choice(ops)
+    if op == "+":
+        result = a + b
+        q = f"{a} + {b}"
+    elif op == "-":
+        result = a - b
+        q = f"{a} - {b}"
+    else:
+        result = a * b
+        q = f"{a} × {b}"
+    qid = _secrets.token_hex(8)
+    _CAPTCHA_STORE[qid] = {"answer": result, "created": _time_captcha.time()}
+    # 清理超过 5 分钟的旧记录
+    now = _time_captcha.time()
+    for k in list(_CAPTCHA_STORE.keys()):
+        if now - _CAPTCHA_STORE[k]["created"] > 300:
+            del _CAPTCHA_STORE[k]
+    return {"qid": qid, "question": q}
+
+@app.post("/api/auth/captcha/verify")
+def captcha_verify(qid: str = Form(...), answer: str = Form(...)):
+    """验证数学验证码答案，成功返回 token"""
+    record = _CAPTCHA_STORE.get(qid)
+    if not record:
+        return {"success": False, "error": "验证已过期，请重新获取"}
+    now = _time_captcha.time()
+    if now - record["created"] > 300:
+        del _CAPTCHA_STORE[qid]
+        return {"success": False, "error": "验证已过期，请重新获取"}
+    try:
+        if int(answer) == record["answer"]:
+            del _CAPTCHA_STORE[qid]
+            # 生成一个一次性验证 token（用于后端防重放）
+            token = _secrets.token_hex(16)
+            return {"success": True, "token": token}
+    except ValueError:
+        pass
+    return {"success": False, "error": "答案错误"}
+
+# ── Cloudflare Turnstile 人机验证（已弃用，保留兼容）─────────
+TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
+
+def verify_turnstile(token: str) -> bool:
+    """验证 Turnstile 令牌。未配置密钥时跳过验证（开发模式）。"""
+    if not TURNSTILE_SECRET_KEY:
+        return True  # 未配置密钥，跳过验证（本地开发/测试）
+    if not token:
+        return False
+    import urllib.request, urllib.parse
+    try:
+        data = urllib.parse.urlencode({
+            "secret": TURNSTILE_SECRET_KEY,
+            "response": token,
+        }).encode()
+        req = urllib.request.Request(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json.loads(resp.read().decode())
+            return bool(result.get("success", False))
+    except Exception:
+        return False
+
 @app.post("/api/auth/register")
 def auth_register(username: str = Form(...), email: str = Form(...),
-                  password: str = Form(...), code: str = Form(...)):
+                  password: str = Form(...), code: str = Form(...),
+                  cf_turnstile_response: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
+    # 先验证注册验证码（不管 Turnstile）
+    if not verify_registration_code(email, code):
+        return {"success": False, "error": "验证码无效或已过期"}
+    # 验证码正确 → 需要人机验证
+    if not verify_turnstile(cf_turnstile_response):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     try:
-        if not verify_registration_code(email, code):
-            return {"success": False, "error": "验证码无效或已过期"}
         user = create_user(username, email, password)
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
         return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"],
@@ -654,17 +793,20 @@ def auth_register(username: str = Form(...), email: str = Form(...),
         return {"success": False, "error": str(e)}
 
 @app.post("/api/auth/login")
-def auth_login(username_or_email: str = Form(...), password: str = Form(...)):
+def auth_login(username_or_email: str = Form(...), password: str = Form(...),
+               cf_turnstile_response: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
+    # 先验证账号密码（不管 Turnstile）
     try:
         user = authenticate_user(username_or_email, password)
     except PermissionError as e:
-        # Account locked due to too many failed attempts — surface the real
-        # message instead of letting FastAPI raise a generic 500.
         return {"success": False, "error": str(e)}
     if not user:
         return {"success": False, "error": "用户名或密码错误"}
+    # 密码正确 → 需要人机验证
+    if not verify_turnstile(cf_turnstile_response):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
     terms_accepted = user.get("terms_accepted", 0)
     needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
@@ -707,7 +849,8 @@ def auth_send_login_code(email: str = Form(...)):
         return {"success": False, "error": str(e)}
 
 @app.post("/api/auth/login-with-code")
-def auth_login_with_code(email: str = Form(...), code: str = Form(...)):
+def auth_login_with_code(email: str = Form(...), code: str = Form(...),
+                         cf_turnstile_response: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
     try:
@@ -717,6 +860,9 @@ def auth_login_with_code(email: str = Form(...), code: str = Form(...)):
         user = get_user_by_email(email)
         if not user:
             return {"success": False, "error": "账号不存在"}
+        # 验证码正确 → 需要人机验证
+        if not verify_turnstile(cf_turnstile_response):
+            return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
         terms_accepted = user.get("terms_accepted", 0)
         needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
@@ -1209,7 +1355,7 @@ async def submit_feedback(request: Request):
 SURVEY_LOG = os.path.join(BASE_DIR, "survey.log")
 
 @app.post("/api/survey/submit")
-async def submit_survey(request: Request):
+async def submit_survey(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         body = await request.json()
     except Exception:
@@ -1225,21 +1371,71 @@ async def submit_survey(request: Request):
     for k in body:
         if len(str(body[k])) > 2000:
             return {"success": False, "error": f"字段 {k} 过长"}
+
+    # 验证登录用户，每个账户只能填一次
+    user_id = None
+    if credentials and credentials.credentials:
+        try:
+            from auth import verify_token
+            payload = verify_token(credentials.credentials)
+            if payload:
+                user_id = int(payload["sub"])
+        except Exception:
+            pass
+    if not user_id:
+        return {"success": False, "error": "请先登录后再填写问卷"}
+
+    # 查 user 表是否已填过
+    try:
+        from auth import get_user_by_id
+        u = get_user_by_id(user_id)
+        if u and u.get("survey_completed"):
+            return {"success": False, "error": "您已填写过问卷调查，每个账户只能填写一次"}
+    except Exception:
+        pass
+
     try:
         from datetime import datetime
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(SURVEY_LOG, "a") as f:
-            f.write(json.dumps({"timestamp": ts, **body}, ensure_ascii=False) + "\n")
+            f.write(json.dumps({"timestamp": ts, "user_id": user_id, **body}, ensure_ascii=False) + "\n")
+        # 标记该用户已完成问卷
+        try:
+            import sqlite3
+            db_path = os.path.join(BASE_DIR, "neuroaccess.db")
+            conn = sqlite3.connect(db_path)
+            conn.execute("UPDATE users SET survey_completed = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[survey] mark user survey_completed failed: {e}")
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/api/survey/status")
+async def get_survey_status(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials or not credentials.credentials:
+        return {"success": False, "completed": False}
+    try:
+        from auth import verify_token, get_user_by_id
+        payload = verify_token(credentials.credentials)
+        if not payload: return {"success": False, "completed": False}
+        uid = int(payload["sub"])
+        u = get_user_by_id(uid)
+        return {"success": True, "completed": bool(u and u.get("survey_completed"))}
+    except Exception:
+        return {"success": False, "completed": False}
+
 @app.get("/api/survey/results")
 async def get_survey_results(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    from auth import verify_token
+    from auth import verify_token, get_user_by_id
     payload = verify_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    # 账号可能已在其它设备被注销；无状态 JWT 删除后依然有效，需校验用户仍存在
+    if not get_user_by_id(int(payload["sub"])):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     if not os.path.exists(SURVEY_LOG):
         return {"success": True, "entries": [], "count": 0}
     try:
@@ -1258,6 +1454,111 @@ async def get_survey_results(credentials: HTTPAuthorizationCredentials = Depends
 
 
 # =================================================================
+# 服务端报告同步（跨设备） —— 分析报告随账号保存，任意设备/重新登录后可用
+# =================================================================
+
+def _report_user_id(credentials: HTTPAuthorizationCredentials) -> int:
+    """从 Bearer token 解析并校验用户，返回 user_id；无效或已注销则抛 401。"""
+    if not AUTH_AVAILABLE:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="认证模块不可用")
+    payload = verify_token(credentials.credentials)
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    try:
+        uid = int(payload["sub"])
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭证无效")
+    if not get_user_by_id(uid):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账号不存在或已注销")
+    return uid
+
+
+@app.post("/api/reports/save")
+async def api_save_report(report: Dict[str, Any], credentials: HTTPAuthorizationCredentials = Depends(security)):
+    uid = _report_user_id(credentials)
+    try:
+        rid = str(report.get("id") or "")
+        if not rid:
+            return {"success": False, "error": "Missing report id"}
+        data_json = json.dumps(report, ensure_ascii=False)
+        conn = get_db()
+        conn.execute(
+            """INSERT INTO reports (id, user_id, file_name, date, mode, quality, language, data)
+               VALUES (?,?,?,?,?,?,?,?)
+               ON CONFLICT(id) DO UPDATE SET
+                 user_id=excluded.user_id, file_name=excluded.file_name, date=excluded.date,
+                 mode=excluded.mode, quality=excluded.quality, language=excluded.language, data=excluded.data""",
+            (rid, uid,
+             str(report.get("fileName", "")), str(report.get("date", "")),
+             str(report.get("mode", "Beginner")), float(report.get("quality", 0) or 0),
+             str(report.get("language", "zh")), data_json),
+        )
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/reports/list")
+def api_list_reports(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    uid = _report_user_id(credentials)
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT data FROM reports WHERE user_id=? ORDER BY created_at DESC", (uid,)
+        ).fetchall()
+        reports = [json.loads(r["data"]) for r in rows]
+        return {"success": True, "reports": reports}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/reports/get")
+async def api_get_report(body: Dict[str, Any], credentials: HTTPAuthorizationCredentials = Depends(security)):
+    uid = _report_user_id(credentials)
+    try:
+        rid = str(body.get("id") or "")
+        if not rid:
+            return {"success": False, "error": "Missing report id"}
+        conn = get_db()
+        row = conn.execute(
+            "SELECT data FROM reports WHERE id=? AND user_id=?", (rid, uid)
+        ).fetchone()
+        if not row:
+            return {"success": False, "error": "Report not found"}
+        return {"success": True, "report": json.loads(row["data"])}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/reports/delete")
+async def api_delete_report(body: Dict[str, Any], credentials: HTTPAuthorizationCredentials = Depends(security)):
+    uid = _report_user_id(credentials)
+    try:
+        rid = str(body.get("id") or "")
+        if not rid:
+            return {"success": False, "error": "Missing report id"}
+        conn = get_db()
+        conn.execute("DELETE FROM reports WHERE id=? AND user_id=?", (rid, uid))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/reports/delete-all")
+async def api_delete_all_reports(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    uid = _report_user_id(credentials)
+    try:
+        conn = get_db()
+        conn.execute("DELETE FROM reports WHERE user_id=?", (uid,))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# =================================================================
 # EEG Simulator
 # =================================================================
 
@@ -1268,8 +1569,80 @@ except Exception as _sim_e:
     EEG_SIMULATOR_AVAILABLE = False
     EEG_SIMULATOR_ERROR = str(_sim_e)
 
+
+# =================================================================
+# 波形图像端点：返回纯 SVG，前端用 <img> 直接加载，绕过 React canvas
+# =================================================================
+@app.get("/api/waveform-image")
+def waveform_image(rid: str = ""):
+    """根据报告ID返回波形SVG图像"""
+    svg = gen_waveform_svg(rid)
+    from fastapi.responses import Response
+    return Response(content=svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
+def gen_waveform_svg(rid: str) -> str:
+    """从数据库读取报告数据，生成纯SVG波形图"""
+    if not rid:
+        return f"<svg width=400 height=100><text y=50 fill=red>Missing report ID</text></svg>"
+    try:
+        from auth import get_db
+        conn = get_db()
+        row = conn.execute("SELECT data FROM reports WHERE id=?", (rid,)).fetchone()
+        conn.close()
+        if not row:
+            return f"<svg width=400 height=100><text y=50 fill=red>Report not found</text></svg>"
+        d = json.loads(row[0])
+        wp = d.get("analysis", {}).get("waveform_preview", {}) or {}
+        chs = wp.get("channels", {}) or {}
+        if not chs:
+            return f"<svg width=400 height=100><text y=50 fill=#888>No waveform data</text></svg>"
+        
+        ch_names = list(chs.keys())
+        nch = len(ch_names)
+        npts = len(chs[ch_names[0]]) if nch else 0
+        if npts < 2:
+            return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points ({npts})</text></svg>"
+        
+        W, LW = 900, 65
+        laneH = max(14, min(22, 400 // nch))
+        H = laneH * nch + 30
+        colors = ["#ef4444","#facc15","#3b82f6","#22c55e"]
+        
+        def esc(s):
+            return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+        
+        svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
+        for i, ch in enumerate(ch_names):
+            y = i * laneH + laneH//2
+            svg.append(f'<line x1="{LW}" y1="{y}" x2="{W}" y2="{y}" stroke="#333" stroke-width="0.5" stroke-dasharray="3 3"/>')
+            svg.append(f'<text x="{LW-4}" y="{y+3}" fill="#aab" font-size="{min(11, max(8, 200//nch))}" text-anchor="end">{esc(ch)}</text>')
+            vals = chs[ch]
+            if len(vals) < 2: continue
+            vabs = sorted([abs(v) for v in vals])
+            p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
+            sc = (laneH * 0.5) / (2 * p95)
+            cl = laneH * 0.5 / sc
+            pts = "M" + "".join(f" {LW + j*(W-LW)/(npts-1):.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
+            svg.append(f'<path d="{pts}" stroke="{colors[i%4]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
+        
+        # 用 times 数组尾端取实际时长（采样率经多次降采样后不准）
+        times = wp.get("times", [])
+        dur = (times[-1] - times[0]) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
+        for i in range(6):
+            t = i * dur / 5
+            x = LW + (W - LW) * i / 5
+            svg.append(f'<text x="{x:.1f}" y="{H-4}" fill="#667" font-size="9" text-anchor="middle">{t:.1f}s</text>')
+        svg.append("</svg>")
+        return "".join(svg)
+    except Exception as e:
+        return f"<svg width=400 height=100><text y=50 fill=red>Error: {esc(str(e))}</text></svg>"
+
 @app.post("/api/eeg-simulator/generate")
-async def eeg_simulator_generate(request: Request):
+async def eeg_simulator_generate(request: Request, _uid: int = Depends(require_user_id)):
+    # ── Auth（AUTH 启用时必须登录；关闭时游客可生成，便于本地开发）──
+    # 鉴权由 Depends(require_user_id) 完成：无 token/账号已注销 → 401
     try:
         try:
             body = await request.json()

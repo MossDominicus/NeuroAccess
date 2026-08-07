@@ -6,6 +6,7 @@ import TopNav from "@/components/TopNav";
 import { DisclaimerModal, PostLoginModals } from "@/components/LazyModals";
 import RoutePrefetcher from "@/components/RoutePrefetcher";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import NotificationToast from "@/components/NotificationToast";
 import PublicPreviewFooter from "@/components/PublicPreviewFooter";
 import type { Lang } from "@/lib/translations";
 import { LanguageProvider } from "@/lib/language-context";
@@ -141,6 +142,7 @@ export default async function RootLayout({
               <AnalysisProvider>
               <DisclaimerModal />
               <PostLoginModals />
+              <NotificationToast />
               <RoutePrefetcher />
               <div className="flex h-screen overflow-hidden">
                 <Sidebar />

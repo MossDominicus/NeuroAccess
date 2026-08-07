@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { useLang } from "./language-context";
 
 interface User {
@@ -15,10 +15,10 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (usernameOrEmail: string, password: string) => Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }>;
-  register: (username: string, email: string, password: string, code?: string) => Promise<{ success: boolean; error?: string }>;
+  login: (usernameOrEmail: string, password: string, cfToken?: string) => Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }>;
+  register: (username: string, email: string, password: string, code?: string, cfToken?: string) => Promise<{ success: boolean; error?: string; needsCaptcha?: boolean }>;
   sendLoginCode: (email: string) => Promise<{ success: boolean; error?: string }>;
-  loginWithCode: (email: string, code: string) => Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }>;
+  loginWithCode: (email: string, code: string, cfToken?: string) => Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }>;
   logout: () => void;
   loading: boolean;
   updateUser: (user: User) => void;
@@ -123,6 +123,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // termsAccepted 从 localStorage consent 记录初始化，不依赖后端
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // ── 跨设备会话失效检测 ──────────────────────────────
+  // 账号可能在其它设备被注销/删除，或 token 已失效。被动信任 localStorage
+  // 缓存会让其它设备一直显示"已登录"，因此每次启动 / 页面重新可见时都向服务端校验一次。
+  const handleSessionInvalid = useCallback(() => {
+    try {
+      localStorage.removeItem("neuroaccess-token");
+      localStorage.removeItem("neuroaccess-user");
+    } catch {}
+    clearAuthCookie();
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  // ── 跨设备报告同步 ──────────────────────────
+  // 会话有效（登录成功 / 启动校验 / 页面重新可见）时调用：把本机独有报告推送到服务端，
+  // 并拉取其它设备的报告。服务端是多设备真相源，本地 localStorage 仅作离线缓存。
+  const syncReportsOnLogin = useCallback(async () => {
+    try {
+      const { loadReports, saveReports, fetchServerReports, syncReportToServer } =
+        await import("@/lib/reports-storage");
+      const serverReports = await fetchServerReports();
+      if (serverReports === null) return; // 网络异常 / 未登录：保留本地，不改动
+      const localReports = loadReports();
+      const serverIds = new Set(serverReports.map((r: any) => r.id));
+      const localOnly = localReports.filter((r: any) => !serverIds.has(r.id));
+      // 把本机独有（尚未上云）的报告推送到服务端
+      for (const r of localOnly) {
+        try { await syncReportToServer(r); } catch {}
+      }
+      // 合并：服务端报告作为真相源覆盖本地同名报告 + 本机独有报告，写回本地缓存
+      const merged = [...serverReports, ...localOnly];
+      saveReports(merged);
+    } catch {}
+  }, []);
+
+  const validateSession = useCallback(async (tok: string) => {
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/me`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      // 401 = 凭证失效 / 用户已被删除 → 静默处理，不自动退出（用户要求永久保留登录）
+      if (resp.status === 401) {
+        // 不退出登录，保留当前状态
+        return;
+      }
+      if (resp.ok) {
+        // 会话有效：同步跨设备报告（推送本机独有 + 拉取其它设备）
+        await syncReportsOnLogin();
+      }
+    } catch {
+      // 网络 / 服务异常：保留当前状态，下次校验再判断
+    }
+  }, [handleSessionInvalid, syncReportsOnLogin]);
+
   useEffect(() => {
     // 加载 token、用户、同意记录
     try {
@@ -132,6 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsedUser = JSON.parse(savedUser);
         setToken(savedToken);
         setUser(parsedUser);
+        // 关键修复：向服务端校验会话是否仍然有效（账号可能已在其它设备被注销）
+        validateSession(savedToken);
       }
       // 检查本地 consent 记录（页面刷新时不显示弹窗）
       if (loadConsent()) {
@@ -141,47 +198,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  // ── Token 过期自动登出 ──────────────────────────
+  // ── Token 过期自动登出（已禁用：用户要求永久保留登录）────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearLogoutTimer = () => {
-    if (logoutTimerRef.current) {
-      clearTimeout(logoutTimerRef.current);
-      logoutTimerRef.current = null;
-    }
-  };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const clearLogoutTimer = () => {};
 
-  const scheduleLogout = (jwtToken: string) => {
-    clearLogoutTimer();
-    const expiry = decodeJwtExpiry(jwtToken);
-    if (expiry && expiry > Date.now()) {
-      const msUntilExpiry = expiry - Date.now();
-      logoutTimerRef.current = setTimeout(() => {
-        console.warn("[Auth] Token expired, logging out");
-        logout();
-      }, msUntilExpiry);
-    }
-  };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const scheduleLogout = (_jwtToken: string) => {};
 
-  // Schedule logout on mount if token exists
+  // Schedule logout on mount if token exists（已禁用）
   useEffect(() => {
-    if (token) {
-      scheduleLogout(token);
-    }
-    return clearLogoutTimer;
+    // Token 过期自动登出功能已永久禁用
+    return () => {};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // 标签页重新可见时重新校验会话（捕捉"账号在其它设备被删除"的情况）
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && token) {
+        validateSession(token);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [token, validateSession]);
 
   const { t } = useLang();
 
   const tf = (key: string, fb: string) => { const v = t(key); return v === key ? fb : v; };
 
-  const login = async (usernameOrEmail: string, password: string): Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
+  const login = async (usernameOrEmail: string, password: string, cfToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
     try {
+      const params = new URLSearchParams({ username_or_email: usernameOrEmail, password });
+      if (cfToken) params.append("cf_turnstile_response", cfToken);
       const resp = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ username_or_email: usernameOrEmail, password }),
+        body: params,
       });
       const data = await resp.json();
       if (data.success) {
@@ -194,19 +251,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const nu = !!data.needs_username_setup;
         setNeedsUsernameSetup(nu);
-
-        // 本地同意记录 > 后端记录（用户离线同意过就算数）
-        if (loadConsent()) {
-          setTermsAccepted(true);
-        } else if (data.terms_accepted) {
-          // 后端说已同意但本地无记录 → 同步到本地
-          saveConsent();
-          setTermsAccepted(true);
-        } else {
-          setTermsAccepted(false);
-        }
-
+        if (loadConsent()) { setTermsAccepted(true); }
+        else if (data.terms_accepted) { saveConsent(); setTermsAccepted(true); }
+        else { setTermsAccepted(false); }
+        await syncReportsOnLogin();
         return { success: true, termsAccepted: !!data.terms_accepted, needsUsernameSetup: nu };
+      }
+      if (data.needsCaptcha) {
+        return { success: false, needsCaptcha: true, error: data.error };
       }
       return { success: false, error: data.error || data.detail || tf("loginFailed", "Login failed") };
     } catch (e: any) {
@@ -214,12 +266,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (username: string, email: string, password: string, code: string = ""): Promise<{ success: boolean; error?: string }> => {
+  const register = async (username: string, email: string, password: string, code: string = "", cfToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean }> => {
     try {
+      const params = new URLSearchParams({ username, email, password, code });
+      if (cfToken) params.append("cf_turnstile_response", cfToken);
       const resp = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ username, email, password, code }),
+        body: params,
       });
       const data = await resp.json();
       if (data.success) {
@@ -242,6 +296,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("neuroaccess-feedback");
         localStorage.removeItem("neuroaccess-survey");
         return { success: true };
+      }
+      if (data.needsCaptcha) {
+        return { success: false, needsCaptcha: true, error: data.error };
       }
       return { success: false, error: data.error || tf("registerFailed", "Registration failed") };
     } catch (e: any) {
@@ -269,12 +326,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithCode = async (email: string, code: string): Promise<{ success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
+  const loginWithCode = async (email: string, code: string, cfToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
     try {
+      const params = new URLSearchParams({ email, code });
+      if (cfToken) params.append("cf_turnstile_response", cfToken);
       const resp = await fetch(`${API_BASE}/api/auth/login-with-code`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ email, code }),
+        body: params,
       });
       const data = await resp.json();
       if (data.success) {
@@ -292,7 +351,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           saveConsent();
           setTermsAccepted(true);
         }
+        await syncReportsOnLogin();
         return { success: true, termsAccepted: !!data.terms_accepted, needsUsernameSetup: nu };
+      }
+      if (data.needsCaptcha) {
+        return { success: false, needsCaptcha: true, error: data.error };
       }
       return { success: false, error: data.error || tf("verificationCodeFailed", "Verification failed") };
     } catch (e: any) {

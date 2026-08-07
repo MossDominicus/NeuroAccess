@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useAnalysis } from "@/lib/analysis-context";
 import {
   UploadCloud,
+  DownloadCloud,
   FileText,
   Activity,
   CheckCircle2,
@@ -17,29 +18,40 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Cpu, Pause,
+  Cpu, Pause, RefreshCw, RotateCcw,
 } from "lucide-react";
 
 type Status = "pending" | "reading" | "computing" | "analysisReady" | "explaining" | "completed" | "failed";
 
-// ── Status badge ─────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: Status }) {
+
+
+// ── 水平进度条 ──────────────────────────────────────────────────────
+function ProgressBar({ status }: { status: Status }) {
   const { t } = useLang();
-  const map: Record<Status, { key: string; color: string; Icon: any; spin?: boolean }> = {
-    pending:     { key: "pending",     color: "bg-[var(--color-border)] text-[var(--color-text-secondary)]",             Icon: Clock,        spin: false },
-    reading:     { key: "reading",     color: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",        Icon: UploadCloud,  spin: true  },
-    computing:   { key: "computing",   color: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",    Icon: Activity,     spin: true  },
-    analysisReady: { key: "analysisReady", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", Icon: CheckCircle2, spin: false },
-    explaining:  { key: "explaining",  color: "bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400", Icon: Cpu,        spin: true  },
-    completed:   { key: "completed",   color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", Icon: CheckCircle2, spin: false },
-    failed:      { key: "failed",      color: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",            Icon: AlertTriangle, spin: false },
+  const map: Record<Status, { label: string; pct: number; color: string }> = {
+    pending:     { label: "pending", pct: 0,   color: "bg-[var(--color-border)]" },
+    reading:     { label: "reading", pct: 33,  color: "bg-blue-500" },
+    computing:   { label: "computing", pct: 66, color: "bg-amber-500" },
+    analysisReady: { label: "analysisReady", pct: 80, color: "bg-emerald-500" },
+    explaining:  { label: "explaining", pct: 80, color: "bg-purple-500" },
+    completed:   { label: "completed", pct: 100, color: "bg-emerald-500" },
+    failed:      { label: "failed", pct: 100,  color: "bg-red-500" },
   };
-  const { key, color, Icon, spin } = map[status] || map.failed;
+  const { label, pct, color } = map[status] || map.pending;
+  const isRunning = status === "reading" || status === "computing" || status === "explaining";
+
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
-      <Icon className={`w-3.5 h-3.5 ${spin ? "animate-spin" : ""}`} />
-      <span>{t(key)}</span>
-    </span>
+    <div className="flex items-center gap-2 min-w-[120px]">
+      <div className="flex-1 h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ease-out ${color} ${isRunning ? "animate-pulse" : ""}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
+        {t(label)}
+      </span>
+    </div>
   );
 }
 
@@ -55,11 +67,11 @@ function OverviewCard({ analysis }: { analysis: any }) {
     { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(0) : "-" },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
       {items.map((it) => (
-        <div key={it.label} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-          <div className="text-xs text-[var(--color-text-secondary)]">{it.label}</div>
-          <div className="mt-1 truncate text-sm font-bold text-[var(--color-text)]">{String(it.value)}</div>
+        <div key={it.label} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:p-4 shadow-sm">
+          <div className="text-[10px] sm:text-xs text-[var(--color-text-secondary)]">{it.label}</div>
+          <div className="mt-1 truncate text-xs sm:text-sm font-bold text-[var(--color-text)]">{String(it.value)}</div>
         </div>
       ))}
     </div>
@@ -169,7 +181,7 @@ function ExplanationCards({ analysis }: { analysis: any }) {
 
 // ── FileCard ────────────────────────────────────────────────────────
 function FileCard({
-  item, expanded, onToggle, onRemove, running, paused,
+  item, expanded, onToggle, onRemove, running, paused, onRetry,
 }: {
   item: any;
   expanded: boolean;
@@ -177,24 +189,30 @@ function FileCard({
   onRemove: () => void;
   running: boolean;
   paused: boolean;
+  onRetry?: (id: string) => void;
 }) {
   const { t } = useLang();
 
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-shadow hover:shadow-md">
-      <div className="flex items-center justify-between px-5 py-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <FileText className="h-5 w-5 flex-shrink-0 text-[var(--color-text-secondary)]" />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-[var(--color-text)]">{item.name}</div>
-            <div className="text-xs text-[var(--color-text-secondary)]">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3 flex-1">
+          <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-[var(--color-text-secondary)]" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs sm:text-sm font-medium text-[var(--color-text)]">{item.name}</div>
+            <div className="text-[10px] sm:text-xs text-[var(--color-text-secondary)]">
               {(item.size / 1024 / 1024).toFixed(2)} {t("mb")}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={item.status} />
-          {(!running || paused) && (
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          <ProgressBar status={item.status} />
+          {item.status === "failed" && onRetry && (
+            <button onClick={() => onRetry(item.id)} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-amber-950/30 hover:text-amber-400" title={t("retry")}>
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          )}
+          {(!running || paused) && item.status !== "reading" && item.status !== "computing" && item.status !== "explaining" && (
             <button onClick={onRemove} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-red-950/30 hover:text-red-400">
               <Trash2 className="h-4 w-4" />
             </button>
@@ -208,7 +226,7 @@ function FileCard({
         </div>
       )}
 
-      {expanded && (item.status === "analysisReady" || item.status === "explaining" || item.status === "completed") && !item.error && (
+      {expanded && (item.status === "completed") && !item.error && (
         <div className="border-t border-[var(--color-border)] px-5 py-4">
           <div className="text-center">
             <Link
@@ -239,10 +257,10 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 
 function DashboardInner() {
   const { t } = useLang();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const {
     files, running, paused, expandId, setExpandId,
-    handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis,
+    handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis, retryFile,
   } = useAnalysis();
 
   // ── 自动展开最近的活动文件（页面切换回来时显示当前进度）─────────
@@ -305,6 +323,28 @@ function DashboardInner() {
   // 分析进行中 = 正在运行且未暂停（暂停后可以继续上传文件）
   const hasActiveAnalysis = running && !paused;
 
+  // ── 未登录：先转圈校验会话，再提示登录（避免刷新瞬间闪现登录框）──
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-primary)] border-t-transparent" />
+      </div>
+    );
+  }
+  if (!user) {
+    return (
+      <motion.div
+        className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] text-[var(--color-text)]"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
+      >
+        <div className="text-center">
+          <FileText className="mx-auto mb-4 h-12 w-12 text-[var(--color-text-secondary)]/50" />
+          <p className="text-lg font-medium text-[var(--color-text)]">{t("pleaseLogin")}</p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -323,13 +363,13 @@ function DashboardInner() {
         {/* Upload area */}
         {!hasActiveAnalysis ? (
           <label
-            className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-8 sm:p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] active:border-[var(--color-primary)] cursor-pointer min-h-[160px] flex flex-col items-center justify-center"
+            className="rounded-3xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-10 text-center shadow-sm transition-colors hover:border-[var(--color-text-secondary)] active:border-[var(--color-primary)] cursor-pointer min-h-[160px] flex flex-col items-center justify-center w-full"
             onDragOver={(e) => { e.preventDefault(); }}
             onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
           >
-            <UploadCloud className="mx-auto mb-3 sm:mb-4 h-8 w-8 sm:h-10 sm:w-10 text-[var(--color-text-secondary)]" />
-            <span className="block text-sm sm:text-base font-medium text-[var(--color-text)]">{t("dragOrClick")}</span>
-            <span className="mt-1 block text-xs sm:text-sm text-[var(--color-text-secondary)]">{t("supportedFormats")}</span>
+            <UploadCloud className="mx-auto mb-2 sm:mb-4 h-6 w-6 sm:h-10 sm:w-10 text-[var(--color-text-secondary)]" />
+            <span className="block text-xs sm:text-base font-medium text-[var(--color-text)]">{t("dragOrClick")}</span>
+            <span className="mt-1 block text-[10px] sm:text-sm text-[var(--color-text-secondary)]">{t("supportedFormats")}</span>
             <input
               type="file"
               multiple
@@ -344,6 +384,18 @@ function DashboardInner() {
             <Activity className="mx-auto mb-4 h-10 w-10 text-amber-500 animate-pulse" />
             <p className="text-sm font-medium text-[var(--color-text)]">{t("uploadDisabledDuringAnalysis")}</p>
           </div>
+        )}
+
+        {/* 黄色下载测试文件按钮（仪表盘右下角固定，分析时隐藏） */}
+        {!hasActiveAnalysis && (
+          <a
+            href="/test-sample.edf"
+            download="test_16ch_128hz.edf"
+            className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 active:bg-yellow-500 text-yellow-800 font-semibold text-sm px-5 py-3 shadow-md transition-colors"
+          >
+            <DownloadCloud className="h-5 w-5" />
+            <span>下载测试脑电图 (.edf)</span>
+          </a>
         )}
 
         {/* File list */}
@@ -401,6 +453,7 @@ function DashboardInner() {
                   onRemove={() => removeFile(item.id)}
                   running={running}
                   paused={paused}
+                  onRetry={retryFile}
                 />
             ))}
             {paused && files.length > 1 && (
@@ -412,20 +465,11 @@ function DashboardInner() {
         )}
       </div>
 
-      {/* AI Status Bar — 仅保留绿色对号 + qwen2.5 */}
-      {aiStatus && (
+      {/* AI Status Bar — 永远绿色，不管AI是否在线（分析用模板兜底，不影响功能） */}
+      {aiStatus && aiStatus.online && (
         <div className="flex items-center justify-center gap-1.5 py-2 text-xs border-t border-[var(--color-border)] mt-4">
-          {aiStatus.online ? (
-            <>
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
-              <span className="font-medium text-green-700 dark:text-green-400">{t("aiModelLabel")}</span>
-            </>
-          ) : (
-            <>
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
-              <span className="font-medium text-red-700 dark:text-red-400">{t("aiOffline")}</span>
-            </>
-          )}
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 dark:text-green-400" />
+          <span className="font-medium text-green-700 dark:text-green-400">{t("aiModelLabel")}</span>
         </div>
       )}
     </motion.div>

@@ -108,12 +108,16 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
             </div>
           </button>
         ) : (
-          <Link
+          <a
             href="/login"
-            className="text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.href = "/login";
+            }}
+            className="text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity cursor-pointer"
           >
             {getLoginText(lang)}
-          </Link>
+          </a>
         )}
       </div>
     </header>

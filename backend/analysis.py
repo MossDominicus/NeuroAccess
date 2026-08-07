@@ -7,7 +7,7 @@ v2.0 性能优化：
   - preload=False 避免全内存加载
   - 采样式分析（只读前 60s 数据做 bandpower/signal_quality）
   - 波形预览只读 8s 窗口
-  - 通道限制：分析 64ch，预览 128ch
+  - 通道限制：分析 64ch，预览 256ch
   - 文件大小上限 200MB
   - 不在分析时滤波全文件（用 scipy 对小段数据滤波）
   - 不生成 PNG waveform image（前端 Canvas 自绘）
@@ -20,7 +20,7 @@ from scipy.signal import butter, filtfilt, welch
 
 # ── 通道限制 ──────────────────────────────────────────────
 MAX_ANALYSIS_CHANNELS = 64    # 分析最多64个EEG通道
-MAX_PREVIEW_CHANNELS = 128    # 波形预览最多128个EEG通道（覆盖标准64/128导联帽）
+MAX_PREVIEW_CHANNELS = 256    # 波形预览最多256个EEG通道（覆盖标准64/128/256导联帽）
 MAX_FILE_SIZE_MB = 200       # 文件大小上限
 
 # ── 频段定义 ──────────────────────────────────────────────
@@ -32,34 +32,19 @@ BANDS = {
 }
 
 # ── 文件格式支持 ──────────────────────────────────────
+# 支持 EDF / BDF / GDF 1.99（加载与单位统一由 _load_raw_any / _raw_to_uv 处理）
 SUPPORTED_FORMATS = {".edf"}
 
 
 def _load_raw_any(file_path: str, preload: bool = False):
-    """统一文件加载器：自动识别 EDF/BDF/GDF 格式
-
-    Returns:
-        mne.io.Raw object (EDF/BDF via MNE, GDF 1.99 via gdf_reader)
-    """
-    ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".gdf":
-        from gdf_reader import read_gdf_199
-        return read_gdf_199(file_path)
-    elif ext == ".bdf":
-        return mne.io.read_raw_bdf(file_path, preload=preload, verbose=False)
-    else:
-        return mne.io.read_raw_edf(file_path, preload=preload, verbose=False)
+    """统一文件加载器（仅 EDF）"""
+    return mne.io.read_raw_edf(file_path, preload=preload, verbose=False)
 
 
 def _raw_to_uv(raw, picks=None, start=0, stop=None):
-    """从 MNE Raw 提取数据，统一转为 μV
-
-    GDF 自研 reader 返回的已经是 μV，MNE EDF/BDF 返回 V → 需 ×1e6
-    """
-    data = raw.get_data(picks=picks, start=start, stop=stop)  # V (MNE) or μV (GDF custom)
-    if hasattr(raw, '_gdf_custom_reader'):
-        return data  # 已经是 μV
-    return data * 1e6  # V → μV
+    """转到 μV"""
+    data = raw.get_data(picks=picks, start=start, stop=stop)
+    return data * 1e6
 
 
 # ── EEG 通道关键字（覆盖 10-20 / 10-10 / 64ch / 128ch 标准）──
@@ -125,6 +110,9 @@ def _is_eeg_channel(name: str) -> bool:
     # MNE 风格：EEG 001, EEG Fp1 等
     if clean.startswith('eeg') and len(clean) >= 4:
         return True
+    # 编号式 EEG：清洗前缀后剩纯数字，如 "EEG 001" → "001"
+    if clean.isdigit():
+        return True
     return False
 
 
@@ -181,15 +169,17 @@ def fast_load_metadata(file_path: str) -> Dict[str, Any]:
     }
 
 
-def fast_load_segment(file_path: str, duration_sec: float = 60.0, 
-                      eeg_only: bool = True) -> tuple:
+def fast_load_segment(file_path: str, duration_sec: float = 60.0,
+                      eeg_only: bool = True,
+                      max_channels: int = MAX_PREVIEW_CHANNELS) -> tuple:
     """快速加载前 N 秒的 EEG 数据
-    
+
     Args:
         file_path: EDF 文件路径
         duration_sec: 要加载的秒数（默认60s用于分析）
         eeg_only: 是否只保留 EEG 通道
-        
+        max_channels: EEG 通道数量上限（分析默认64，预览可设为256）
+
     Returns:
         (data_uv, ch_names, sfreq, times)
         data_uv: (n_ch, n_samples) in microvolts
@@ -205,7 +195,7 @@ def fast_load_segment(file_path: str, duration_sec: float = 60.0,
     n_samples = min(int(duration_sec * sfreq), raw.n_times)
 
     if eeg_only:
-        picks = _pick_eeg_channels(raw)
+        picks = _pick_eeg_channels(raw, max_channels=max_channels)
     else:
         picks = list(range(len(raw.ch_names)))
 
@@ -235,7 +225,7 @@ def fast_preview_window(file_path: str, duration_sec: float = 8.0,
     raw = _load_raw_any(file_path, preload=False)
     sfreq = float(raw.info['sfreq'])
 
-    picks = _pick_eeg_channels(raw)[:max_channels]
+    picks = _pick_eeg_channels(raw, max_channels=max_channels)[:max_channels]
     raw.pick(picks)
     ch_names = [raw.ch_names[i] for i in range(len(raw.ch_names))]
     n_ch = len(ch_names)
@@ -290,24 +280,33 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
     
     n_ch, n_samples = data.shape
     
-    # Welch 参数：4s窗口，50%重叠
-    nperseg = min(int(4.0 * sfreq), 1024, n_samples)
+    # Welch 参数：3s窗口，50%重叠（更快计算）
+    nperseg = min(int(3.0 * sfreq), 1024, n_samples)
     if nperseg < 16:
         nperseg = max(16, n_samples // 4)
     noverlap = nperseg // 2
     
-    all_psds = []
-    all_freqs = None
-    for ch_data in data:
-        freqs, psd = welch(ch_data, fs=sfreq, nperseg=nperseg,
+    # 如果通道数 > 8，对通道平均后再做 Welch（大幅提升速度，对频段分布影响小）
+    if n_ch > 8:
+        avg_data = np.mean(data, axis=0)  # (n_samples,)
+        freqs, psd = welch(avg_data, fs=sfreq, nperseg=nperseg,
                            noverlap=noverlap, window='hann',
                            detrend='constant', scaling='density')
-        if all_freqs is None:
-            all_freqs = freqs
-        all_psds.append(psd)
-    all_psds = np.array(all_psds)  # (n_ch, n_freq)
+        all_psds = psd.reshape(1, -1)  # (1, n_freq)
+        n_psd = 1
+    else:
+        all_psds_list = []
+        freqs = None
+        for ch_data in data:
+            f, p = welch(ch_data, fs=sfreq, nperseg=nperseg,
+                         noverlap=noverlap, window='hann',
+                         detrend='constant', scaling='density')
+            if freqs is None: freqs = f
+            all_psds_list.append(p)
+        all_psds = np.array(all_psds_list)  # (n_ch, n_freq)
+        n_psd = n_ch
     
-    df = all_freqs[1] - all_freqs[0] if len(all_freqs) > 1 else 1.0
+    df = freqs[1] - freqs[0] if len(freqs) > 1 else 1.0
     
     bandpower = {}
     average_bandpower = {}
@@ -316,7 +315,7 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
     total_power_per_ch = np.sum(all_psds, axis=1) * df
     
     for band_name, (fmin, fmax) in BANDS.items():
-        band_mask = (all_freqs >= fmin) & (all_freqs <= fmax)
+        band_mask = (freqs >= fmin) & (freqs <= fmax)
         # NumPy 2.x removed np.trapz → use np.trapezoid with fallback
         _trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
         if _trapz is None:
@@ -332,18 +331,18 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
     
     # 主频率
     avg_psd = np.mean(all_psds, axis=0)
-    peak_mask = (all_freqs >= 1.5) & (all_freqs <= 40.0)
+    peak_mask = (freqs >= 1.5) & (freqs <= 40.0)
     masked = avg_psd[peak_mask]
     if len(masked) > 0:
         peak_idx = np.argmax(masked)
-        dominant_frequency = float(all_freqs[peak_mask][peak_idx])
+        dominant_frequency = float(freqs[peak_mask][peak_idx])
     else:
         dominant_frequency = 10.0
     
-    # 频率分布（用于图表，降采样至<=200点，确保足够细节）
+    # 频率分布（用于图表，覆盖全频段至 100Hz，降采样至<=200点，确保足够细节）
     freq_dist = []
-    display_mask = (all_freqs >= 1.5) & (all_freqs <= 40.0)
-    display_freqs = all_freqs[display_mask]
+    display_mask = (freqs >= 1.5) & (freqs <= 40.0)
+    display_freqs = freqs[display_mask]
     display_psd = avg_psd[display_mask]
     # 至少保留 64 个点，最多 200 个点
     target_n = max(64, min(200, len(display_freqs)))
@@ -370,20 +369,18 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
 
 
 def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "zh", sfreq: float = 250.0) -> Dict[str, Any]:
-    """多维度信号质量评估 — 真实评分（原始分量之和 ×2.5 线性重映射到 0~100）
+    """多维度信号质量评估 — 七项相加 = 满分 100（无 × 系数）
 
-    评分体系（7个独立组件，原始分量之和 0~63，最终 ×2.5 映射到 0~100）：
-      SNR 信噪比     : 0~25 分（EEG频段功率 vs 高频噪声）
-      通道一致性     : 0~20 分（相邻通道空间相关性）
-      频谱特征质量   : 0~10 分（alpha峰 + 1/f 衰减）
-      基础分         : 0~8 分（是否采集到真实可用脑电活动；0=平坦/全噪声什么也没检测到）
-      伪影水平       : 0~-35 分（峰度/幅度异常值 + 高频污染）
-      数据完整性     : 0~-25 分（削波/平坦/缺失）
-      基线稳定性     : 0~-8 分（慢漂移/DC偏移）
+    评分体系（七项直接相加，每项已计算为目标满分）：
+      SNR 信噪比        : 0~15 分（EEG 频段功率 vs 高频噪声）
+      通道一致性        : 0~10 分（相邻通道空间相关性）
+      频谱特征质量      : 0~15 分（alpha 峰 + 1/f 衰减 + 频谱熵）
+      基础分            : 0 或 25 分（二元：虚假文件/平坦→0；真实脑电→25）
+      伪影水平          : 0~10 扣分（峰度/异常值/尖峰/高频污染）
+      数据完整性        : 0~15 扣分（缺失/削波/平坦通道）
+      基线稳定性        : 0~10 扣分（慢漂移）
 
-    原始总和 = SNR + 通道一致性 + 频谱特征 + 基础分 − 伪影 − 完整性 − 漂移（范围约 -68~63）
-    最终总分 = max(5, min(100, 原始总和 × 2.5))，保底 5 分避免极端 0 分误读。
-    真实伪影/噪声一定会被检测并扣分（任一强异常指标即标记噪声通道 + 高频污染检测），不再出现全零误判。
+    总分 = SNR + 一致性 + 频谱 + 基础 − 伪影 − 完整性 − 漂移，clamp 0~100。
     """
     import i18n
 
@@ -409,6 +406,27 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     var_std = float(np.std(variances))
     stds = np.std(data_uv, axis=1, keepdims=True)
     means = np.mean(data_uv, axis=1, keepdims=True)
+
+    # ── 平坦 / 无信号（死电极、断连、全零）→ 视为无效记录，直接 0 分 ──
+    # 真实 EEG 必有来自神经活动的方差（通常 std ≫ 0.1 µV，方差 ≫ 1e-2），
+    # 不会触发此分支。仅当整段信号几乎无起伏时才判为"零分假文件"。
+    if var_mean <= 1e-3:
+        return {
+            "signal_quality_score": 0.0,
+            "noisy_channels": list(ch_names),
+            "possible_artifacts": ["Flat / no signal (dead channel or disconnected)"],
+            "missing_data": True,
+            "clipping_detected": False,
+            "high_frequency_noise": False,
+            "quality_details": {
+                "average_variance": round(var_mean, 6),
+                "max_variance": round(float(np.max(variances)), 6),
+                "outlier_percentage": 0.0,
+                "snr_component": 0.0, "consistency_component": 0.0,
+                "spectral_component": 0.0, "base_score": 0.0,
+                "artifact_penalty": 0.0, "integrity_penalty": 0.0, "drift_penalty": 0.0,
+            },
+        }
 
     # ── 组件 1: SNR 信噪比 (0~25分) ─────────────────
     # Welch PSD 每通道
@@ -448,19 +466,19 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if eeg_power < 1e-6:
                 snr_db = -40.0  # 实质上无 EEG 频段能量（平坦/断连）→ 视为最差，避免误给保底分
 
-            # 映射到 0~25 分：平滑连续曲线，无硬顶，让不同信噪比文件拉开差距。
-            # 典型 EEG 10~20dB 会落在 13~23/25 之间，而非全部满分。
+            # 映射到 0~15 分（直接是目标满分，无需 × 系数）
+            # 典型 EEG 10~20dB 会落在 7~15/15 之间，而非全部满分。
             if snr_db >= 25:
-                s = 25.0
+                s = 15.0
             elif snr_db >= 0:
-                s = 10.0 + snr_db * 0.75          # 0→10, 20→25, 线性递增
+                s = 6.0 + snr_db * 0.45          # 0→6, 20→15
             elif snr_db >= -10:
-                s = max(0.0, 10.0 + snr_db)       # -10→0, 0→10
+                s = max(0.0, 6.0 + snr_db * 0.6)  # -10→0, 0→6
             else:
                 s = 0.0
             snr_scores.append(s)
         except Exception:
-            snr_scores.append(20.0)  # 中等默认值
+            snr_scores.append(12.0)  # 中等默认值
 
     component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
 
@@ -491,9 +509,9 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     else:
         avg_correlation = 0.5
 
-    # 相关性映射：指数逼近曲线，取绝对值处理负相关（反相但仍有关系）。
-    # 0→2.0, 0.01→3.7, 0.05→9.1, 0.10→13.4, 0.20→17.6, 0.50→20.0 (raw)
-    component_consistency = max(0.0, min(20.0, 2.0 + 18.0 * (1.0 - np.exp(-abs(avg_correlation) / 0.10))))
+    # 相关性映射：指数逼近曲线，直接输出 0~10 分（目标满分）
+    # 0→1.0, 0.01→1.85, 0.05→4.55, 0.10→6.7, 0.20→8.8, 0.50→10.0
+    component_consistency = max(0.0, min(10.0, 1.0 + 9.0 * (1.0 - np.exp(-abs(avg_correlation) / 0.10))))
 
     # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
     # 3a. 峰度异常
@@ -546,20 +564,20 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
     # 连续噪声总分（所有通道加和），映射到惩罚分
     total_noise = sum(ch_noise_scores)
-    artifact_penalty += min(total_noise * 8, 20)        # 连续得分 → 0~20 分
+    artifact_penalty += min(total_noise * 4, 10)        # 连续得分 → 0~10 分
 
     # 异常值比例（已是连续）
-    artifact_penalty += min(outlier_pct * 600, 10)      # 异常值比例: 0~10 分
+    artifact_penalty += min(outlier_pct * 300, 5)      # 异常值比例: 0~5 分
 
     # 尖峰检测（连续映射：150μV→0.5, 250μV→2, 600μV→5, >1000μV→8）
     max_amp = float(np.max(np.abs(data_uv)))
     if max_amp > 150:
-        spike_score = min(8, (max_amp - 150) / 100)
+        spike_score = min(5, (max_amp - 150) / 100)
         artifact_penalty += spike_score
 
-    artifact_penalty = min(artifact_penalty, 35)
+    artifact_penalty = min(artifact_penalty, 10)
 
-    # ── 组件 4: 频谱特征质量 (0~10分) ─────────────────
+    # ── 组件 4: 频谱特征质量 (0~15分，直接目标满分) ─────
     spectral_score = 0.0
     try:
         # 取一个代表性通道（方差最接近中位数的）
@@ -575,7 +593,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         alpha_psd = r_psd[alpha_mask] if np.any(alpha_mask) else np.array([0])
         if len(alpha_psd) > 2:
             alpha_max_ratio = float(np.max(alpha_psd)) / (float(np.mean(alpha_psd)) + 1e-12)
-            spectral_score += min(3.5, max(0.0, (alpha_max_ratio - 1.0) / 0.3 * 3.5))
+            spectral_score += min(5.0, max(0.0, (alpha_max_ratio - 1.0) / 0.3 * 5.0))
 
         # 频谱斜率（低频应比高频强 — 1/f 特征）：连续评分，ratio_db 0→0, 3→4（极宽松）
         low_mask = (r_freqs >= 2) & (r_freqs <= 10)
@@ -585,7 +603,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             high_pow = _trapz(r_psd[high_mask], dx=r_df)
             if high_pow > 1e-12:
                 ratio_db = 10 * np.log10(max(low_pow, 1e-12) / high_pow)
-                spectral_score += min(4.0, max(0.0, ratio_db / 3.0 * 4.0))
+                spectral_score += min(6.0, max(0.0, ratio_db / 3.0 * 6.0))
 
         # 频谱熵：低熵 = 谱结构清晰（如 alpha 峰），高熵 = 平坦/噪声。连续评分 0~3.5
         if len(r_psd) > 10:
@@ -593,7 +611,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             spectral_entropy = -np.sum(psd_norm * np.log2(psd_norm + 1e-12))
             max_entropy = np.log2(len(r_psd))
             entropy_norm = min(1.0, max(0.0, spectral_entropy / max_entropy))
-            spectral_score += min(3.5, max(0.0, (1.0 - entropy_norm) * 3.5))
+            spectral_score += min(5.0, max(0.0, (1.0 - entropy_norm) * 5.0))
 
         # 高频污染检测（肌电/工频噪声）：30–100Hz 功率相对 1–30Hz 过高 → 伪影
         hf_mask = (r_freqs >= 30) & (r_freqs <= 100)
@@ -604,13 +622,13 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             if band_pow > 1e-12:
                 hf_ratio = hf_pow / band_pow
                 # 正常脑电 hf_ratio < 0.10；肌电伪影可达 0.3~1.0
-                artifact_penalty += min(max(0.0, hf_ratio - 0.08) * 35, 15)
+                artifact_penalty += min(max(0.0, hf_ratio - 0.08) * 25, 5)
     except Exception:
-        spectral_score = 4.0  # 默认中等
+        spectral_score = 6.0  # 默认中等
 
-    spectral_score = min(10, max(0, spectral_score))
+    spectral_score = min(15, max(0, spectral_score))
 
-    # ── 组件 5: 数据完整性 (0 ~ -25分扣分) ─────────────
+    # ── 组件 5: 数据完整性 (0 ~ -15分扣分) ─────────────
     integrity_penalty = 0.0
     n_flat = 0
     flat_channels = []
@@ -618,7 +636,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     # 5a. 缺失数据
     has_missing = bool(np.any(~np.isfinite(data_uv)))
     if has_missing:
-        integrity_penalty += 8
+        integrity_penalty += 5
 
     # 5b. 削波检测（连续评分：接近削波边界的样本比例越大扣分越多）
     # 1% 以下的自然信号峰值不视为削波，超过 1% 后 clip_ratio × 200 连续递增
@@ -631,7 +649,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             clip_ratio = near_max_count / n_samples
             if clip_ratio > 0.01:
                 clipping_detected = True
-                clip_scores.append(min(10, clip_ratio * 200))
+                clip_scores.append(min(6, clip_ratio * 200))
     if clip_scores:
         integrity_penalty += float(np.mean(clip_scores))
 
@@ -640,10 +658,10 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         flat_threshold = var_mean * 0.0005
         n_flat = int(np.sum(variances < flat_threshold))
         if n_flat > 0:
-            integrity_penalty += min(n_flat * 4, 12)
+            integrity_penalty += min(n_flat * 3, 8)
             flat_channels = [ch_names[i] for i in range(n_ch) if variances[i] < flat_threshold]
 
-    integrity_penalty = min(integrity_penalty, 25)
+    integrity_penalty = min(integrity_penalty, 15)
 
     # ── 组件 6: 基线稳定性 (0 ~ -8分扣分) ─────────────
     # 慢漂移检测：逐通道计算绝对漂移量（μV），避免比值法被大幅信号掩盖
@@ -659,59 +677,42 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         if ch_drifts:
             mean_drift = float(np.mean(ch_drifts))  # 所有通道平均漂移 μV
             # 连续映射：0μV→0, 20μV→8（满分）。无门槛，微弱漂移也扣分。
-            drift_penalty = max(0.0, min(8.0, mean_drift / 20.0 * 8.0))
+            drift_penalty = max(0.0, min(10.0, mean_drift / 20.0 * 10.0))
 
-    # ── 基础分 (0~8) — 这是真脑电图吗 ──────────
-    # 正常脑电 ≈ 满分 8，有异常根据异常扣分；不是脑电 ≈ 0。
-    # 只有噪声得分 > 0.4 的才计为"不可用"（之前 0.2 太敏感，会标记所有通道）
+    # ── 合成/伪造 EEG 检测 ─────────────────────────────────
+    # (已禁用 - 用户要求回滚)
+    possible_artifacts = []
+
+    # ── 基础分 (0~8) — 真实可用脑电活动的连续质量评估 ──────────
+    # 旧逻辑把正常文件直接顶到 8 分（再 ×3.125 变成 25/25），只给完全不可用文件 0 分，
+    # ── 基础分 (0 或 25) — 二元：要么虚假文件零分，要么满分 ──────
+    # 不再做连续惩罚。判定"是脑电"则满分 25，否则 0。
     n_seriously_noisy = sum(1 for s in ch_noise_scores if s > 0.4)
-    usable_ch = n_ch - n_flat - n_seriously_noisy
-    usable_ratio = max(0.0, usable_ch) / max(1, n_ch)
-
-    # 判断是否像脑电：真实 EEG 各通道方差有差异，纯噪声/纯正弦高度一致
-    eeg_like = False
-    if var_mean > 1e-6:
-        median_var = float(np.median(variances))
-        if median_var > 1e-12:
-            var_max_ratio = float(np.max(variances)) / median_var
-            eeg_like = var_max_ratio > 1.3
-
-    if not eeg_like or var_mean <= 0.001 or usable_ratio <= 0.0:
+    median_var = float(np.median(variances))
+    is_effectively_flat = (var_mean <= 1e-6) and (n_flat > n_ch * 0.5)
+    # 二元判定：是真实脑电 → 25 分；否则 → 0 分
+    if is_effectively_flat or var_mean <= 1e-3 or median_var < 0.001:
         base_score = 0.0
     else:
-        # ── 正常脑电：从满分开始扣 ────────────────
-        deduct = n_flat * 1.0 + n_seriously_noisy * 0.5
-        if median_var < 10:
-            deduct += (10 - median_var) * 0.3
-        if mean_grad > var_mean * 2 if var_mean > 0 else False:
-            deduct += 1.0
-        base_score = max(0.0, min(8.0, 8.0 - deduct))
+        base_score = 25.0
 
-    # ── 最终评分组装 ──────────────────────────────────
-    # 每个分量乘 (新满分/原满分) 比例调至用户指定的满分范围
-    factor_snr = 15.0 / 25.0
-    factor_cons = 10.0 / 20.0
-    factor_spec = 15.0 / 10.0
-    factor_base = 25.0 / 8.0
-    factor_art = 10.0 / 35.0
-    factor_int = 15.0 / 25.0
-    factor_drift = 10.0 / 8.0
-
+    # ── 最终评分组装（无 × factor 系数，直接各分量按目标满分相加）──────────
+    # SNR(0~15) + 一致性(0~10) + 频谱(0~15) + 基础(0/25) + 伪影(10→0) + 完整性(15→0) + 漂移(10→0)
     quality_score = (
-        component_snr * factor_snr +           # 0~15
-        component_consistency * factor_cons +  # 0~10
-        spectral_score * factor_spec +         # 0~15
-        base_score * factor_base +             # 0~25
-        (10.0 - artifact_penalty * factor_art) +   # 10 → 0（无伪影→10, 满伪影→0）
-        (15.0 - integrity_penalty * factor_int) +  # 15 → 0
-        (10.0 - drift_penalty * factor_drift)      # 10 → 0
+        component_snr                     # 0~15（已直接计算为目标值）
+        + component_consistency           # 0~10
+        + spectral_score                  # 0~15
+        + base_score                      # 0 或 25
+        + (10.0 - artifact_penalty)        # 10 → 0
+        + (15.0 - integrity_penalty)       # 15 → 0
+        + (10.0 - drift_penalty)           # 10 → 0
     )
 
-    # 七项全加 = 满分 100。不做 ×2.5，clamp 到 0~100。
+    # 七项全加 = 满分 100。clamp 到 0~100。
     quality_score = max(0.0, min(100.0, quality_score))
 
     # ── 伪影描述文本 ──────────────────────────────────
-    possible_artifacts = []
+    # possible_artifacts 已在前面的合成检测中初始化
     if len(noisy_channels_list) > n_ch * 0.15:
         possible_artifacts.append(i18n.get_artifact_text(lang, "many_noisy_channels"))
     if np.any(np.abs(data_uv) > 250):
@@ -725,7 +726,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     if flat_channels:
         possible_artifacts.append(f"{len(flat_channels)} flat/disconnected channel(s)")
 
-    print(f"[QualityScore] score={quality_score:.1f}  snr={component_snr*factor_snr:.1f}  consistency={component_consistency*factor_cons:.1f}  spectral={spectral_score*factor_spec:.1f}  artifact_pen={artifact_penalty*factor_art:.1f}  integrity_pen={integrity_penalty*factor_int:.1f}  drift_pen={drift_penalty*factor_drift:.1f}")
+    print(f"[QualityScore] score={quality_score:.1f}  snr={component_snr:.1f}  consistency={component_consistency:.1f}  spectral={spectral_score:.1f}  base={base_score:.1f}  artifact_pen={artifact_penalty:.1f}  integrity_pen={integrity_penalty:.1f}  drift_pen={drift_penalty:.1f}")
     return {
         "signal_quality_score": quality_score,
         "noisy_channels": noisy_channels_list,
@@ -737,13 +738,13 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             "average_variance": round(var_mean, 4),
             "max_variance": round(float(np.max(variances)), 4),
             "outlier_percentage": round(outlier_pct * 100, 3),
-            "snr_component": round(component_snr * factor_snr, 2),
-            "consistency_component": round(component_consistency * factor_cons, 2),
-            "spectral_component": round(spectral_score * factor_spec, 2),
-            "artifact_penalty": round(artifact_penalty * factor_art, 2),
-            "integrity_penalty": round(integrity_penalty * factor_int, 2),
-            "drift_penalty": round(drift_penalty * factor_drift, 2),
-            "base_score": round(base_score * factor_base, 2),
+            "snr_component": round(component_snr, 2),
+            "consistency_component": round(component_consistency, 2),
+            "spectral_component": round(spectral_score, 2),
+            "artifact_penalty": round(artifact_penalty, 2),
+            "integrity_penalty": round(integrity_penalty, 2),
+            "drift_penalty": round(drift_penalty, 2),
+            "base_score": round(base_score, 2),
         },
     }
 
@@ -911,7 +912,9 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
     seg_ch_names = None
     seg_sfreq = None
     try:
-        seg_data_uv, seg_ch_names, seg_sfreq, _ = fast_load_segment(file_path, duration_sec=30.0, eeg_only=True)
+        seg_data_uv, seg_ch_names, seg_sfreq, _ = fast_load_segment(
+            file_path, duration_sec=15.0, eeg_only=True, max_channels=MAX_PREVIEW_CHANNELS
+        )
         
         quality = quick_signal_quality(seg_data_uv, seg_ch_names, lang, seg_sfreq)
         freq = quick_bandpower(seg_data_uv, seg_sfreq)
@@ -919,7 +922,7 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
     except Exception as e:
         print(f"[WARN] fast_load_segment failed: {e}, using fallback")
         raw = _load_raw_any(file_path, preload=True)
-        all_picks = _pick_eeg_channels(raw)
+        all_picks = _pick_eeg_channels(raw, max_channels=MAX_PREVIEW_CHANNELS)
         n_samples = min(int(30 * raw.info['sfreq']), raw.n_times)
         seg_data_uv = _raw_to_uv(raw, picks=all_picks, start=0, stop=n_samples)
         seg_ch_names = [raw.ch_names[i] for i in all_picks]
@@ -930,7 +933,7 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
     
     # ── 3. 波形预览（从分段数据直接提取，避免二次读取文件）────
     # fast_load_segment 已载入前60s，取前8s
-    preview_n = min(int(8.0 * seg_sfreq), seg_data_uv.shape[1]) if seg_data_uv is not None else 0
+    preview_n = min(int(20.0 * seg_sfreq), seg_data_uv.shape[1]) if seg_data_uv is not None else 0
     if preview_n > 100 and seg_data_uv is not None and seg_ch_names is not None:
         p_data = seg_data_uv[:, :preview_n]
         p_ch = min(p_data.shape[0], MAX_PREVIEW_CHANNELS)
@@ -954,7 +957,7 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
             "duration_seconds": 8.0,
         }
     else:
-        waveform_preview = fast_preview_window(file_path, duration_sec=8.0, max_channels=MAX_PREVIEW_CHANNELS)
+        waveform_preview = fast_preview_window(file_path, duration_sec=20.0, max_channels=MAX_PREVIEW_CHANNELS)
     
     # ── 4. 频段波形（从已加载数据提取，避免重复读取文件）────
     # 用前10s数据做频段滤波

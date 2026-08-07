@@ -107,13 +107,6 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
           );
         })}
       </div>
-
-      {disclaimerText && (
-        <section className="rounded-xl border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-900/50 p-4">
-          <div className="mb-1 text-xs font-bold text-yellow-900 dark:text-yellow-300">{t("nonMedicalDisclaimer")}</div>
-          <p className="text-xs leading-relaxed text-yellow-800 dark:text-yellow-400">{disclaimerText}</p>
-        </section>
-      )}
     </div>
   );
 }

@@ -135,8 +135,28 @@ export const EEGGenerationManager = {
       });
 
       _state.progress = 50; _saveState(); _notify();
-      const data = await resp.json();
-      if (!data.success) throw new Error(data.error || "Generation failed");
+
+      // 解析响应：兼容 JSON / 非 JSON（网关错误页）
+      let data: any = {};
+      const text = await resp.text();
+      try { data = text ? JSON.parse(text) : {}; }
+      catch { data = {}; }
+
+      if (!resp.ok || !data.success) {
+        const detail = data?.detail || data?.error || data?.message || "";
+        const statusInfo = resp.status !== 200 ? ` (HTTP ${resp.status})` : "";
+        // 401/403：token 无效，清除本地会话并跳登录页
+        if (resp.status === 401 || resp.status === 403) {
+          try {
+            localStorage.removeItem("neuroaccess-token");
+            localStorage.removeItem("neuroaccess-user");
+          } catch {}
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+        }
+        throw new Error(detail ? `${detail}${statusInfo}` : `Generation failed${statusInfo}`);
+      }
 
       _state.progress = 90; _saveState(); _notify();
 

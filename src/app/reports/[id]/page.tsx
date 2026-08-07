@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import nextDynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, FileX, FileText, Waves, AlertTriangle } from "lucide-react";
-import { StoredReport, getReportById } from "@/lib/reports-storage";
+import { ArrowLeft, FileX, FileText, Waves, AlertTriangle, Download } from "lucide-react";
+import { StoredReport, getReportById, fetchServerReport, addReport } from "@/lib/reports-storage";
 import { useLang } from "@/lib/language-context";
 import ReportDetail from "@/components/ReportDetail";
+import { downloadCSV } from "@/lib/csv-export";
 
-const ReportEEGChart = nextDynamic(() => import("@/components/ReportEEGChart"), {
-  ssr: false,
-  loading: () => <div className="animate-pulse bg-[var(--color-bg)] rounded-xl h-64" />,
-});
+import ReportEEGChart from "@/components/ReportEEGChart";
 
 type Tab = "analysis" | "eeg";
 
@@ -55,6 +52,21 @@ export default function ReportDetailPage() {
     }
     const found = getReportById(id);
     setReport(found);
+
+    // 始终从服务端拉最新完整数据（服务端 analysis.waveform_preview 永远有全通道）
+    // localStorage 可能存的旧版带不完整通道数，禁用本地缓存
+    if (found && token) {
+      fetchServerReport(id)
+        .then((serverReport) => {
+          if (serverReport?.analysis) {
+            setReport(serverReport as StoredReport);
+            try {
+              addReport(serverReport as StoredReport);
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
   }, [id, router]);
 
   // Loading state
@@ -100,7 +112,7 @@ export default function ReportDetailPage() {
       transition={{ duration: 0.05 }}
     >
       {/* Header with back button */}
-      <div className="px-6 pt-6">
+      <div className="px-6 pt-6 flex items-center justify-between">
         <Link
           href="/reports"
           className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text)]"
@@ -108,6 +120,14 @@ export default function ReportDetailPage() {
           <ArrowLeft className="h-4 w-4" />
           {t("reports")}
         </Link>
+        <button
+          onClick={() => downloadCSV(report.id, report.fileName || "report")}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] transition-colors"
+          title="Download CSV data"
+        >
+          <Download className="h-3.5 w-3.5" />
+          CSV
+        </button>
       </div>
 
       {/* Tab bar */}
@@ -150,7 +170,7 @@ export default function ReportDetailPage() {
         {activeTab === "eeg" && (
           <div>
             <ReportErrorBoundary fallback={t("noBandWaveform")}>
-              <ReportEEGChart reportFileName={report.fileName} eegData={report.eegData} analysis={report.analysis} />
+              <ReportEEGChart key={report.id + "eeg"} reportFileName={report.fileName} analysis={report.analysis} id={report.id} />
             </ReportErrorBoundary>
           </div>
         )}

@@ -98,22 +98,19 @@ def template_beginner(a: Dict, lang: str) -> str:
         return (
             f"This file can be opened and read. It contains brainwave recordings from several sensors.\n\n"
             f"Overall readability: {q}. {n} sensor area(s) may be harder to read.\n\n"
-            "This report helps you understand whether the file is clear enough for learning. "
-            "It does not tell whether someone is healthy or sick."
+            "This report helps you understand whether the file is clear enough for learning."
         )
     if lang == "zh":
         return (
             f"这份文件可以被正常读取。它记录的是一段时间内的脑电波形。\n\n"
             f"整体可读性：{q}。系统发现 {n} 个可能较难阅读的传感区域。\n\n"
             "这份报告主要帮助你判断这份数据是否清楚、是否适合学习。"
-            "它不能说明一个人是否健康，也不能用于判断疾病。"
         )
     # fallback English for unsupported languages
     return (
         f"This file can be opened and read. It contains brainwave recordings from several sensors.\n\n"
         f"Overall readability: {q}. {n} sensor area(s) may be harder to read.\n\n"
-        "This report helps you understand whether the file is clear enough for learning. "
-        "It does not tell whether someone is healthy or sick."
+        "This report helps you understand whether the file is clear enough for learning."
     )
 
 
@@ -150,34 +147,37 @@ def template_student(a: Dict, lang: str) -> str:
 def template_research(a: Dict, lang: str) -> str:
     bp   = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
     bp_s = ", ".join(f"{k}: {v}" for k, v in list(bp.items())[:4])
-    ch_s = ", ".join((a.get("channel_names") or [])[:20]) or ("not available" if lang == "en" else "暂无")
+    dom  = a.get("dominant_frequency") or a.get("frequency_analysis", {}).get("dominant_frequency")
     ns   = a.get("noisy_channels") or []
     n_s  = ", ".join(ns[:10]) or ("none highlighted" if lang == "en" else "未明显标出")
+    n_n  = len(ns)
+    ch_n = a.get("channel_count")
+    sr   = a.get("sampling_rate")
+    dur  = a.get("duration")
+    sq   = a.get("signal_quality_score")
     if lang == "en":
         return (
-            f"Technical review: channels={a.get('channel_count')}, SR={a.get('sampling_rate')}, "
-            f"duration={a.get('duration')}. Channels: {ch_s}. Quality={a.get('signal_quality_score')}. "
-            f"Noisy: {n_s}.\n\n"
-            f"Bandpower (percent): {bp_s}.\n\n"
-            "Limitations: artifact rejection is basic; montage metadata may be incomplete; "
-            "no task labels assumed. Qualified reviewer should inspect raw traces before research use."
+            f"Dataset metadata: {ch_n} channels at SR={sr} Hz, duration={dur}. "
+            f"Signal quality score: {sq}/100.\n\n"
+            f"Spectral summary (bandpower percent): {bp_s}. "
+            f"Dominant frequency: {dom} Hz. "
+            f"Noisy channels flagged: {n_n} ({n_s})."
         )
     if lang == "zh":
         return (
-            f"技术审阅：通道数={a.get('channel_count')}，采样率={a.get('sampling_rate')}，"
-            f"时长={a.get('duration')}。通道：{ch_s}。质量评分={a.get('signal_quality_score')}。噪声：{n_s}。\n\n"
-            f"频段功率（百分比）：{bp_s}。\n\n"
-            "局限性：artifact 处理较基础，montage 元数据可能不完整，无任务标签。"
-            "若用于研究，应由专业人员检查原始波形。"
+            f"数据集概览：{ch_n} 个通道，采样率 {sr} Hz，时长 {dur}。"
+            f"信号质量评分：{sq}/100。\n\n"
+            f"频段功率（百分比）：{bp_s}。"
+            f"主导频率：{dom} Hz。"
+            f"噪声通道数：{n_n}（{n_s}）。"
         )
     # fallback English
     return (
-        f"Technical review: channels={a.get('channel_count')}, SR={a.get('sampling_rate')}, "
-        f"duration={a.get('duration')}. Channels: {ch_s}. Quality={a.get('signal_quality_score')}. "
-        f"Noisy: {n_s}.\n\n"
-        f"Bandpower (percent): {bp_s}.\n\n"
-        "Limitations: artifact rejection is basic; montage metadata may be incomplete; "
-        "no task labels assumed. Qualified reviewer should inspect raw traces before research use."
+        f"Dataset metadata: {ch_n} channels at SR={sr} Hz, duration={dur}. "
+        f"Signal quality score: {sq}/100.\n\n"
+        f"Spectral summary (bandpower percent): {bp_s}. "
+        f"Dominant frequency: {dom} Hz. "
+        f"Noisy channels flagged: {n_n} ({n_s})."
     )
 
 
@@ -230,9 +230,9 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         "2. NEVER interpret bandpower values as indicators of mental states (e.g., do NOT say 'high alpha means relaxation' or 'low beta means poor attention').\n"
         "3. NEVER suggest what the user should do based on EEG data (no lifestyle, medication, or therapy advice).\n"
         "4. NEVER claim to detect emotions, attention levels, cognitive states, personality traits, or intelligence.\n"
-        "5. ALWAYS emphasize the limitations of EEG analysis and that single-session data cannot characterize brain function.\n"
-        "6. ALWAYS use cautious language (e.g., 'may be associated with', 'could reflect', 'might indicate') when describing patterns.\n"
-        "7. This is for EEG literacy, education, and accessibility ONLY."
+        "5. ALWAYS use cautious language (e.g., 'may be associated with', 'could reflect', 'might indicate') when describing patterns.\n"
+        "6. This is for EEG literacy, education, and accessibility ONLY.\n"
+        "7. Do NOT add a general disclaimer at the end of every explanation; the website already displays limitation notices separately."
     )
     sq = safe_float(a.get("signal_quality_score", 100), 100)
     uncertainty = ""
@@ -256,13 +256,70 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         return (
             f"You are writing ONLY the Student explanation.\nOutput language: {output_lang}.\n"
             f"Audience: neuroscience beginners.\nRules:\n- 2 short paragraphs.\n"
-            f"- Explain alpha/beta/theta/delta if useful.\n- Mention signal quality.\n{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
+            f"- Explain alpha/beta/theta/delta if useful.\n- Mention signal quality.\n"
+            f"- DO NOT list all channel names individually; refer to them collectively as 'the channels'.\n"
+            f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
         )
     return (
         f"You are writing ONLY the Research explanation.\nOutput language: {output_lang}.\n"
-        f"Audience: researchers/techs.\nRules:\n- 2-3 technical paragraphs.\n"
-        f"- You MAY use PSD, bandpower, artifacts, sampling rate, montage.\n{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
+        f"Audience: researchers/technicians.\nRules:\n- 2-3 concise technical paragraphs.\n"
+        f"- DO NOT list individual channel names; refer to them collectively.\n"
+        f"- Focus on technical INTERPRETATION: dominant frequency, bandpower distribution, "
+        f"any artifacts or noise patterns, data quality implications for analysis.\n"
+        f"- Mention what can/cannot be reliably concluded from this recording.\n"
+        f"- You MAY use PSD, bandpower, artifacts, sampling rate, montage terminology.\n"
+        f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
     )
+
+
+import re
+
+# 各语言常见免责声明句式，用于从 LLM 输出中移除末尾/穿插的重复免责说明
+DISCLAIMER_PATTERNS = [
+    # Chinese
+    r"(?:但是|不过|然而|需要|请注意|重要|提醒|免责|声明|注意).*?(?:不能|无法|不应|不要|请勿|不应用来|不足以|不适合|无法判断|无法诊断|无法确定|不能反映|不代表|不说明|不表明|不等同于|不能作为|仅供参考|仅作参考|参考).*?(?:诊断|疾病|健康|智商|性格|心理|情绪|认知|功能|状态|治疗|建议|医疗|医学|专业|医生|医师|结论|判断|依据|用途)?[。；]?",
+    r"(?:单次|一次|单次记录|一次记录|仅一次|单次 EEG|一次 EEG).*?(?:不能|无法|不应|不要|不足以|不适合|无法判断|无法诊断|无法确定|不能反映|不代表|不说明|不表明).*?(?:大脑|具体|功能|状态|智商|性格|心理|健康|疾病|情绪|认知|治疗|诊断|建议)?[。；]?",
+    r"(?:EEG|脑电图|脑电|频谱|功率|波段|频段|分析).*?(?:不能|无法|不应|不要|不足以|不适合|无法用来|不能直接|不能简单|不能单独|不能作为).*?(?:诊断|判断|确定|说明|反映|代表|指示|预测|评估|衡量|评价).*?(?:疾病|健康|智商|性格|心理|情绪|认知|状态|功能|治疗|医疗|专业|结论)?[。；]?",
+    # English
+    r"(?:However|But|Please note|Important|Disclaimer|Note that|Keep in mind|It is important to).*?(?:cannot|can not|should not|does not|is not|may not|unable to|not enough|not sufficient|not suitable|not appropriate|not intended|not a substitute|not diagnostic|not medical|not clinical).*?(?:diagnose|determine|reflect|represent|indicate|predict|assess|evaluate|measure|judge|tell|show|suggest|advise|treat|medical|health|disease|condition|IQ|personality|mental|cognitive|emotional|state|function|condition|disorder|ADHD|depression|anxiety|professional|physician|doctor|clinician)?[.!?;]?",
+    r"(?:single|one|individual|single-session|one-time).*?(?:recording|session|measurement|data|EEG).*?(?:cannot|can not|should not|does not|is not|may not|unable to|not enough|not sufficient).*?(?:diagnose|determine|reflect|represent|indicate|predict|assess|evaluate|measure|judge|tell|show|characterize).*?(?:brain|health|disease|condition|IQ|personality|mental|cognitive|emotional|state|function|disorder|medical|clinical)?[.!?;]?",
+    # Spanish
+    r"(?:Esta|Este|La|El).*?(?:información|análisis|herramienta|sistema|resultado|dato|datos|aplicación).*?(?:no debe|no se debe|no debe ser|no puede|no es|no constituye|no reemplaza|no sustituye|no proporciona|no ofrece|no pretende|solo con fines|únicamente|meramente|exclusivamente).*?(?:diagnosticar|diagnóstico|médico|médica|consejo|consulta|tratamiento|terapia|enfermedad|enfermedades|condición|condiciones|trastorno|trastornos|evaluar|determinar|juzgar|indicar|predecir|asesorar)?[.!?;]?",
+    r"(?:No|Este|Estos).*?(?:debe|deben|puede|pueden).*?(?:ser utilizado|ser utilizada|ser usada|ser usado|interpretarse|considerarse|tomarse).*?(?:como|para).*?(?:diagnóstico|diagnóstico médico|reemplazo|sustituto|sustituta|alternativa).*?(?:médico|médica|profesional|clínico)?[.!?;]?",
+    r"(?:Solo|Únicamente|Meramente|Exclusivamente).*?(?:para|a título|con fines).*?(?:informativos|informativo|referencia|educativos|educativo|orientativos|orientativo).*?(?:y no|no|sin).*?(?:debe|puede|constituye|reemplaza|sustituye).*?(?:médico|médica|clínico|diagnóstico|tratamiento|profesional)?[.!?;]?",
+    # French
+    r"(?:Ces|Cette|Ce|L'|Les).*?(?:informations|analyse|outil|système|résultat|données|application|explication).*?(?:ne doit pas|ne doivent pas|ne peut pas|ne peuvent pas|n'est pas|ne sont pas|ne constitue pas|ne remplacent pas|ne remplace pas|ne se substitue pas|ne prétend pas|n'est pas destiné|uniquement à titre|à titre|uniquement).*?(?:diagnostiquer|diagnostic|médical|médicale|avis|consultation|traitement|thérapie|maladie|maladies|état|condition|trouble|troubles|évaluer|déterminer|indiquer|prédire|conseiller)?[.!?;]?",
+    r"(?:Ne|À titre).*?(?:doit|doivent|peut|peuvent).*?(?:pas être utilisé|pas être utilisée|pas être employé|pas être employée|pas constituer|pas remplacer|pas se substituer).*?(?:un|une|le|la|comme|en tant que).*?(?:diagnostic|remplacement|substitut|alternative).*?(?:médical|médicale|professionnel|clinique)?[.!?;]?",
+    r"(?:Uniquement|Seulement|À titre|Simplement).*?(?:informatif|informative|d'information|de référence|pédagogique|d'orientation).*?(?:et ne|sans).*?(?:doit|doivent|peut|peuvent|constitue|remplace|se substitue).*?(?:médical|médicale|clinique|diagnostic|traitement|professionnel)?[.!?;]?",
+    # German
+    r"(?:Diese|Dieser|Das|Die|Dieses).*?(?:Informationen|Analyse|Werkzeug|System|Ergebnis|Ergebnisse|Daten|Anwendung|Erklärung|Auswertung|Bewertung).*?(?:darf nicht|dürfen nicht|kann nicht|können nicht|ist nicht|sind nicht|stellt keine|stellen keine|ersetzt nicht|ersetzen nicht|sollte nicht|sollten nicht|nicht als|nicht zur|nicht für|ausschließlich|lediglich|nur).*?(?:Diagnose|diagnostizieren|medizinisch|medizinische|medizinischer|ärztlich|ärztliche|ärztlicher|Behandlung|Therapie|Krankheit|Krankheiten|Zustand|Zustände|Störung|Störungen|bewerten|beurteilen|feststellen|anzeigen|vorhersagen|beraten)?[.!?;]?",
+    r"(?:Diese|Diese).*?(?:Informationen|Analyse|Ergebnisse|Daten).*?(?:sind nicht|ist nicht|dienen nicht|stellt keine|stellen keine).*?(?:als|für|zur).*?(?:medizinische|ärztliche|klinische).*?(?:Diagnose|Beurteilung|Beratung|Bewertung|Empfehlung)?[.!?;]?",
+    r"(?:Nur|Ausschließlich|Lediglich|Bloß).*?(?:zu|zur|als|für).*?(?:Informationszwecken|Information|Referenz|Bildungszwecken|Orientierung).*?(?:und|aber).*?(?:nicht|keine|kein|keinen).*?(?:medizinisch|ärztlich|klinisch|Diagnose|Behandlung|Therapie|professionell)?[.!?;]?",
+    # Japanese
+    r"(?:この|本|当).*?(?:情報|分析|ツール|システム|結果|データ|アプリケーション|説明|評価).*?(?:は|が).*?(?:医療|医学|診断|治療|健康|病気|疾患|症状|状態).*?(?:目的|ため|用|代わり|代替|判断|評価|決定).*?(?:では(?:あり|ござい)ません|できません|しないでください|できません|するものでは(?:あり|ござい)ません|いたしません|行いません|できませんので|お控えください)?",
+    r"(?:医師|専門家|医療機関).*?(?:の|による|へ).*?(?:診断|治療|相談|アドバイス|判断|指示).*?(?:を|に).*?(?:代わる|代替|置き換える).*?(?:ものでは(?:あり|ござい)ません|では(?:あり|ござい)ません|できません)?",
+    r"(?:参考|参照|教育|学習|情報提供).*?(?:目的|用|ため|として).*?(?:のみ|だけ|限定).*?(?:であり|で).*?(?:医療|医学|診断|治療|健康).*?(?:目的|用|ため).*?(?:では(?:あり|ござい)ません|するものではありません)?",
+    # Korean
+    r"(?:이|본|해당).*?(?:정보|분석|도구|시스템|결과|데이터|애플리케이션|설명|평가).*?(?:는|은|이|가).*?(?:의학적|의료|진단|치료|건강|질병|질환|증상|상태).*?(?:목적|용도|대체|판단|평가|결정).*?(?:이(?: 아닙니| 아닙)다|할 수 없습니다|하지 마십시오|할 수 없습니다|위한 것이 아닙니다|목적으로 하지 않습니다)?",
+    r"(?:의사|전문가|의료진|의료 기관).*?(?:의|에게|에).*?(?:진단|치료|상담|조언|판단|지시).*?(?:를|을).*?(?:대체|대신|갈음).*?(?:할 수 없습니다|하는 것이 아닙니다|위한 것이 아닙니다|되지 않습니다)?",
+    r"(?:참고|참조|교육|학습|정보 제공).*?(?:목적|용도|용).*?(?:으로|로|만|만을|입니다).*?(?:의학적|의료|진단|치료|건강).*?(?:목적|용도|판단).*?(?:이(?: 아닙니| 아닙)다|할 수 없습니다|위한 것이 아닙니다)?",
+]
+
+
+def _strip_disclaimers(text: str) -> str:
+    """移除 LLM 输出中重复的免责声明；保留主体解释内容。"""
+    if not text:
+        return text
+    # 先尝试移除独立成段的免责声明段落（以换行分隔）
+    paragraphs = [p.strip() for p in str(text).split("\n") if p.strip()]
+    cleaned = []
+    for p in paragraphs:
+        if any(re.search(pat, p, re.IGNORECASE) for pat in DISCLAIMER_PATTERNS):
+            continue
+        cleaned.append(p)
+    result = "\n\n".join(cleaned)
+    # 如果整段被删光了，退回原文本避免空输出
+    return result if result.strip() else text
 
 
 def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]:
@@ -282,7 +339,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
-            return text
+            return _strip_disclaimers(text)
         except Exception:
             return fallbacks[level]
 

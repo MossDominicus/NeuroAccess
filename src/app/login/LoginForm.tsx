@@ -2,17 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/language-context";
 import Link from "next/link";
 import { translations } from "@/lib/translations";
 import AuthSettingsBar from "@/components/AuthSettingsBar";
+import TurnstileModal from "@/components/TurnstileModal";
 
 interface LoginFormProps {
   lang: string;
 }
 
 export default function LoginForm({ lang }: LoginFormProps) {
+  const router = useRouter();
   const { login, sendLoginCode, loginWithCode, token } = useAuth();
   const { lang: ctxLang } = useLang();
   const effectiveLang = ctxLang || lang;
@@ -20,7 +23,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
   // 已登录则重定向到首页
   useEffect(() => {
     if (token) {
-      window.location.href = "/";
+      router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
     }
   }, [token]);
 
@@ -41,6 +44,10 @@ export default function LoginForm({ lang }: LoginFormProps) {
   // ── Shared state ──
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // ── Turnstile 人机验证 ──
+  const [turnstileOpen, setTurnstileOpen] = useState(false);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  const pendingLoginRef = useRef<{ type: "password" | "code"; args: Record<string, string> } | null>(null);
 
   // Cleanup countdown
   useEffect(() => {
@@ -66,7 +73,10 @@ export default function LoginForm({ lang }: LoginFormProps) {
     try {
       const result = await login(usernameOrEmail, password);
       if (result.success) {
-        window.location.href = "/";
+        router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
+      } else if (result.needsCaptcha && turnstileSiteKey) {
+        pendingLoginRef.current = { type: "password", args: { usernameOrEmail, password } };
+        setTurnstileOpen(true);
       } else {
         setError(result.error || tf("loginFailed", "Login failed"));
       }
@@ -85,7 +95,10 @@ export default function LoginForm({ lang }: LoginFormProps) {
     try {
       const result = await loginWithCode(codeEmail, code);
       if (result.success) {
-        window.location.href = "/";
+        router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
+      } else if (result.needsCaptcha && turnstileSiteKey) {
+        pendingLoginRef.current = { type: "code", args: { codeEmail, code } };
+        setTurnstileOpen(true);
       } else {
         setError(result.error || tf("verificationCodeFailed", "Verification failed"));
       }
@@ -128,11 +141,28 @@ export default function LoginForm({ lang }: LoginFormProps) {
     }
   };
 
+  // ── Turnstile 人机验证回调 ──
+  const handleTurnstileVerify = async (cfToken: string) => {
+    try {
+      const pending = pendingLoginRef.current;
+      if (!pending) { setTurnstileOpen(false); return; }
+      let result: { success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean };
+      if (pending.type === "password") {
+        result = await login(pending.args.usernameOrEmail, pending.args.password, cfToken);
+      } else {
+        result = await loginWithCode(pending.args.codeEmail, pending.args.code, cfToken);
+      }
+      if (result.success) { window.location.replace("/"); }
+      else { setTurnstileOpen(false); setError(result.error || tf("loginFailed", "Login failed")); }
+    } catch (err: any) { setTurnstileOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
+    finally { pendingLoginRef.current = null; }
+  };
+
   // ── Switch modes ──
   const switchToCodeMode = () => {
     setUseCode(true);
     setError("");
-    setCodeEmail(usernameOrEmail); // pre-fill email from username field
+    setCodeEmail(usernameOrEmail);
     setCode("");
   };
   const switchToPasswordMode = () => {
@@ -153,7 +183,6 @@ export default function LoginForm({ lang }: LoginFormProps) {
       </div>
 
       <div className="w-full max-w-md p-5 sm:p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] mx-3 sm:mx-auto">
-        {/* 网站介绍 */}
         <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 text-xs leading-relaxed text-[var(--color-text)]">
           {tf("siteIntro", "")}
           <span className="mt-2 block font-semibold text-blue-600 dark:text-blue-400 text-[11px]">{tf("freePlatform", "")}</span>
@@ -161,12 +190,8 @@ export default function LoginForm({ lang }: LoginFormProps) {
 
         <div className="text-center mb-8">
           <img src="/neuroaccess-logo.png" alt="NeuroAccess" width={48} height={48} className="w-12 h-12 rounded-xl mx-auto mb-3 object-cover" />
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">
-            NeuroAccess
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            {tf("login", "Log in")}
-          </p>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">NeuroAccess</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{tf("login", "Log in")}</p>
         </div>
 
         {!useCode ? (
@@ -175,36 +200,19 @@ export default function LoginForm({ lang }: LoginFormProps) {
               <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
                 {tf("username", "Username")} / {tf("email", "Email")}
               </label>
-              <input
-                type="text"
-                value={usernameOrEmail}
-                onChange={(e) => setUsernameOrEmail(e.target.value)}
+              <input type="text" value={usernameOrEmail} onChange={(e) => setUsernameOrEmail(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-                placeholder={tf("username", "Username")}
-                required
-              />
+                placeholder={tf("username", "Username")} required />
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
-                {tf("password", "Password")}
-              </label>
+              <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("password", "Password")}</label>
               <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3.5 py-2.5 pr-10 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-                  placeholder={tf("password", "Password")}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-                  tabIndex={0}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
+                  placeholder={tf("password", "Password")} required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors" tabIndex={0}
+                  aria-label={showPassword ? "Hide password" : "Show password"}>
                   {showPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="m3 3 18 18"/></svg>
                   ) : (
@@ -212,9 +220,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
                   )}
                 </button>
               </div>
-              {/* 忘记密码 - 切换验证码登录 */}
-              <button type="button" onClick={switchToCodeMode}
-                className="mt-1.5 text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity">
+              <button type="button" onClick={switchToCodeMode} className="mt-1.5 text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity">
                 {tf("forgotPassword", "Forgot password?")}
               </button>
             </div>
@@ -233,32 +239,17 @@ export default function LoginForm({ lang }: LoginFormProps) {
         ) : (
           <form onSubmit={handleCodeSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
-                {tf("email", "Email")}
-              </label>
-              <input
-                type="email"
-                value={codeEmail}
-                onChange={(e) => setCodeEmail(e.target.value)}
+              <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("email", "Email")}</label>
+              <input type="email" value={codeEmail} onChange={(e) => setCodeEmail(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-                placeholder={tf("email", "Email")}
-                required
-              />
+                placeholder={tf("email", "Email")} required />
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">
-                {tf("verificationCode", "Verification Code")}
-              </label>
+              <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("verificationCode", "Verification Code")}</label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                <input type="text" value={code} onChange={(e) => setCode(e.target.value)}
                   className="flex-1 px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-                  placeholder={tf("verificationCode", "Verification Code")}
-                  required
-                />
+                  placeholder={tf("verificationCode", "Verification Code")} required />
                 <button type="button" onClick={handleSendCode} disabled={codeCountdown > 0 || codeSending}
                   className="shrink-0 px-3 py-2.5 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] text-xs font-medium hover:bg-[var(--color-primary)]/20 disabled:opacity-40 transition-colors whitespace-nowrap">
                   {codeCountdown > 0 ? `${codeCountdown}s` : tf("getCode", "Get Code")}
@@ -293,7 +284,8 @@ export default function LoginForm({ lang }: LoginFormProps) {
         <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
           {tf("loginHint", "You will be redirected after login.")}
         </p>
-      </div>
-    </motion.div>
+        </div>
+        <TurnstileModal siteKey={turnstileSiteKey} open={turnstileOpen} onVerify={handleTurnstileVerify} onClose={() => { setTurnstileOpen(false); pendingLoginRef.current = null; }} />
+      </motion.div>
   );
 }

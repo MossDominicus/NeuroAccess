@@ -29,7 +29,16 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
 
   // 优先使用 frequency_distribution_array（[{frequency, power}]），fallback 到 frequency_distribution
   const distRaw = frequencyData.frequency_distribution_array || frequencyData.frequency_distribution || [];
-  const distributionData = Array.isArray(distRaw) ? distRaw : [];
+  let distributionData = Array.isArray(distRaw) ? distRaw : [];
+  // 若仍为空，用 average_bandpower 合成（delta/theta/alpha/beta 中心频率），
+  // 保证旧报告也能显示频率分布，无需重新分析。
+  if (distributionData.length === 0) {
+    const bp = frequencyData.average_bandpower || frequencyData.bandpower || {};
+    const bandCenters: Record<string, number> = { delta: 2.5, theta: 6.5, alpha: 10, beta: 22 };
+    distributionData = Object.keys(bp)
+      .filter((k) => bandCenters[k] !== undefined && typeof (bp as any)[k] === "number")
+      .map((k) => ({ frequency: bandCenters[k], power: Number((bp as any)[k]) }));
+  }
 
   return (
     <div className="space-y-8">

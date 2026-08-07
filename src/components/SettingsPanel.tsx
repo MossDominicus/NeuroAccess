@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Moon, Sun, Monitor, User, X, Eye, Key, MessageSquare, FileText, CheckCircle2, AlertTriangle, Cpu } from "lucide-react";
+import { setNotificationEnabled } from "@/components/NotificationToast";
+import { Settings, Moon, Sun, Monitor, User, X, Eye, Key, MessageSquare, FileText, CheckCircle2, AlertTriangle, Cpu, Bell } from "lucide-react";
 const FeedbackPanel = dynamic(() => import("@/components/FeedbackPanel"), { ssr: false, loading: () => null });
 const SurveyPanel = dynamic(() => import("@/components/SurveyPanel"), { ssr: false, loading: () => null });
 
@@ -15,6 +16,33 @@ type SettingsPanelProps = {
   open: boolean;
   onClose: () => void;
 };
+
+// ── 自定义通知开关（避免 Tailwind peer 全白渲染问题）───────────────
+function NotifyToggle() {
+  const [enabled, setEnabled] = useState(true);
+  useEffect(() => {
+    setEnabled(localStorage.getItem("neuroaccess-notifications") !== "false");
+  }, []);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const next = !enabled;
+        setEnabled(next);
+        setNotificationEnabled(next);
+      }}
+      className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+      style={{ backgroundColor: enabled ? "#10b981" : "rgba(115,115,115,0.35)" }}
+      role="switch"
+      aria-checked={enabled}
+    >
+      <span
+        className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+        style={{ transform: enabled ? "translateX(20px)" : "translateX(0px)" }}
+      />
+    </button>
+  );
+}
 
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { lang, setLang, t } = useLang();
@@ -196,6 +224,20 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   {surveyLoginHint && (
                     <p className="px-3 pb-2 text-xs text-amber-500 dark:text-amber-400">{t("surveyLoginRequired")}</p>
                   )}
+                </div>
+              </section>
+
+          {/* 消息通知 */}
+              <section>
+                <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+                  {t("notifications") || "Notifications"}
+                </h3>
+                <div className="rounded-xl bg-[var(--color-bg)] p-3 flex items-center justify-between">
+                  <span className="text-sm flex items-center gap-2 text-[var(--color-text)]">
+                    <Bell className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                    {t("analysisCompleteNotify") || "Analysis complete notification"}
+                  </span>
+                  <NotifyToggle />
                 </div>
               </section>
 

@@ -28,7 +28,7 @@ if not _SECRET_KEY:
         print("   Set JWT_SECRET_KEY environment variable in production.", file=sys.stderr)
 SECRET_KEY = _SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_DAYS = 365
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -94,6 +94,11 @@ def init_db():
     # Add phone_verified column if not exists
     try:
         conn.execute("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists
+    # Add survey_completed column if not exists (每个账户只能填一次问卷)
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN survey_completed INTEGER DEFAULT 0")
     except Exception:
         pass  # column already exists
     # Add phone column to verification_codes if not exists
@@ -274,7 +279,7 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
         # Try username first
         row = conn.execute(
             "SELECT id, username, email, avatar_url, avatar_color, password_hash, "
-            "created_at, terms_accepted, login_attempts, locked_until "
+            "created_at, terms_accepted, login_attempts, locked_until, survey_completed "
             "FROM users WHERE username = ?",
             (username_or_email,),
         ).fetchone()
@@ -283,7 +288,7 @@ def authenticate_user(username_or_email: str, password: str) -> Optional[Dict[st
         if row is None:
             row = conn.execute(
                 "SELECT id, username, email, avatar_url, avatar_color, password_hash, "
-                "created_at, terms_accepted, login_attempts, locked_until "
+                "created_at, terms_accepted, login_attempts, locked_until, survey_completed "
                 "FROM users WHERE email = ?",
                 (username_or_email,),
             ).fetchone()
@@ -379,7 +384,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, avatar_color, created_at, terms_accepted FROM users WHERE email = ?",
+            "SELECT id, username, email, avatar_url, avatar_color, created_at, terms_accepted, survey_completed FROM users WHERE email = ?",
             (email,),
         ).fetchone()
         if row:
