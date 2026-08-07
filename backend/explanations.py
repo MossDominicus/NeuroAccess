@@ -353,6 +353,8 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"STYLE RULES:\n"
         f"- You MAY and SHOULD use technical terminology: PSD, bandpower, artifacts, Nyquist, montage, SNR.\n"
         f"- NEVER list individual channel names; refer to them collectively or by count.\n"
+        f"- Write the ENTIRE explanation, including any paragraph headings, in {output_lang}. "
+        f"Never leave headings in English — translate or omit them. The output must be fully in {output_lang}.\n"
         f"- NEVER output sentences stating that the data cannot provide information about "
         f"intelligence, personality, mental health, diseases, emotions, or specific psychological disorders "
         f"(the website already displays a unified disclaimer; do not repeat it inside the explanation).\n"
@@ -413,6 +415,24 @@ def _strip_disclaimers(text: str) -> str:
     return result if result.strip() else text
 
 
+# 英文段落标题行模式（用于从非英文解释中剔除，保证语言适配）
+_EN_HEADING_RE = re.compile(
+    r"^(?:#{1,4}\s+)?(?:Paragraph|Section|Step|Part)\s*\d*[.:、\-\s]*"
+    r"[A-Za-z][A-Za-z0-9 ,&'()\-/]{2,50}\s*$"
+    r"|^#{1,4}\s+[A-Z][A-Za-z0-9 ,&'()\-]{3,60}\s*$",
+    re.MULTILINE,
+)
+
+
+def _strip_en_headings(text: str, lang: str) -> str:
+    """非英文解释中剔除 AI 偶尔留下的英文段落标题（如 'Paragraph 1 — Acquisition...'、'### Spectral'），
+    保证输出与界面语言一致。英文解释原样保留。"""
+    if lang == "en" or not text:
+        return text
+    lines = [ln for ln in str(text).split("\n") if not _EN_HEADING_RE.match(ln.strip())]
+    return "\n".join(lines).strip()
+
+
 def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]:
     """为指定语言生成三层解释；三层各独立调用 Ollama（并行），失败用模板兜底"""
     a     = analysis.copy()
@@ -430,7 +450,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
-            return _strip_disclaimers(text)
+            return _strip_en_headings(_strip_disclaimers(text), lang)
         except Exception:
             return fallbacks[level]
 
