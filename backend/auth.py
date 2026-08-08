@@ -123,6 +123,34 @@ def init_db():
         )
         """
     )
+    # Add feedback table for permanent feedback storage (replaces fragile file log)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            name TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            type TEXT DEFAULT '',
+            rating TEXT DEFAULT '',
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+        """
+    )
+    # Add survey table for permanent survey storage (replaces fragile file log)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS survey_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+        """
+    )
     # Add email column if not exists (for registration codes)
     try:
         conn.execute("ALTER TABLE verification_codes ADD COLUMN email TEXT")

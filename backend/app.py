@@ -1347,6 +1347,30 @@ async def submit_feedback(request: Request):
         log_path = os.path.join(BASE_DIR, "feedback.log")
         with open(log_path, "a") as f2:
             f2.write("\n=== " + ts + " ===\n" + email_body + "\n")
+
+        # ── 永久保存到数据库（feedback 表），不依赖易被清空的日志文件 ──
+        user_id = None
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                payload = verify_token(auth_header[7:].strip())
+                if payload:
+                    user_id = int(payload["sub"])
+        except Exception:
+            pass
+        try:
+            from auth import get_db
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO feedback (user_id, name, email, type, rating, message, created_at) VALUES (?,?,?,?,?,?,?)",
+                (user_id, name, email, type_, rating, message, ts),
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            # 数据库写入失败不阻塞反馈（日志已写），仅记录
+            print(f"[feedback] DB save failed: {e}")
+
         return {"success": True, "message": "Feedback received"}
     except Exception as e:
         return {"success": False, "error": str(e)}

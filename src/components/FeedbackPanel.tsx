@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
 import { MessageSquare, Send, CheckCircle } from "lucide-react";
@@ -34,6 +34,31 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [savedLocally, setSavedLocally] = useState(false);
+
+  // 挂载时自动把上次因网络失败缓存在本地的反馈补传到服务器（防丢失）
+  useEffect(() => {
+    const pending = loadFeedback();
+    if (!pending.length) return;
+    (async () => {
+      const remaining: FeedbackEntry[] = [];
+      let retried = 0;
+      for (const entry of pending) {
+        try {
+          const resp = await fetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "", email: "", type: entry.reportId ? "report" : "general", message: entry.message, rating: "" }),
+          });
+          if (resp.ok) retried++;
+          else remaining.push(entry);
+        } catch {
+          remaining.push(entry);
+        }
+      }
+      saveFeedback(remaining); // 成功的移除，失败的保留待下次
+      if (retried > 0) console.log(`[Feedback] 已补传 ${retried} 条离线反馈`);
+    })();
+  }, []);
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
