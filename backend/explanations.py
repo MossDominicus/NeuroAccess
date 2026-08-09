@@ -337,45 +337,43 @@ def template_research(a: Dict, lang: str) -> str:
     sr   = a.get("sampling_rate")
     dur  = a.get("duration")
     sq   = a.get("signal_quality_score")
+    sq3  = _rnd(sq, 3)
     bp_s = _band_pct_display(bp)
     dom_str = f"{dom_band}" if dom_band else ("unknown" if lang == "en" else ("未知" if lang == "zh" else "unknown"))
     q_label = _quality_level(sq, lang)
     if lang == "en":
         return (
-            f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq}/100 ({q_label}).\n\n"
-            f"Spectral profile: {bp_s}. Dominant band: {dom_str}. "
-            f"Noisy-channel count: {n_n}"
-            + (f" (e.g., {n_s})" if ns else "")
-            + ".\n\n"
-            f"Interpretation guidance: the relative bandpower distribution describes the spectral balance, "
-            f"not cognitive state. With {n_n} channel(s) below noise tolerance, "
-            f"any per-channel analysis should treat those channels as unreliable. "
-            f"Overall quality ({q_label}) supports whole-dataset summaries but limits fine-grained inference."
+            f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq3}/100 ({q_label}).\n\n"
+            f"The spectrum is dominated by the {dom_str} band; interpretation should rely on absolute power "
+            f"and cross-band ratios, not single percentages. "
+            f"{n_n} channel(s) fall below noise tolerance; per-channel analyses on them are unreliable. "
+            f"Overall quality ({q_label}) supports dataset-level spectral conclusions but limits "
+            f"fine-grained time-frequency or peak-fitting analyses."
         )
     if lang == "zh":
         return (
-            f"数据集概览：{ch_n} 个通道，采样率 {sr} Hz，时长 {dur}；"
-            f"信号质量评分 {sq}/100（{q_label}）。\n\n"
-            f"频谱概貌：{bp_s}。主导频段：{dom_str}。"
-            f"噪声通道数：{n_n}"
-            + (f"（如 {n_s}）" if ns else "")
-            + "。\n\n"
-            f"解读提示：频段功率的相对分布描述的是频谱平衡，不代表认知状态。"
-            f"有 {n_n} 个通道低于噪声容忍度，针对这些通道的逐通道分析应视为不可靠。"
-            f"整体质量（{q_label}）足以支撑数据集级结论，但限制细粒度推断。"
+            f"数据集：{ch_n} 个通道，采样率 {sr} Hz，时长 {dur}；"
+            f"信号质量评分 {sq3}/100（{q_label}）。\n\n"
+            f"频谱以{dom_str}为主导，解读应结合各频段的绝对功率与相对比值，而非单一百分比。"
+            f"共 {n_n} 个通道低于噪声容忍度，针对这些通道的逐通道分析应视为不可靠。"
+            f"整体质量（{q_label}）足以支撑数据集级频谱结论，但限制需要精细时频或峰值定位的分析。"
         )
     # fallback English
     return (
-        f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq}/100 ({q_label}).\n\n"
-        f"Spectral profile: {bp_s}. Dominant band: {dom_str}. "
-        f"Noisy-channel count: {n_n}"
-        + (f" (e.g., {n_s})" if ns else "")
-        + ".\n\n"
-        f"Interpretation guidance: the relative bandpower distribution describes the spectral balance, "
-        f"not cognitive state. With {n_n} channel(s) below noise tolerance, "
-        f"any per-channel analysis should treat those channels as unreliable. "
-        f"Overall quality ({q_label}) supports whole-dataset summaries but limits fine-grained inference."
+        f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq3}/100 ({q_label}).\n\n"
+        f"The spectrum is dominated by the {dom_str} band; interpretation should rely on absolute power "
+        f"and cross-band ratios, not single percentages. "
+        f"{n_n} channel(s) fall below noise tolerance; per-channel analyses on them are unreliable. "
+        f"Overall quality ({q_label}) supports dataset-level spectral conclusions but limits "
+        f"fine-grained time-frequency or peak-fitting analyses."
     )
+
+
+def _rnd(v, dp: int = 3):
+    """数值四舍五入到 dp 位小数；非数值原样返回（避免 AI 把 89.4021072898585 这类超长小数抄进文案）"""
+    if isinstance(v, (int, float)):
+        return round(float(v), dp)
+    return v
 
 
 def _summarize_for_ai(a: Dict) -> Dict:
@@ -393,20 +391,20 @@ def _summarize_for_ai(a: Dict) -> Dict:
         "sampling_rate":            overview.get("sampling_rate") or a.get("sampling_rate"),
         "duration":                 overview.get("duration") or a.get("duration"),
         "duration_seconds":         overview.get("recording_duration_seconds") or a.get("recording_duration_seconds") or a.get("duration_seconds"),
-        "signal_quality_score":     sq.get("signal_quality_score") or a.get("signal_quality_score"),
+        "signal_quality_score":     _rnd(sq.get("signal_quality_score") or a.get("signal_quality_score"), 3),
         # 只保留前若干项，避免超长通道列表
         "noisy_channels":           (sq.get("noisy_channels") or a.get("noisy_channels") or [])[:20],
         "possible_artifacts":       (sq.get("possible_artifacts") or a.get("possible_artifacts") or [])[:10],
         "clipping_detected":        sq.get("clipping_detected") or a.get("clipping_detected"),
         "missing_data":             sq.get("missing_data") or a.get("missing_data"),
         "high_frequency_noise":     sq.get("high_frequency_noise") or a.get("high_frequency_noise"),
-        # 频段只用聚合百分比 / 均值（已经是 5 个 key 的字典），丢弃逐通道 bandpower 数组
-        "bandpower_percent":        fa.get("bandpower_percent") or a.get("bandpower_percent") or {},
-        "average_bandpower":        fa.get("average_bandpower") or a.get("average_bandpower") or {},
-        "dominant_frequency":       fa.get("dominant_frequency") or a.get("dominant_frequency"),
+        # 频段只用聚合百分比 / 均值（已经是 5 个 key 的字典），丢弃逐通道 bandpower 数组；数值顺手截位
+        "bandpower_percent":        {k: _rnd(v, 1) for k, v in (fa.get("bandpower_percent") or a.get("bandpower_percent") or {}).items()},
+        "average_bandpower":        {k: _rnd(v, 2) for k, v in (fa.get("average_bandpower") or a.get("average_bandpower") or {}).items()},
+        "dominant_frequency":       _rnd(fa.get("dominant_frequency") or a.get("dominant_frequency"), 2),
         "dominant_band":            fa.get("dominant_band") or a.get("dominant_band"),
-        "literacy_scores":          literacy,
-        "file_size_mb":             a.get("file_size_mb"),
+        "literacy_scores":          {k: _rnd(v, 3) if isinstance(v, (int, float)) else v for k, v in literacy.items()},
+        "file_size_mb":             _rnd(a.get("file_size_mb"), 2),
         "what_this_data_cannot_tell": a.get("what_this_data_cannot_tell"),
     }
 
@@ -455,14 +453,15 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"You are writing ONLY the Beginner explanation for an EEG literacy website.\n"
             f"Output language: {output_lang}.\n"
             f"Audience: ordinary non-expert users who know nothing about EEG.\n\n"
-            f"TASK: Write 6-8 short sentences (ONE paragraph, plain words), covering EACH of these facts in its own sentence:\n"
+            f"TASK: Write 7-9 short sentences (ONE paragraph, plain words), covering EACH of these facts in its own sentence:\n"
             f"  (a) how long the recording is;\n"
             f"  (b) how many sensing positions were used;\n"
             f"  (c) what kind of brain activity dominates — mostly slow waves, mostly fast waves, or a balanced mix;\n"
             f"  (d) about how much of the activity that is (in words, e.g. 'about half');\n"
             f"  (e) whether the recording is clear or noisy overall;\n"
-            f"  (f) whether any specific areas were noticeably harder to read.\n"
-            f"Do not skip any item — write all six; add a seventh or eighth sentence only if it adds a genuinely new fact.\n\n"
+            f"  (f) whether any specific areas were noticeably harder to read;\n"
+            f"  (g) whether any obvious interference was present and roughly how widespread it was.\n"
+            f"Do not skip any item — write all seven; add an eighth or ninth sentence only if it adds a genuinely new fact.\n\n"
             f"STYLE RULES:\n"
             f"- Use everyday words a complete beginner understands. NO technical terms: do NOT use alpha/beta/delta/theta, "
             f"bandpower, PSD, SNR, sampling rate, channel, or artifact. Say 'slow brainwaves' / 'fast brainwaves' or describe it in plain words.\n"
@@ -574,7 +573,7 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"(the website already displays a unified disclaimer; do not repeat it inside the explanation).\n"
         f"- Do NOT fabricate or overstate problems (e.g., do not claim hidden low-frequency noise or "
         f"threats to analyses unless the JSON explicitly shows them).\n"
-        f"- 3 paragraphs, each 4-6 sentences. TOTAL 450-550 words — the LONGEST section of the report. "
+        f"- 3 paragraphs, each 4-6 sentences. TOTAL 500-650 words — the LONGEST section of the report. "
         f"Every sentence must add information a researcher could not get by reading the raw parameters; "
         f"ALL required items from the three paragraph specs above must appear — a missing item is a failure.\n"
         f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
@@ -782,6 +781,8 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             ollama = call_ollama(prompt, timeout=75, max_tokens=_MAX_TOKENS.get(level, 400))
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
+                reason = "empty/jargon" if not text else "beginner jargon"
+                print(f"[explanations] fallback {level}({lang}): {reason} | {ollama.get('error','')}", flush=True)
                 return fallbacks[level]
             # 通道名保留完整显示（不删，避免半截残留）；只清免责声明/英文标题/元话语/心智状态句，
             # 末端做单档内去重（删同义复读），保证零凑数
@@ -794,9 +795,11 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             )
             # AI 输出全是无效文本（被清空）→ 回退模板，避免空解释
             if not cleaned.strip():
+                print(f"[explanations] fallback {level}({lang}): cleaned-empty", flush=True)
                 return fallbacks[level]
             return cleaned
-        except Exception:
+        except Exception as e:
+            print(f"[explanations] fallback {level}({lang}): exception {e}", flush=True)
             return fallbacks[level]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -805,8 +808,11 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
         future_research = executor.submit(_call_level, "research")
         for key, future in [("beginner", future_beginner), ("student", future_student), ("research", future_research)]:
             try:
-                results[key] = future.result(timeout=45)
-            except Exception:
+                # 90s 必须 > call_ollama 的 75s：研究档 max_tokens 大、生成慢，
+                # 之前 45s 就把还没跑完的 AI 结果丢了 → 用户看到模板
+                results[key] = future.result(timeout=90)
+            except Exception as e:
+                print(f"[explanations] fallback {key}({lang}): future timeout/err {e}", flush=True)
                 results[key] = fallbacks[key]
 
     return results
