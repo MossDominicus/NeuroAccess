@@ -136,19 +136,28 @@ _CHANNEL_LIST_RE = re.compile(
 
 def _strip_channel_names(text: str) -> str:
     """强制清除 AI 输出中的通道名（不符合 STYLE RULES 时兜底）。
-    只把通道名（含连续列表）替换成中性词，保留句子主干 —— 避免牺牲正常内容。"""
+    直接删除通道名本身并清理残留连接词/标点，不留下'各通道'之类的占位词。
+    例如 '两个噪声通道：EEG O2和EEG A2-A1。' → '两个噪声通道。'"""
     if not text:
         return text
-    repl = "各通道" if re.search(r"[\u4e00-\u9fff]", text) else "the channels"
-    # 1) 连续通道名列表整体替换
-    out = _CHANNEL_LIST_RE.sub(repl, text)
-    # 2) 兜底：孤立的单个通道名
-    out = _CHANNEL_RE.sub(repl, out)
-    # 3) 压缩重复（"各通道 各通道"、"各通道, 各通道"、"各通道这些通道" 等）
-    out = re.sub(r"(?:各通道[，,、;\s和及]+)+各通道", "各通道", out)
-    out = re.sub(r"各通道(?:\s*[,，、;\s]\s*)+", "各通道", out)
-    out = re.sub(r"各通道\s*这(?:些|些个)?\s*通道", "各通道", out)
-    out = re.sub(r"(?:the channels\s*[,，、;\sand&]*\s*)+the channels", "the channels", out)
+    # 1) 连续通道名列表整体删除（含连接逗号/顿号/和/及）
+    out = _CHANNEL_LIST_RE.sub("", text)
+    # 2) 孤立单个通道名删除（含可选 EEG/CH/channel 前缀）
+    out = _CHANNEL_RE.sub("", out)
+    # 3) 清理残留（只处理被删通道名留下的碎片，不动正常标点）：
+    #    a) 孤立的 EEG/CH/channel 前缀（后跟标点/破折号/行尾）。
+    #       不能用 \b（中文相邻时 \b 失效），改用 (?<![A-Za-z0-9])
+    out = re.sub(r"(?<![A-Za-z0-9])(?:EEG|CH|Channel|channel)(?=\s*[-—–。.,，、;；:！？!?]|\s*$)", "", out)
+    #    b) 孤立的连接词"和/与/及"（前是标点/空格，后是标点/空格/行尾）
+    out = re.sub(r"(?<=[：:,，、;；\s])(?:和|与|及|or|and)(?=\s*[-—–。.,，、;；:！？!?\s]|$)", "", out)
+    #    c) 破折号碎片 "A2-A1" → "-"
+    out = re.sub(r"-{1,3}", "", out)
+    #    d) "：。" / "，。" / "、。" → "。"
+    out = re.sub(r"[：:，,、;；]\s*[。.]", "。", out)
+    #    e) 行尾残留冒号/连接词/空格
+    out = re.sub(r"[：:,，、;；\s]+$", "", out)
+    # 压缩行内多余空格（不碰换行——避免把 ### 标题与正文合并，导致标题正则误删整段）
+    out = re.sub(r"[ \t]+", " ", out)
     return out.strip()
 
 
@@ -428,6 +437,10 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- NEVER EVER list individual channel names such as 'EEG Fp1, EEG Fp2, F3, F4...' or 'EEG 001, EEG 002...'. "
             f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
             f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
+            f"- DO NOT use markdown heading markers (### / ## / #) or 'Paragraph 1:' style section labels. "
+            f"Output plain paragraphs separated by blank lines only — any markdown heading is stripped at output time.\n"
+            f"- Output language MUST be fully {output_lang}. NO English words mixed in (except technical "
+            f"abbreviations: EEG, PSD, SNR, Nyquist, EEG 001/002 channel patterns). Everything else in {output_lang}.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
             f"- 3 paragraphs, each 3-4 sentences. TOTAL around 200-280 words. Substantive, no filler.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
@@ -470,6 +483,12 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
         f"- Write the ENTIRE explanation, including any paragraph headings, in {output_lang}. "
         f"Never leave headings in English — translate or omit them. The output must be fully in {output_lang}.\n"
+        f"- DO NOT use markdown heading markers (### / ## / #) or 'Paragraph 1:' / 'Paragraph 2:' style section labels. "
+        f"Output plain paragraphs separated by blank lines only — any markdown heading or English section label "
+        f"is automatically stripped at output time.\n"
+        f"- Output language MUST be fully {output_lang}. NO mixing of English words or sentences inside a "
+        f"Chinese explanation (and vice versa). Allowed technical abbreviations only: EEG, PSD, SNR, "
+        f"Nyquist, EEG 001/002 (channel naming pattern). Everything else in {output_lang}.\n"
         f"- NEVER output sentences stating that the data cannot provide information about "
         f"intelligence, personality, mental health, diseases, emotions, or specific psychological disorders "
         f"(the website already displays a unified disclaimer; do not repeat it inside the explanation).\n"
@@ -531,21 +550,46 @@ def _strip_disclaimers(text: str) -> str:
     return result if result.strip() else text
 
 
-# 英文段落标题行模式（用于从非英文解释中剔除，保证语言适配）
+# 标题行模式：用于从非英文解释中剔除。
+# ① AI 有时输出 "### Spectral analysis" / "### 噪声与伪迹分析" — 任何以 # 开头（1-4 个）作为段落分隔的行都视为多余标题，统一删除
+# ② AI 有时输出 "Paragraph 1 — ..." / "Section 2:" 等英文段落标记，同样删除
 _EN_HEADING_RE = re.compile(
-    r"^(?:#{1,4}\s+)?(?:Paragraph|Section|Step|Part)\s*\d*[.:、\-\s]*"
-    r"[A-Za-z][A-Za-z0-9 ,&'()\-/]{2,50}\s*$"
-    r"|^#{1,4}\s+[A-Z][A-Za-z0-9 ,&'()\-]{3,60}\s*$",
+    r"^#{1,6}\s+\S.*$",
     re.MULTILINE,
 )
 
 
 def _strip_en_headings(text: str, lang: str) -> str:
-    """非英文解释中剔除 AI 偶尔留下的英文段落标题（如 'Paragraph 1 — Acquisition...'、'### Spectral'），
+    """非英文解释中剔除 AI 偶尔留下的标题/段落标记（'Paragraph 1 — ...'、'### Spectral'、'### 中文标题'），
     保证输出与界面语言一致。英文解释原样保留。"""
     if lang == "en" or not text:
         return text
-    lines = [ln for ln in str(text).split("\n") if not _EN_HEADING_RE.match(ln.strip())]
+    # 1) 删 markdown 标题行（### 或 ## 等开头）
+    text = _EN_HEADING_RE.sub("", text)
+    # 2) 删英文段落标记 "Paragraph 1 — ...\n" 等（行首）
+    text = re.sub(
+        r"^(?:Paragraph|Section|Step|Part)\s*\d*[.:、\-\s]*[A-Za-z][A-Za-z0-9 ,&'()\-/]{2,80}\s*$",
+        "",
+        text,
+        flags=re.MULTILINE,
+    )
+    # 3) 清理通道名替换的啰嗦："各通道和EEG 各通道-各通道" → "各通道"
+    text = re.sub(r"\bEEG\s*各通道", "各通道", text)
+    text = re.sub(r"各通道\s*[,，、和与及]\s*EEG\s*各通道", "各通道", text)
+    text = re.sub(r"各通道\s*[,，、和与及]+\s*各通道", "各通道", text)
+    # 4) 删掉 AI 输出的中英混杂句（英文连续 ≥5 字符 + 中文夹在一起的整句）
+    cleaned = []
+    for line in text.split("\n"):
+        if not line.strip():
+            cleaned.append(line)
+            continue
+        ascii_run = max((len(m.group()) for m in re.finditer(r"[A-Za-z][A-Za-z\s,.\-']{4,}", line)), default=0)
+        if ascii_run >= 8:  # 长英文片段 ≥8 字符 → 整句删除
+            continue
+        cleaned.append(line)
+    text = "\n".join(cleaned)
+    # 清理多余空行
+    lines = [ln for ln in text.split("\n") if ln.strip()]
     return "\n".join(lines).strip()
 
 
