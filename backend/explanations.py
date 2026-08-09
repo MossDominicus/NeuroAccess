@@ -120,12 +120,16 @@ _CHANNEL_PATTERNS = [
     r"\bA[1-2]\b", r"\bM[1-2]\b", r"\bI[1-2]\b",
     r"\bEEG\s*CH\s*\d+\b", r"\bEEG\s*\d{2,3}\b", r"\bchannel\s*\d+\b",
 ]
-_CHANNEL_RE = re.compile("|".join(_CHANNEL_PATTERNS), re.IGNORECASE)
+_CHANNEL_RE = re.compile(
+    "|".join(p[:-2] + r"(?![A-Za-z0-9])" if p.endswith(r"\b") else p for p in _CHANNEL_PATTERNS),
+    re.IGNORECASE,
+)
 # 连续通道名列表（逗号/顿号/空格/和/及 分隔），整体替换为一个中性词，保留句子主干
 # 注意：不带前缀的裸数字（如 68、128）不是通道名，不能匹配——只有 EEG/CH/channel 前缀的数字编号才算
+# 尾部用 (?![A-Za-z0-9]) 而非 \b：中文（如"和""的"）在 re 中是 \w，\b 在中文相邻时失效
 _CHANNEL_ATOM = r"(?:(?:EEG|CH|Channel|channel)\s*)?(?:Fp1|Fp2|AF[3-7]|F[3-8z]|T[3-6]|C[3-4z]|P[3-4z]|O[1-2z]|A[1-2]|M[1-2]|I[1-2])"
 _CHANNEL_LIST_RE = re.compile(
-    r"\b" + _CHANNEL_ATOM + r"(?:\s*[,，、;；\s]\s*" + _CHANNEL_ATOM + r")*\b",
+    r"\b" + _CHANNEL_ATOM + r"(?:\s*[,，、;；\s]\s*" + _CHANNEL_ATOM + r")*(?![A-Za-z0-9])",
     re.IGNORECASE,
 )
 
@@ -403,24 +407,29 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"You are writing ONLY the Student explanation for an EEG literacy website.\n"
             f"Output language: {output_lang}.\n"
             f"Audience: neuroscience beginners taking their first EEG course.\n\n"
-            f"TASK: Write a CONCISE teaching-style explanation in 2 short paragraphs. "
-            f"Keep it brief — this is a summary level, NOT a deep dive. "
+            f"TASK: Write a teaching-style explanation in 3 short paragraphs. "
+            f"This is a middle level — more detail than the beginner summary, less depth than a research report. "
             f"Each paragraph must teach a specific concept AND relate it to THIS recording's real numbers.\n\n"
             f"PARAGRAPH 1 — The recording and its quality: "
-            f"Describe the setup in ONE line (channels, sampling rate, duration), then in one more sentence "
-            f"what the signal quality score means for this data's trustworthiness.\n\n"
+            f"Describe the setup in one line (channels, sampling rate, duration), then explain "
+            f"what the signal quality score means for how much we can trust this data, "
+            f"connecting the quality level to the actual score.\n\n"
             f"PARAGRAPH 2 — Brainwave bands in this recording: "
-            f"Briefly explain delta/theta/alpha/beta (one clause each), then point to which band dominates "
-            f"in THIS recording with its percentage (cautious wording: may reflect, could indicate). "
-            f"Then in one short sentence state how many channels were flagged noisy (or none) and "
-            f"whether artifacts/clipping/high-frequency noise were detected.\n\n"
+            f"Briefly explain what delta/theta/alpha/beta waves are and their rough frequency ranges, "
+            f"then point to which band dominates in THIS recording with its real percentage "
+            f"(cautious wording: may reflect, could indicate) and compare the bands against each other "
+            f"using the real percentages.\n\n"
+            f"PARAGRAPH 3 — Noise and artifacts in this recording: "
+            f"In one or two sentences explain what EEG artifacts and noisy channels are, "
+            f"then state how many channels were flagged noisy here (or none) and whether "
+            f"artifacts/clipping/high-frequency noise were detected.\n\n"
             f"STYLE RULES:\n"
             f"- You MAY use the terms alpha/beta/theta/delta, bandpower, artifact, sampling rate, channel — but define each briefly the first time.\n"
             f"- NEVER EVER list individual channel names such as 'EEG Fp1, EEG Fp2, F3, F4...' or 'EEG 001, EEG 002...'. "
             f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
             f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
-            f"- 2 paragraphs, each 2-3 sentences. CONCISE — around 90-150 words total. No filler.\n"
+            f"- 3 paragraphs, each 3-4 sentences. TOTAL around 200-280 words. Substantive, no filler.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
         )
     # research
@@ -443,16 +452,19 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"implications that are REAL for this recording, quantified where possible (frequency resolution "
         f"from duration, adequacy of sampling rate, montage considerations if derivable). "
         f"Do not pad with generic statements.\n\n"
-        f"PARAGRAPH 2 — Spectral profile & standout findings: "
-        f"Give the actual bandpower_percent distribution with the real percentages, name the dominant band "
-        f"and its share relative to the others, state whether the profile looks physiological (1/f-like) "
-        f"or atypical, and call out the single most notable finding (e.g., alpha dominance, beta excess, "
-        f"an unusually flat profile).\n\n"
-        f"PARAGRAPH 3 — Signal quality & handling guidance: "
+        f"PARAGRAPH 2 — Spectral profile, absolute power & standout findings: "
+        f"Give the actual bandpower_percent distribution with the real percentages AND the absolute "
+        f"average_bandpower values (μV²/Hz) — compare the dominant band's absolute power against the others, "
+        f"not just the percentages. Name the dominant band and its share. Assess whether the profile looks "
+        f"physiological (1/f-like) or atypical, and HOW FAR it deviates (e.g., 'alpha exceeds the next band "
+        f"by ~3.2× in absolute power, a strong posterior-dominance signature'). Call out the single most "
+        f"notable quantitative finding a researcher would act on.\n\n"
+        f"PARAGRAPH 3 — Signal quality, cross-channel consistency & handling guidance: "
         f"Report the signal quality score, noisy-channel count (by category, not full names), "
         f"possible_artifacts, clipping_detected, high_frequency_noise, missing_data — what was found "
-        f"and what was not. End with 1-2 concrete preprocessing or interpretation actions a researcher "
-        f"should take with THIS data, derived from the actual findings (not generic advice).\n\n"
+        f"and what was not. Add what the noisy-channel count and quality score imply about cross-channel "
+        f"consistency and which downstream analyses are safe vs risky on THIS data. End with 1-2 concrete "
+        f"preprocessing or interpretation actions derived from the actual findings (not generic advice).\n\n"
         f"STYLE RULES:\n"
         f"- You MAY and SHOULD use technical terminology: PSD, bandpower, artifacts, Nyquist, montage, SNR.\n"
         f"- NEVER EVER list individual channel names such as 'Fp1, Fp2, F3, F4, T3, T4, C3, C4...' or 'EEG 001, EEG 002...'. "
@@ -465,7 +477,8 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"(the website already displays a unified disclaimer; do not repeat it inside the explanation).\n"
         f"- Do NOT fabricate or overstate problems (e.g., do not claim hidden low-frequency noise or "
         f"threats to analyses unless the JSON explicitly shows them).\n"
-        f"- 3 paragraphs, each 3-4 sentences. Dense, precise, zero filler.\n"
+        f"- 3 paragraphs, each 4-5 sentences. Dense, precise, zero filler — every sentence must add "
+        f"information a researcher could not get by reading the raw parameters.\n"
         f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
     )
 
