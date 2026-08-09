@@ -1,7 +1,7 @@
 "use client";
 
 import { useLang } from "@/lib/language-context";
-import { User, GraduationCap, Microscope, Shield, AlertTriangle } from "lucide-react";
+import { User, Microscope, Shield, AlertTriangle } from "lucide-react";
 
 type ExplanationData = {
   explanations?: {
@@ -58,17 +58,11 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       iconColor: "text-green-600 dark:text-green-400",
     },
     {
-      key: "student" as const,
-      label: t("studentMode"),
-      icon: GraduationCap,
-      card: "border-blue-200 bg-[var(--color-surface)] dark:border-blue-900/50",
-      iconBox: "bg-blue-50 dark:bg-blue-950/30",
-      iconColor: "text-blue-600 dark:text-blue-400",
-    },
-    {
       key: "research" as const,
       label: t("researchMode"),
       icon: Microscope,
+      // 学习档 + 研究档 合并为"研究解析"一栏展示
+      text: [explanations.student, explanations.research].filter(Boolean).join("\n\n"),
       card: "border-purple-200 bg-[var(--color-surface)] dark:border-purple-900/50",
       iconBox: "bg-purple-50 dark:bg-purple-950/30",
       iconColor: "text-purple-600 dark:text-purple-400",
@@ -83,9 +77,9 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-2">
         {modes.map((mode) => {
-          const text = explanations[mode.key] || t("explanationFailed");
+          const text = (mode as any).text ?? explanations[mode.key] ?? t("explanationFailed");
           const Icon = mode.icon;
           const paragraphs = String(text).split("\n").map((p) => p.trim()).filter(Boolean);
 
