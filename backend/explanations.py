@@ -121,31 +121,31 @@ _CHANNEL_PATTERNS = [
     r"\bEEG\s*CH\s*\d+\b", r"\bEEG\s*\d{2,3}\b", r"\bchannel\s*\d+\b",
 ]
 _CHANNEL_RE = re.compile("|".join(_CHANNEL_PATTERNS), re.IGNORECASE)
+# 连续通道名列表（逗号/顿号/空格/和/及 分隔），整体替换为一个中性词，保留句子主干
+# 注意：不带前缀的裸数字（如 68、128）不是通道名，不能匹配——只有 EEG/CH/channel 前缀的数字编号才算
+_CHANNEL_ATOM = r"(?:(?:EEG|CH|Channel|channel)\s*)?(?:Fp1|Fp2|AF[3-7]|F[3-8z]|T[3-6]|C[3-4z]|P[3-4z]|O[1-2z]|A[1-2]|M[1-2]|I[1-2])"
+_CHANNEL_LIST_RE = re.compile(
+    r"\b" + _CHANNEL_ATOM + r"(?:\s*[,，、;；\s]\s*" + _CHANNEL_ATOM + r")*\b",
+    re.IGNORECASE,
+)
 
 
 def _strip_channel_names(text: str) -> str:
     """强制清除 AI 输出中的通道名（不符合 STYLE RULES 时兜底）。
-    匹配到任何通道名模式，整段用方括号包裹的省略号代替，避免半句话残缺。"""
+    只把通道名（含连续列表）替换成中性词，保留句子主干 —— 避免牺牲正常内容。"""
     if not text:
         return text
-    # 把包含通道名的整句替换为简洁表达（保留原句式但清掉具体名称）
-    # 策略：检测到行内 channel 列举，整行替换为 "（已省略通道名列表，仅展示汇总特征）"
-    out_lines = []
-    for line in text.split("\n"):
-        matches = _CHANNEL_RE.findall(line)
-        if matches:
-            stripped = _CHANNEL_RE.sub("各通道", line).strip()
-            # 多通道名出现（≥3）或替换后内容过短 → 整行换成省略标记
-            if len(matches) >= 3 or len(stripped) < len(line) * 0.4:
-                if "个通道" in line or "通道" in line:
-                    out_lines.append("（已省略具体通道名，仅展示汇总特征）")
-                else:
-                    out_lines.append("(channel details omitted; aggregated view only)")
-            else:
-                out_lines.append(stripped)
-        else:
-            out_lines.append(line)
-    return "\n".join(out_lines)
+    repl = "各通道" if re.search(r"[\u4e00-\u9fff]", text) else "the channels"
+    # 1) 连续通道名列表整体替换
+    out = _CHANNEL_LIST_RE.sub(repl, text)
+    # 2) 兜底：孤立的单个通道名
+    out = _CHANNEL_RE.sub(repl, out)
+    # 3) 压缩重复（"各通道 各通道"、"各通道, 各通道"、"各通道这些通道" 等）
+    out = re.sub(r"(?:各通道[，,、;\s和及]+)+各通道", "各通道", out)
+    out = re.sub(r"各通道(?:\s*[,，、;\s]\s*)+", "各通道", out)
+    out = re.sub(r"各通道\s*这(?:些|些个)?\s*通道", "各通道", out)
+    out = re.sub(r"(?:the channels\s*[,，、;\sand&]*\s*)+the channels", "the channels", out)
+    return out.strip()
 
 
 def _dominant_band_from_percent(bp: Dict[str, Any]) -> str | None:
