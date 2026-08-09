@@ -162,6 +162,67 @@ def _strip_channel_names(text: str) -> str:
     return out.strip()
 
 
+def _norm_for_dedup(s: str) -> str:
+    """归一化句子：去所有空白与标点，小写。用于精确去重。"""
+    return re.sub(r"[\s\W_]+", "", s).lower()
+
+
+def _tokens_for_dedup(s: str) -> set:
+    """去重用的 token 集合：CJK 按单字、Latin/digit 按词。"""
+    toks = set(re.findall(r"[a-z0-9]+", s.lower()))
+    toks |= set(re.findall(r"[\u4e00-\u9fff]", s))
+    return toks
+
+
+def _is_near_dup(toks: set, seen: list, jac: float = 0.85) -> bool:
+    """与已保留句子中任一高度重叠（Jaccard >= jac）则视为重复。"""
+    if not toks:
+        return False
+    for st in seen:
+        if not st:
+            continue
+        inter = len(toks & st)
+        if inter == 0:
+            continue
+        union = len(toks | st)
+        if union and inter / union >= jac:
+            return True
+    return False
+
+
+def _dedup_sentences(text: str) -> str:
+    """单档内去重：删除与前面句子归一化相同或高度重叠的重复句，
+    防止模型同义复读凑字数。跨段落累计去重，保留段落结构。"""
+    if not text:
+        return text
+    paras = re.split(r"\n{1,}", text)
+    out_paras: list = []
+    seen_norm: list = []
+    seen_toks: list = []
+    for para in paras:
+        if not para.strip():
+            continue
+        raw = re.split(r"(?<=[。！？!?；;])|(?<=\.)(?<!\d\.)(?!\d)", para)
+        kept: list = []
+        for seg in raw:
+            s = seg.strip()
+            if not s:
+                continue
+            norm = _norm_for_dedup(s)
+            if norm and norm in seen_norm:
+                continue
+            toks = _tokens_for_dedup(s)
+            if _is_near_dup(toks, seen_toks):
+                continue
+            if norm:
+                seen_norm.append(norm)
+            seen_toks.append(toks)
+            kept.append(seg)
+        if kept:
+            out_paras.append("".join(kept))
+    return "\n\n".join(out_paras).strip()
+
+
 def _dominant_band_from_percent(bp: Dict[str, Any]) -> str | None:
     """从 bandpower_percent 字典找主导频段（数值最高），自动处理 '%' 字符串"""
     best, best_v = None, -1.0
@@ -612,7 +673,8 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
             # 所有级别都强制清除通道名列表（避免 AI 违反 prompt 列通道）
-            cleaned = _strip_channel_names(_strip_en_headings(_strip_disclaimers(text), lang))
+            # 末端再做单档内去重，删掉模型同义复读的重复句
+            cleaned = _dedup_sentences(_strip_channel_names(_strip_en_headings(_strip_disclaimers(text), lang)))
             return cleaned
         except Exception:
             return fallbacks[level]
