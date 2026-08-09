@@ -43,7 +43,7 @@ def contains_beginner_jargon(text: str) -> bool:
     return count >= 3
 
 
-def call_openrouter(prompt: str, timeout: int = 30) -> Dict[str, Any]:
+def call_openrouter(prompt: str, timeout: int = 30, max_tokens: int = 400) -> Dict[str, Any]:
     """调用 OpenRouter API；失败返回 { success: False, error }"""
     if not OPENROUTER_API_KEY:
         return {"success": False, "error": "OpenRouter API key not configured"}
@@ -57,7 +57,7 @@ def call_openrouter(prompt: str, timeout: int = 30) -> Dict[str, Any]:
             json={
                 "model": OPENROUTER_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 400,
+                "max_tokens": max_tokens,
                 "temperature": 0.15,
             },
             timeout=(10, timeout),
@@ -78,9 +78,9 @@ def call_openrouter(prompt: str, timeout: int = 30) -> Dict[str, Any]:
         return {"success": False, "error": f"OpenRouter unexpected error: {str(e)}"}
 
 
-def call_ollama(prompt: str, timeout: int = 120) -> Dict[str, Any]:
+def call_ollama(prompt: str, timeout: int = 120, max_tokens: int = 400) -> Dict[str, Any]:
     """兼容旧接口，内部调用 OpenRouter"""
-    return call_openrouter(prompt, timeout=timeout)
+    return call_openrouter(prompt, timeout=timeout, max_tokens=max_tokens)
 
 
 def _quality_level(score: Any, lang: str) -> str:
@@ -258,21 +258,21 @@ def template_beginner(a: Dict, lang: str) -> str:
         f"有 {n} 个区域读数较不清晰" if lang == "zh" else f"{n} area(s) are harder to read")
     if lang == "en":
         return (
-            f"The main activity in this recording is {dom_plain}"
+            f"This recording lasts about {dur or 'a short period'} and its main activity is {dom_plain}"
             + (f", accounting for about {pct_num}% of total activity" if pct_num is not None else "")
             + f". Signal clarity is {q}"
             + (f"; {n_s}." if n > 0 else "; readings across all positions are clear.")
         )
     if lang == "zh":
         return (
-            f"这份记录的主要活动属于{dom_plain}"
+            f"这份记录时长约 {dur or '一小段时间'}，主要活动属于{dom_plain}"
             + (f"，约占全部活动的 {pct_num}%" if pct_num is not None else "")
             + f"。信号清晰度为{q}"
             + (f"，{n_s}。" if n > 0 else "，各位置的读数都比较清楚。")
         )
     # fallback English for unsupported languages
     return (
-        f"The main activity in this recording is {dom_plain}"
+        f"This recording lasts about {dur or 'a short period'} and its main activity is {dom_plain}"
         + (f", accounting for about {pct_num}% of total activity" if pct_num is not None else "")
         + f". Signal clarity is {q}"
         + (f"; {n_s}." if n > 0 else "; readings across all positions are clear.")
@@ -454,10 +454,12 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"You are writing ONLY the Beginner explanation for an EEG literacy website.\n"
             f"Output language: {output_lang}.\n"
             f"Audience: ordinary non-expert users who know nothing about EEG.\n\n"
-            f"TASK: Say exactly two things in the plainest possible words, in 3-5 short sentences, ONE paragraph:\n"
-            f"  (1) what kind of brain activity dominates this recording — mostly slow waves, mostly fast waves, or a balanced mix;\n"
-            f"  (2) whether the recording is clear or noisy.\n"
-            f"That is ALL. If you cannot add another fact without repeating yourself, stop at 3 sentences — shorter is better.\n\n"
+            f"TASK: In 5-7 short sentences (ONE paragraph, plain words), tell a total beginner:\n"
+            f"  (1) how long the recording is and roughly how many sensing positions were used;\n"
+            f"  (2) what kind of brain activity dominates — mostly slow waves, mostly fast waves, or a balanced mix — "
+            f"and about how much of it there is (in words, e.g. 'about half');\n"
+            f"  (3) whether the recording is clear or noisy, and whether any areas were noticeably harder to read.\n"
+            f"Each sentence must add ONE new fact. Do NOT repeat the same fact twice in different words.\n\n"
             f"STYLE RULES:\n"
             f"- Use everyday words a complete beginner understands. NO technical terms: do NOT use alpha/beta/delta/theta, "
             f"bandpower, PSD, SNR, sampling rate, channel, or artifact. Say 'slow brainwaves' / 'fast brainwaves' or describe it in plain words.\n"
@@ -504,7 +506,7 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- Output language MUST be fully {output_lang}. NO English words mixed in (except technical "
             f"abbreviations: EEG, PSD, SNR, Nyquist, EEG 001/002 channel patterns). Everything else in {output_lang}.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
-            f"- 3 paragraphs, each 3-4 sentences. TOTAL around 200-280 words. Substantive, no filler, no repetition.\n"
+            f"- 3 paragraphs, each 3-4 sentences. TOTAL around 300-380 words. Substantive, no filler, no repetition.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
         )
     # research
@@ -713,11 +715,13 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
         "student":  template_student(a, lang),
         "research": template_research(a, lang),
     }
+    # 各档的 max_tokens：入门短小、学习中等、研究最长（400-500 字，默认 400 tokens 会被截断）
+    _MAX_TOKENS = {"beginner": 300, "student": 700, "research": 1100}
 
     def _call_level(level: str) -> str:
         try:
             prompt = _build_prompt(a, level, lang)
-            ollama = call_ollama(prompt, timeout=75)
+            ollama = call_ollama(prompt, timeout=75, max_tokens=_MAX_TOKENS.get(level, 400))
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
