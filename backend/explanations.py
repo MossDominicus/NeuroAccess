@@ -442,6 +442,12 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         "7. Do NOT add a general disclaimer at the end of every explanation; the website already displays limitation notices separately.\n"
         "8. NEVER list individual channel names (e.g., 'EEG 001, EEG 002, ...'). Refer to them collectively as 'the channels' or 'the recording'.\n"
         "9. NEVER pad the explanation with channel lists, sampling-rate restatements, or parameter dumps. Focus on INTERPRETATION and ANALYSIS.\n"
+        "10. NEVER write meta or framing sentences such as 'The following is an analysis of this recording', "
+        "'This report...', '以下/本文/本报告是对…的分析/介绍/总结', '综上所述', '总之', '总体来看', "
+        "or closing invitations like '希望这份分析能帮助您' / '如需更多信息请咨询'. Output ONLY the explanation itself.\n"
+        "11. EVERY sentence must add new information grounded in the JSON. Never repeat an earlier point in "
+        "different words; a sentence that merely restates a parameter or an earlier statement is padding. "
+        "If you have nothing new to add, END the explanation instead of padding it.\n"
     )
     sq = safe_float(a.get("signal_quality_score", 100), 100)
     uncertainty = ""
@@ -457,19 +463,19 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"You are writing ONLY the Beginner explanation for an EEG literacy website.\n"
             f"Output language: {output_lang}.\n"
             f"Audience: ordinary non-expert users who know nothing about EEG.\n\n"
-            f"TASK: Write a clear, plain, but scientifically RIGOROUS explanation of what this brainwave recording shows. "
-            f"5-8 short sentences, ONE paragraph.\n\n"
+            f"TASK: Say exactly two things in the plainest possible words, in 3-5 short sentences, ONE paragraph:\n"
+            f"  (1) what kind of brain activity dominates this recording — mostly slow waves, mostly fast waves, or a balanced mix;\n"
+            f"  (2) whether the recording is clear or noisy.\n"
+            f"That is ALL. If you cannot add another fact without repeating yourself, stop at 3 sentences — shorter is better.\n\n"
             f"STYLE RULES:\n"
-            f"- Use simple, precise scientific language. Do NOT use metaphors, analogies, or poetic comparisons.\n"
-            f"- Avoid technical jargon where possible: instead of alpha/beta/theta/delta say 'slow brainwaves (delta/theta range)' "
-            f"or 'fast brainwaves (beta range)' — or simply describe the frequency activity in plain words. "
-            f"If you must use a technical term, define it briefly in parentheses.\n"
-            f"- State facts only: the recording's duration, whether slow or fast activity dominates, how clean or noisy the signal is. "
-            f"Do NOT speculate about mental states, emotions, attention, or what the person was doing.\n"
-            f"- Reference the real numbers naturally in words (e.g., 'fast brainwaves accounted for roughly half of the activity'), "
-            f"but never dump raw numbers or parameter lists.\n"
-            f"- NEVER mention individual channel names or channel 1, channel 2, etc.\n"
-            f"- Keep it concise and factual — every sentence should convey accurate information from the data. No generic filler.\n"
+            f"- Use everyday words a complete beginner understands. NO technical terms: do NOT use alpha/beta/delta/theta, "
+            f"bandpower, PSD, SNR, sampling rate, channel, or artifact. Say 'slow brainwaves' / 'fast brainwaves' or describe it in plain words.\n"
+            f"- Never dump percentages or parameter lists. You MAY say 'about half of the activity was in the slower range' "
+            f"to convey a proportion in words.\n"
+            f"- State facts only. Do NOT speculate about mental states, emotions, attention, or what the person was doing.\n"
+            f"- NEVER mention channel names or channel 1, channel 2, etc.\n"
+            f"- NO meta sentences ('以下是对这份记录的分析', '本文介绍了…', '总的来说…'), NO disclaimers, NO advice, NO closing invitation.\n"
+            f"- Do NOT repeat the same fact twice in different words — that is padding.\n"
             f"{uncertainty}"
             f"{boundary}\nEEG analysis JSON:\n{payload}\n"
         )
@@ -496,15 +502,18 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"artifacts/clipping/high-frequency noise were detected.\n\n"
             f"STYLE RULES:\n"
             f"- You MAY use the terms alpha/beta/theta/delta, bandpower, artifact, sampling rate, channel — but define each briefly the first time.\n"
+            f"- Each paragraph covers ONLY its own topic. State the dominant band percentage in paragraph 2 ONCE; "
+            f"do NOT restate it or the quality score anywhere else. Never repeat a point already made in an earlier paragraph.\n"
             f"- NEVER EVER list individual channel names such as 'EEG Fp1, EEG Fp2, F3, F4...' or 'EEG 001, EEG 002...'. "
             f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
             f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
             f"- DO NOT use markdown heading markers (### / ## / #) or 'Paragraph 1:' style section labels. "
             f"Output plain paragraphs separated by blank lines only — any markdown heading is stripped at output time.\n"
+            f"- NO meta or framing sentences: do NOT write '以下/本文/本报告…', do NOT open or close with '总的来说' / '综上所述' / '总之' / '希望…'.\n"
             f"- Output language MUST be fully {output_lang}. NO English words mixed in (except technical "
             f"abbreviations: EEG, PSD, SNR, Nyquist, EEG 001/002 channel patterns). Everything else in {output_lang}.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
-            f"- 3 paragraphs, each 3-4 sentences. TOTAL around 200-280 words. Substantive, no filler.\n"
+            f"- 3 paragraphs, each 3-4 sentences. TOTAL around 200-280 words. Substantive, no filler, no repetition.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
         )
     # research
@@ -524,10 +533,11 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"REAL, quantified limitation such as 'only 20 s ⇒ ~0.05 Hz resolution');\n"
         f"  (c) is a hedge with no number behind it.\n\n"
         f"PARAGRAPH 1 — Dominant spectral finding & absolute power (4-5 sentences): "
-        f"Open with the dominant band and its real percentage. Give the ABSOLUTE average_bandpower "
-        f"comparison (μV²/Hz) and QUANTIFY the dominance (e.g., 'alpha is 4.1× theta, 3.2× beta'), "
-        f"then assess how physiological (1/f-like) the profile is and how far it deviates, "
-        f"and name the single finding a researcher would act on.\n\n"
+        f"Open with the dominant band and its real percentage from bandpower_percent. Then use average_bandpower "
+        f"(absolute power, μV²/Hz) to QUANTIFY dominance as exact ratios computed from the real values "
+        f"(e.g., 'alpha power is 4.1× theta and 3.2× beta'), comparing the dominant band against EACH other band "
+        f"with its own real value. Assess how physiological (1/f-like) the spectral profile is and how far it deviates. "
+        f"Close by naming the single most actionable finding a researcher would act on.\n\n"
         f"PARAGRAPH 2 — Methodological limits that actually bind THIS data (3-4 sentences): "
         f"State only the constraints that are REAL for this recording, quantified (frequency resolution "
         f"from duration, e.g. '3 min ⇒ ~0.01 Hz resolution, adequate for band ratios; 20 s ⇒ ~0.05 Hz, "
@@ -540,6 +550,11 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"findings. No generic advice.\n\n"
         f"STYLE RULES:\n"
         f"- You MAY and SHOULD use technical terminology: PSD, bandpower, artifacts, Nyquist, montage, SNR.\n"
+        f"- EVERY sentence must carry at least one quantified value from the JSON (a %, a μV²/Hz value, a computed ratio, "
+        f"a Hz resolution, a channel count) OR a precise technical judgment about THIS recording. "
+        f"A sentence with neither is invalid text — delete it.\n"
+        f"- NEVER define terms (bandpower, sampling rate, PSD, Nyquist…). The reader is a researcher.\n"
+        f"- NO meta sentences, NO concluding summary ('综上所述' / '总体来看' / '总之'), NO disclaimers, NO advice.\n"
         f"- NEVER EVER list individual channel names such as 'Fp1, Fp2, F3, F4, T3, T4, C3, C4...' or 'EEG 001, EEG 002...'. "
         f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
         f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
@@ -655,6 +670,49 @@ def _strip_en_headings(text: str, lang: str) -> str:
     return "\n".join(lines).strip()
 
 
+# ── 无效文本/元话语清理 ──
+# 删除 AI 偶尔输出的"元话语"和纯套话句子：自我指涉框架句、总结空壳、客套结尾、纯废话。
+# 与 DISCLAIMER_PATTERNS 互补（免责声明那里已处理，这里处理"凑数"性质的无信息句）。
+_META_SENTENCE_RES = [
+    # 自我指涉框架句："以下/以上/本文/本报告/本分析…（…分析/介绍/总结/说明/解读/内容/信息）"
+    re.compile(r"^[（(]?(?:以下|以上|上面|上文|本文|本报告|本分析|本内容|这一|这段|本次|此次)[^。！？!?；;]{0,24}?(?:分析|介绍|总结|说明|解读|内容|报告|结论|信息)[）)]?。?$"),
+    # 总结空壳（后接内容 ≤4 字视为没实质内容）："综上所述。" "总而言之。" "总结来说。" "总体来看。"
+    re.compile(r"^[（(]?(?:综上(?:所述)?|总而言之|总的说来|总结来说|总结|最后|结尾|结语)[，,:：]?[^。！？!?；;]{0,4}。?$"),
+    # 客套/邀请结尾
+    re.compile(r"^[（(]?(?:希望|愿|如需|若有|如果有|如您|有任何问题|请咨询|建议您|欢迎)[^。！？!?；;]{0,34}?[。！？!?]?$"),
+    # 纯废话/空壳
+    re.compile(r"^[（(]?(?:仅|只是|仅供)(?:供|作|作为)?(?:参考|科普参考|科普|学习|了解|示意|展示|科普所用)。?$"),
+    re.compile(r"^(?:好的|OK|是的|嗯|总之|因此|可见|由上可知)。?$"),
+]
+
+
+def _strip_meta_sentences(text: str) -> str:
+    """删除 AI 输出中的元话语/套话/空壳句（'以下是对…的分析'、'综上所述'、'希望这份分析能帮助您'、
+    '仅供科普参考'等），与免责声明清理互补，保证每一句都有实质内容。按句切分处理，保留段落。"""
+    if not text:
+        return text
+    lines = [ln for ln in str(text).split("\n") if ln.strip()]
+    kept = []
+    for ln in lines:
+        segs = re.split(r"(?<=[。！？!?；;])|(?<=\.)(?<!\d\.)(?!\d)", ln)
+        kept_segs = []
+        for seg in segs:
+            s = seg.strip()
+            if not s:
+                continue
+            if any(p.match(s) for p in _META_SENTENCE_RES):
+                continue
+            # 句首/句尾带引号括号时再查一次
+            s2 = s.strip("\"'“”‘’（）()【】[]「」")
+            if s2 != s and any(p.match(s2) for p in _META_SENTENCE_RES):
+                continue
+            kept_segs.append(seg)
+        if kept_segs:
+            kept.append("".join(kept_segs))
+    # 全删光就返回空串（由调用方决定是否回退模板），不要把无效文本原样还回去
+    return "\n\n".join(kept).strip()
+
+
 def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]:
     """为指定语言生成三层解释；三层各独立调用 Ollama（并行），失败用模板兜底"""
     a     = analysis.copy()
@@ -673,8 +731,15 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
             # 所有级别都强制清除通道名列表（避免 AI 违反 prompt 列通道）
-            # 末端再做单档内去重，删掉模型同义复读的重复句
-            cleaned = _dedup_sentences(_strip_channel_names(_strip_en_headings(_strip_disclaimers(text), lang)))
+            # 再删元话语/套话/空壳句，末端做单档内去重（删同义复读），保证零凑数
+            cleaned = _dedup_sentences(
+                _strip_meta_sentences(
+                    _strip_channel_names(_strip_en_headings(_strip_disclaimers(text), lang))
+                )
+            )
+            # AI 输出全是无效文本（被清空）→ 回退模板，避免空解释
+            if not cleaned.strip():
+                return fallbacks[level]
             return cleaned
         except Exception:
             return fallbacks[level]
