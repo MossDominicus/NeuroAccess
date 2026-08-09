@@ -654,6 +654,13 @@ def _strip_en_headings(text: str, lang: str) -> str:
         text,
         flags=re.MULTILINE,
     )
+    # 2b) 删中文分节标签行："段落1：xxx" / "段落 2: xxx" / "第三部分：xxx"（设计不允许分节标签）
+    text = re.sub(
+        r"^(?:段落\s*[一二三四五六七八九十\d]*|第\s*[一二三四五六七八九十\d]+\s*(?:部分|小节))\s*[：:、.\-\s]*\S{0,40}$",
+        "",
+        text,
+        flags=re.MULTILINE,
+    )
     # 3) 清理通道名替换的啰嗦："各通道和EEG 各通道-各通道" → "各通道"
     text = re.sub(r"\bEEG\s*各通道", "各通道", text)
     text = re.sub(r"各通道\s*[,，、和与及]\s*EEG\s*各通道", "各通道", text)
