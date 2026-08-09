@@ -120,16 +120,33 @@ _CHANNEL_PATTERNS = [
     r"\bA[1-2]\b", r"\bM[1-2]\b", r"\bI[1-2]\b",
     r"\bEEG\s*CH\s*\d+\b", r"\bEEG\s*\d{2,3}\b", r"\bchannel\s*\d+\b",
 ]
+def _fix_channel_pattern(p: str) -> str:
+    """把 \b 边界改成 Unicode 安全的前/后顾。
+
+    关键：中文（如"和""如""的"）在 Python re 的 Unicode 模式下属于 \\w，
+    因此当中文直接紧贴 'EEG'/'Fp1' 时 \\b 根本不存在 → 通道名无法匹配。
+    改用 (?<![A-Za-z0-9])（前顾）与 (?![A-Za-z0-9])（后顾），
+    只排除 ASCII 字母/数字，中文相邻也能正常命中。
+    """
+    if p.startswith(r"\b"):
+        p = r"(?<![A-Za-z0-9])" + p[2:]
+    if p.endswith(r"\b"):
+        p = p[:-2] + r"(?![A-Za-z0-9])"
+    return p
+
+
 _CHANNEL_RE = re.compile(
-    "|".join(p[:-2] + r"(?![A-Za-z0-9])" if p.endswith(r"\b") else p for p in _CHANNEL_PATTERNS),
+    "|".join(_fix_channel_pattern(p) for p in _CHANNEL_PATTERNS),
     re.IGNORECASE,
 )
-# 连续通道名列表（逗号/顿号/空格/和/及 分隔），整体替换为一个中性词，保留句子主干
-# 注意：不带前缀的裸数字（如 68、128）不是通道名，不能匹配——只有 EEG/CH/channel 前缀的数字编号才算
-# 尾部用 (?![A-Za-z0-9]) 而非 \b：中文（如"和""的"）在 re 中是 \w，\b 在中文相邻时失效
+# 连续通道名列表（逗号/顿号/空格/和/与/及 分隔，可选前置"如/例如/比如"引导词），整体删除。
+# 注意：不带前缀的裸数字（如 68、128）不是通道名，不能匹配——只有 EEG/CH/channel 前缀的数字编号才算。
+# 前/后边界均用 (?<![A-Za-z0-9]) / (?![A-Za-z0-9]) 而非 \\b（原因见 _fix_channel_pattern）。
 _CHANNEL_ATOM = r"(?:(?:EEG|CH|Channel|channel)\s*)?(?:Fp1|Fp2|AF[3-7]|F[3-8z]|T[3-6]|C[3-4z]|P[3-4z]|O[1-2z]|A[1-2]|M[1-2]|I[1-2])"
 _CHANNEL_LIST_RE = re.compile(
-    r"\b" + _CHANNEL_ATOM + r"(?:\s*[,，、;；\s]\s*" + _CHANNEL_ATOM + r")*(?![A-Za-z0-9])",
+    r"(?<![A-Za-z0-9])(?:如|例如|比如|如\s*[:：]|例如\s*[:：]|比如\s*[:：])?\s*"
+    + _CHANNEL_ATOM
+    + r"(?:\s*[,，、;；\s和和与及]\s*" + _CHANNEL_ATOM + r")*(?![A-Za-z0-9])",
     re.IGNORECASE,
 )
 
@@ -149,14 +166,19 @@ def _strip_channel_names(text: str) -> str:
     #       不能用 \b（中文相邻时 \b 失效），改用 (?<![A-Za-z0-9])
     #       后置 lookahead 加上 "和/与/及"：处理 'EEG 和EEG' 这类连接词残留
     out = re.sub(r"(?<![A-Za-z0-9])(?:EEG|CH|Channel|channel)(?=\s*[-—–。.,，、;；:！？!?和与及]|\s*$)", "", out)
-    #    b) 孤立的连接词"和/与/及"（前是标点/空格，后是标点/空格/行尾）
-    out = re.sub(r"(?<=[：:,，、;；\s])(?:和|与|及|or|and)(?=\s*[-—–。.,，、;；:！？!?\s]|$)", "", out)
+    #    b) 孤立的连接词"和/与/及"（前是标点/括号/空格，后是标点/括号/空格/行尾）
+    out = re.sub(r"(?<=[：:,，、;；\s（(【])(?:和|与|及|or|and)(?=\s*[-—–。.,，、;；:！？!?\s)）】]|$)", "", out)
+    #    b2) 括号内残留的孤立引导词"如/例如/比如/比方"（通道名被删后只剩空壳，如"噪声通道（如）"）
+    out = re.sub(r"[（(]\s*(?:如|例如|比如|比方)\s*[：:，,、]?\s*[）)]", "", out)
     #    c) 破折号碎片 "A2-A1" → "-"
     out = re.sub(r"-{1,3}", "", out)
     #    d) "：。" / "，。" / "、。" → "。"
     out = re.sub(r"[：:，,、;；]\s*[。.]", "。", out)
     #    e) 行尾残留冒号/连接词/空格
     out = re.sub(r"[：:,，、;；\s]+$", "", out)
+    #    f) 清空空括号（删除通道名后留下的"（）"或"（ ）"）
+    out = re.sub(r"[（(]\s*[）)]", "", out)
+    out = re.sub(r"[【\[]\s*[】\]]", "", out)
     # 压缩行内多余空格（不碰换行——避免把 ### 标题与正文合并，导致标题正则误删整段）
     out = re.sub(r"[ \t]+", " ", out)
     return out.strip()
