@@ -145,9 +145,10 @@ def _strip_channel_names(text: str) -> str:
     # 2) 孤立单个通道名删除（含可选 EEG/CH/channel 前缀）
     out = _CHANNEL_RE.sub("", out)
     # 3) 清理残留（只处理被删通道名留下的碎片，不动正常标点）：
-    #    a) 孤立的 EEG/CH/channel 前缀（后跟标点/破折号/行尾）。
+    #    a) 孤立的 EEG/CH/channel 前缀（后跟标点/连接词/破折号/行尾）。
     #       不能用 \b（中文相邻时 \b 失效），改用 (?<![A-Za-z0-9])
-    out = re.sub(r"(?<![A-Za-z0-9])(?:EEG|CH|Channel|channel)(?=\s*[-—–。.,，、;；:！？!?]|\s*$)", "", out)
+    #       后置 lookahead 加上 "和/与/及"：处理 'EEG 和EEG' 这类连接词残留
+    out = re.sub(r"(?<![A-Za-z0-9])(?:EEG|CH|Channel|channel)(?=\s*[-—–。.,，、;；:！？!?和与及]|\s*$)", "", out)
     #    b) 孤立的连接词"和/与/及"（前是标点/空格，后是标点/空格/行尾）
     out = re.sub(r"(?<=[：:,，、;；\s])(?:和|与|及|or|and)(?=\s*[-—–。.,，、;；:！？!?\s]|$)", "", out)
     #    c) 破折号碎片 "A2-A1" → "-"
