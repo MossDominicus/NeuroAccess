@@ -3,6 +3,7 @@ NeuroAccess Backend — AI 解释生成模块
 OpenRouter API 调用 / prompt 构建 / 三层解释
 """
 import os
+import re
 import json
 import concurrent.futures
 import requests
@@ -107,6 +108,44 @@ def _pct(v) -> float | None:
         return float(s)
     except (TypeError, ValueError):
         return None
+
+
+# 标准 10-20 系统电极名 + 通用命名模式（数字编号 / 自定义名）—— 用于检测 AI 是否违规列出了通道名
+_CHANNEL_PATTERNS = [
+    r"\bEEG\s*Fp1\b", r"\bEEG\s*Fp2\b", r"\bEEG\s*AF[3-7]\b", r"\bEEG\s*F[3-8z]\b",
+    r"\bEEG\s*T[3-6]\b", r"\bEEG\s*C[3-4z]\b", r"\bEEG\s*P[3-4z]\b", r"\bEEG\s*O[1-2z]\b",
+    r"\bEEG\s*A[1-2]\b", r"\bEEG\s*M[1-2]\b", r"\bEEG\s*I[1-2]\b",
+    r"\bFp1\b", r"\bFp2\b", r"\bAF[3-7]\b", r"\bF[3-8z]\b",
+    r"\bT[3-6]\b", r"\bC[3-4z]\b", r"\bP[3-4z]\b", r"\bO[1-2z]\b",
+    r"\bA[1-2]\b", r"\bM[1-2]\b", r"\bI[1-2]\b",
+    r"\bEEG\s*CH\s*\d+\b", r"\bEEG\s*\d{2,3}\b", r"\bchannel\s*\d+\b",
+]
+_CHANNEL_RE = re.compile("|".join(_CHANNEL_PATTERNS), re.IGNORECASE)
+
+
+def _strip_channel_names(text: str) -> str:
+    """强制清除 AI 输出中的通道名（不符合 STYLE RULES 时兜底）。
+    匹配到任何通道名模式，整段用方括号包裹的省略号代替，避免半句话残缺。"""
+    if not text:
+        return text
+    # 把包含通道名的整句替换为简洁表达（保留原句式但清掉具体名称）
+    # 策略：检测到行内 channel 列举，整行替换为 "（已省略通道名列表，仅展示汇总特征）"
+    out_lines = []
+    for line in text.split("\n"):
+        matches = _CHANNEL_RE.findall(line)
+        if matches:
+            stripped = _CHANNEL_RE.sub("各通道", line).strip()
+            # 多通道名出现（≥3）或替换后内容过短 → 整行换成省略标记
+            if len(matches) >= 3 or len(stripped) < len(line) * 0.4:
+                if "个通道" in line or "通道" in line:
+                    out_lines.append("（已省略具体通道名，仅展示汇总特征）")
+                else:
+                    out_lines.append("(channel details omitted; aggregated view only)")
+            else:
+                out_lines.append(stripped)
+        else:
+            out_lines.append(line)
+    return "\n".join(out_lines)
 
 
 def _dominant_band_from_percent(bp: Dict[str, Any]) -> str | None:
@@ -382,7 +421,9 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"End with one sentence on what a beginner can learn from this particular file.\n\n"
             f"STYLE RULES:\n"
             f"- You MAY use the terms alpha/beta/theta/delta, bandpower, artifact, sampling rate, channel — but define each briefly the first time.\n"
-            f"- NEVER list individual channel names; refer to them collectively.\n"
+            f"- NEVER EVER list individual channel names such as 'EEG Fp1, EEG Fp2, F3, F4...' or 'EEG 001, EEG 002...'. "
+            f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
+            f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
             f"- 3 paragraphs, each 3-4 sentences. Substantive, not padded.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
@@ -412,7 +453,9 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"hidden problems or infer threats that the data does not directly show.\n\n"
         f"STYLE RULES:\n"
         f"- You MAY and SHOULD use technical terminology: PSD, bandpower, artifacts, Nyquist, montage, SNR.\n"
-        f"- NEVER list individual channel names; refer to them collectively or by count.\n"
+        f"- NEVER EVER list individual channel names such as 'Fp1, Fp2, F3, F4, T3, T4, C3, C4...' or 'EEG 001, EEG 002...'. "
+        f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
+        f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
         f"- Write the ENTIRE explanation, including any paragraph headings, in {output_lang}. "
         f"Never leave headings in English — translate or omit them. The output must be fully in {output_lang}.\n"
         f"- NEVER output sentences stating that the data cannot provide information about "
@@ -510,7 +553,9 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
-            return _strip_en_headings(_strip_disclaimers(text), lang)
+            # 所有级别都强制清除通道名列表（避免 AI 违反 prompt 列通道）
+            cleaned = _strip_channel_names(_strip_en_headings(_strip_disclaimers(text), lang))
+            return cleaned
         except Exception:
             return fallbacks[level]
 
