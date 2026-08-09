@@ -258,33 +258,24 @@ def template_beginner(a: Dict, lang: str) -> str:
         f"有 {n} 个区域读数较不清晰" if lang == "zh" else f"{n} area(s) are harder to read")
     if lang == "en":
         return (
-            f"This recording contains brainwave signals from {ch_n or 'multiple'} sensors "
-            f"over {dur or 'a short'} period of time.\n\n"
-            f"The most prominent activity is {dom_plain}"
-            + (f" (about {pct_num}% of total activity)" if pct_num is not None else "")
-            + f". {n_s}.\n\n"
-            f"Overall, the recording is {q} — it is clear enough to study how brainwaves behave, "
-            f"but it reflects only this particular moment of recording."
+            f"The main activity in this recording is {dom_plain}"
+            + (f", accounting for about {pct_num}% of total activity" if pct_num is not None else "")
+            + f". Signal clarity is {q}"
+            + (f"; {n_s}." if n > 0 else "; readings across all positions are clear.")
         )
     if lang == "zh":
         return (
-            f"这份记录包含了来自 {ch_n or '多个'} 个传感位置的脑电信号，"
-            f"记录了 {dur or '一小段时间'} 的脑电活动。\n\n"
-            f"其中最主要的是{dom_plain}，"
-            + (f"约占全部活动的 {pct_num}%" if pct_num is not None else "占了较大比例")
-            + f"。{n_s}。\n\n"
-            f"总体来看，这份记录的清晰度属于「{q}」，足以用来观察和了解脑电波的基本样子；"
-            f"但请注意，它只反映这一小段记录时间内的情况。"
+            f"这份记录的主要活动属于{dom_plain}"
+            + (f"，约占全部活动的 {pct_num}%" if pct_num is not None else "")
+            + f"。信号清晰度为{q}"
+            + (f"，{n_s}。" if n > 0 else "，各位置的读数都比较清楚。")
         )
     # fallback English for unsupported languages
     return (
-        f"This recording contains brainwave signals from {ch_n or 'multiple'} sensors "
-        f"over {dur or 'a short'} period of time.\n\n"
-        f"The most prominent activity is {dom_plain}"
-        + (f" (about {pct_num}% of total activity)" if pct_num is not None else "")
-        + f". {n_s}.\n\n"
-        f"Overall, the recording is {q} — it is clear enough to study how brainwaves behave, "
-        f"but it reflects only this particular moment of recording."
+        f"The main activity in this recording is {dom_plain}"
+        + (f", accounting for about {pct_num}% of total activity" if pct_num is not None else "")
+        + f". Signal clarity is {q}"
+        + (f"; {n_s}." if n > 0 else "; readings across all positions are clear.")
     )
 
 
