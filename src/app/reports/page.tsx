@@ -285,7 +285,7 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
     <div class="meta-item"><div class="meta-label">${t("fileName")}</div><div class="meta-value">${report.fileName}</div></div>
     <div class="meta-item"><div class="meta-label">${t("date")}</div><div class="meta-value">${report.date}</div></div>
     <div class="meta-item"><div class="meta-label">${t("mode")}</div><div class="meta-value">${report.mode}</div></div>
-    <div class="meta-item"><div class="meta-label">${t("signalQuality")}</div><div class="meta-value">${a?.signal_quality_score ?? "-"}</div></div>
+    <div class="meta-item"><div class="meta-label">${t("signalQuality")}</div><div class="meta-value">${a?.signal_quality_score != null ? Number(a.signal_quality_score.toFixed(3)) : "-"}</div></div>
     <div class="meta-item"><div class="meta-label">${t("channelCount")}</div><div class="meta-value">${a?.channel_count ?? "-"}</div></div>
     <div class="meta-item"><div class="meta-label">${t("samplingRate")}</div><div class="meta-value">${a?.sampling_rate ?? "-"} Hz</div></div>
   </div>

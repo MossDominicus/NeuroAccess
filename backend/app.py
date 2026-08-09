@@ -217,6 +217,8 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
     })
     literacy_scores = _compute_literacy_scores(data, quality, bp_normalized)
     sq = quality.get("signal_quality_score") or data.get("signal_quality_score")
+    _sqf = safe_float(sq)
+    sq3 = round(_sqf, 3) if _sqf is not None else None  # 评分源头截位到 3 位小数，前端/存储/AI 全用舍入值
     confidence = _compute_confidence(data, sq, quality, language)
     cannot_tell = to_jsonable(data.get("what_this_data_cannot_tell") or ["智商","性格","心理健康","疾病","情绪","ADHD","抑郁症"])
     return to_jsonable({
@@ -225,7 +227,7 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
         "sampling_rate": overview.get("sampling_rate") or data.get("sampling_rate") or 0,
         "duration": overview.get("duration") or data.get("duration") or "Unknown",
         "channel_names": overview.get("channel_names") or data.get("channel_names") or [],
-        "signal_quality_score": safe_float(sq),
+        "signal_quality_score": sq3,
         "noisy_channels": quality.get("noisy_channels") or [],
         "possible_artifacts": quality.get("possible_artifacts") or [],
         "clipping_detected": quality.get("clipping_detected", False),
@@ -239,7 +241,7 @@ def enhance_analysis(raw: Dict[str, Any], language: str = "zh") -> Dict[str, Any
         "waveform_preview": to_jsonable(data.get("waveform_preview", {})),
         "band_waveforms": to_jsonable(data.get("band_waveforms", {})),
         "signal_quality": to_jsonable({
-            "signal_quality_score": safe_float(sq),
+            "signal_quality_score": sq3,
             "noisy_channels": quality.get("noisy_channels") or [],
             "clipping_detected": quality.get("clipping_detected", False),
             "possible_artifacts": quality.get("possible_artifacts") or [],
