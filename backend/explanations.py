@@ -466,6 +466,7 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"STYLE RULES:\n"
             f"- Use everyday words a complete beginner understands. NO technical terms: do NOT use alpha/beta/delta/theta, "
             f"bandpower, PSD, SNR, sampling rate, channel, or artifact. Say 'slow brainwaves' / 'fast brainwaves' or describe it in plain words.\n"
+            f"- NEVER write the wave names alpha/beta/theta/delta/gamma (even translated) — always say 'slow waves' or 'fast waves'.\n"
             f"- Never dump percentages or parameter lists. You MAY say 'about half of the activity was in the slower range' "
             f"to convey a proportion in words.\n"
             f"- State facts only. Do NOT speculate about mental states, emotions, attention, or what the person was doing.\n"
@@ -500,12 +501,15 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- You MAY use the terms alpha/beta/theta/delta, bandpower, artifact, sampling rate, channel — but define each briefly the first time.\n"
             f"- Each paragraph covers ONLY its own topic. State the dominant band percentage in paragraph 2 ONCE; "
             f"do NOT restate it or the quality score anywhere else. Never repeat a point already made in an earlier paragraph.\n"
-            f"- NEVER EVER list individual channel names such as 'EEG Fp1, EEG Fp2, F3, F4...' or 'EEG 001, EEG 002...'. "
-            f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
-            f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
+            f"- If specific channels were flagged noisy, you MAY name them briefly (e.g., 'EEG 001, EEG 005'); "
+            f"keep such lists to at most 3-5 names. Otherwise refer to a channel count (e.g. '21 channels') or 'the channels'.\n"
             f"- DO NOT use markdown heading markers (### / ## / #) or 'Paragraph 1:' style section labels. "
             f"Output plain paragraphs separated by blank lines only — any markdown heading is stripped at output time.\n"
             f"- NO meta or framing sentences: do NOT write '以下/本文/本报告…', do NOT open or close with '总的来说' / '综上所述' / '总之' / '希望…'.\n"
+            f"- NEVER describe the recording in terms of mental states: do NOT say the data indicates relaxation, "
+            f"attention, emotion, cognition, sleepiness, or any psychological condition. Bandpower is a signal property, not a mind-reading.\n"
+            f"- When stating a frequency range, ALWAYS keep the two numbers separate with a hyphen or '到' "
+            f"(e.g., '8-13 Hz' or '8 到 13 Hz'); never merge them into one number (never write '813 Hz').\n"
             f"- Output language MUST be fully {output_lang}. NO English words mixed in (except technical "
             f"abbreviations: EEG, PSD, SNR, Nyquist, EEG 001/002 channel patterns). Everything else in {output_lang}.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
@@ -518,7 +522,8 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"Output language: {output_lang}.\n"
         f"Audience: researchers, EEG technicians, and data analysts.\n\n"
         f"TASK: Write a RIGOROUS, DENSE research analysis of THIS recording in 3 paragraphs. "
-        f"You MUST write all 3 paragraphs described below — a missing paragraph is a failure. "
+        f"You MUST write EXACTLY three paragraphs — 段落1：频谱主导与绝对功率；段落2：方法学局限（频率分辨率等）；段落3：质量与下游处理。 "
+        f"Each paragraph is mandatory; merging or skipping any paragraph is a FAILURE. "
         f"This is the deepest level of the report — it MUST be the longest and most information-dense "
         f"of the three levels. Every sentence must carry the highest-value technical information a "
         f"researcher would act on. NO filler, NO generic methodology notes.\n\n"
@@ -552,9 +557,10 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"A sentence with neither is invalid text — delete it.\n"
         f"- NEVER define terms (bandpower, sampling rate, PSD, Nyquist…). The reader is a researcher.\n"
         f"- NO meta sentences, NO concluding summary ('综上所述' / '总体来看' / '总之'), NO disclaimers, NO advice.\n"
-        f"- NEVER EVER list individual channel names such as 'Fp1, Fp2, F3, F4, T3, T4, C3, C4...' or 'EEG 001, EEG 002...'. "
-        f"NEVER list a numbered/lettered subset of channels either. Refer to channels ONLY as a count (e.g. '21 channels') or collectively ('the channels', '各通道'). "
-        f"Violations are automatically stripped at output time, so writing them out wastes your response.\n"
+        f"- NEVER describe the recording in terms of mental states: do NOT say the data reflects relaxation, "
+        f"attention, emotion, cognition, sleepiness, or any psychological condition. Bandpower describes the signal, not the person.\n"
+        f"- If specific channels were flagged noisy, you MAY name them (e.g., 'EEG 001, EEG 005') in the quality sentence; "
+        f"keep such lists to at most 3-5 names. Otherwise refer to a channel count or 'the channels'.\n"
         f"- Write the ENTIRE explanation, including any paragraph headings, in {output_lang}. "
         f"Never leave headings in English — translate or omit them. The output must be fully in {output_lang}.\n"
         f"- DO NOT use markdown heading markers (### / ## / #) or 'Paragraph 1:' / 'Paragraph 2:' style section labels. "
@@ -711,6 +717,46 @@ def _strip_meta_sentences(text: str) -> str:
     return "\n\n".join(kept).strip()
 
 
+# ── 心智状态解读清理 ──
+# 删除 AI 把频段功率解读成"人处于什么状态"的句子（违反边界规则 2：bandpower 是信号属性，不是读心）。
+# 规则：句中同时出现「心智词」和「推测/关联词」才删，避免误删正常描述。
+_MENTAL_WORDS = [
+    "放松", "紧张", "注意力", "专注", "情绪", "认知", "心理", "精神状态", "清醒",
+    "困倦", "疲劳", "睡眠", "焦虑", "兴奋", "平静", "警觉", "活跃", "做梦", "冥想",
+    "思考", "心境", "压力", "意识", "心态",
+    "relax", "attention", "emotion", "cognitive", "mental", "alert", "focus",
+    "fatigue", "sleep", "calm", "anxiety", "thinking", "arousal", "stress", "mind",
+]
+_MENTAL_HEDGE = [
+    "可能", "或许", "也许", "大概", "表明", "反映", "提示", "意味着", "说明",
+    "暗示", "推测", "推断", "相关", "关联",
+    "may", "might", "could", "likely", "suggests", "reflects", "indicates",
+    "implies", "related", "associated",
+]
+
+
+def _strip_mental_states(text: str) -> str:
+    """删除心智状态解读句（'alpha 占主导可能表明处于放松状态' 等），按句切分，保留段落。"""
+    if not text:
+        return text
+    lines = [ln for ln in str(text).split("\n") if ln.strip()]
+    kept = []
+    for ln in lines:
+        segs = re.split(r"(?<=[。！？!?；;])|(?<=\.)(?<!\d\.)(?!\d)", ln)
+        kept_segs = []
+        for seg in segs:
+            s = seg.strip()
+            if not s:
+                continue
+            low = s.lower()
+            if any(w in low for w in _MENTAL_WORDS) and any(w in low for w in _MENTAL_HEDGE):
+                continue
+            kept_segs.append(seg)
+        if kept_segs:
+            kept.append("".join(kept_segs))
+    return "\n\n".join(kept).strip()
+
+
 def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]:
     """为指定语言生成三层解释；三层各独立调用 Ollama（并行），失败用模板兜底"""
     a     = analysis.copy()
@@ -730,11 +776,13 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 return fallbacks[level]
-            # 所有级别都强制清除通道名列表（避免 AI 违反 prompt 列通道）
-            # 再删元话语/套话/空壳句，末端做单档内去重（删同义复读），保证零凑数
+            # 通道名保留完整显示（不删，避免半截残留）；只清免责声明/英文标题/元话语/心智状态句，
+            # 末端做单档内去重（删同义复读），保证零凑数
             cleaned = _dedup_sentences(
-                _strip_meta_sentences(
-                    _strip_channel_names(_strip_en_headings(_strip_disclaimers(text), lang))
+                _strip_mental_states(
+                    _strip_meta_sentences(
+                        _strip_en_headings(_strip_disclaimers(text), lang)
+                    )
                 )
             )
             # AI 输出全是无效文本（被清空）→ 回退模板，避免空解释
