@@ -187,12 +187,16 @@ export function computeBandDominantCounts(
     for (const band of BANDS) {
       const lo = Math.max(1, Math.round(band.low / freqRes));
       const hi = Math.min(fftN - 1, Math.round(band.high / freqRes));
+      // 用"每bin平均功率"而不是"总累加"，避免宽频段（beta ~17 bin）天然赢过窄频段（delta ~3 bin）
       let power = 0;
+      let nBins = 0;
       for (let k = lo; k <= hi; k++) {
         power += re[k] * re[k] + im[k] * im[k];
+        nBins += 1;
       }
-      if (power > bestPower) {
-        bestPower = power;
+      const meanPower = nBins > 0 ? power / nBins : 0;
+      if (meanPower > bestPower) {
+        bestPower = meanPower;
         bestName = band.name;
       }
     }
