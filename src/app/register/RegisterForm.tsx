@@ -8,7 +8,7 @@ import { useLang } from "@/lib/language-context";
 import Link from "next/link";
 import { translations } from "@/lib/translations";
 import AuthSettingsBar from "@/components/AuthSettingsBar";
-import CaptchaModal from "@/components/CaptchaModal";
+import TurnstileModal from "@/components/TurnstileModal";
 
 interface RegisterFormProps {
   lang: string;
@@ -39,8 +39,9 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
-  // ── 人机验证（数学验证码） ──
-  const [captchaOpen, setCaptchaOpen] = useState(false);
+  // ── Turnstile 人机验证 ──
+  const [turnstileOpen, setTurnstileOpen] = useState(false);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
   const pendingRegRef = useRef<{ username: string; email: string; password: string; code: string } | null>(null);
   const [devCode, setDevCode] = useState("");
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -89,24 +90,24 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
     try {
       const result = await register(username, email, password, code);
       if (result.success) { router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800); }
-      else if (result.needsCaptcha) {
+      else if (result.needsCaptcha && turnstileSiteKey) {
         pendingRegRef.current = { username, email, password, code };
-        setCaptchaOpen(true);
+        setTurnstileOpen(true);
       }
       else { setError(result.error || tf("registerFailed", "Registration failed")); }
     } catch (err: any) { setError(err.message || tf("networkErrorMsg", "Network error")); }
     finally { setSubmitting(false); }
   };
 
-  // ── 人机验证回调（数学验证码） ──
-  const handleCaptchaVerify = async (captchaToken: string) => {
+  // ── Turnstile 人机验证回调 ──
+  const handleTurnstileVerify = async (cfToken: string) => {
     try {
       const pending = pendingRegRef.current;
-      if (!pending) { setError("验证状态丢失，请重新注册"); setCaptchaOpen(false); return; }
-      const result = await register(pending.username, pending.email, pending.password, pending.code, captchaToken);
+      if (!pending) { setError("验证状态丢失，请重新注册"); setTurnstileOpen(false); return; }
+      const result = await register(pending.username, pending.email, pending.password, pending.code, cfToken);
       if (result.success) { window.location.assign("/"); }
-      else { setCaptchaOpen(false); setError(result.error || tf("registerFailed", "Registration failed")); }
-    } catch (err: any) { setCaptchaOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
+      else { setTurnstileOpen(false); setError(result.error || tf("registerFailed", "Registration failed")); }
+    } catch (err: any) { setTurnstileOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
     finally { pendingRegRef.current = null; }
   };
 
@@ -186,7 +187,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
           <Link href="/login" className="font-medium underline underline-offset-2 hover:opacity-70 transition-opacity">{tf("login", "Login")}</Link>
         </div>
       </div>
-      <CaptchaModal open={captchaOpen} onVerify={handleCaptchaVerify} onClose={() => { setCaptchaOpen(false); pendingRegRef.current = null; }} />
+      <TurnstileModal siteKey={turnstileSiteKey} open={turnstileOpen} onVerify={handleTurnstileVerify} onClose={() => { setTurnstileOpen(false); pendingRegRef.current = null; }} />
     </motion.div>
   );
 }

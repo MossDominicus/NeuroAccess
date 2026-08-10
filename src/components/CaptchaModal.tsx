@@ -22,7 +22,7 @@ export default function CaptchaModal({ open, onVerify, onClose }: Props) {
     setAnswer("");
     setError("");
     setLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/captcha`, { method: "POST" })
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/captcha`)
       .then((r) => r.json())
       .then((data) => {
         if (data.qid) { setQid(data.qid); setQuestion(data.question); }

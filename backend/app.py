@@ -763,7 +763,7 @@ def captcha_generate():
 
 @app.post("/api/auth/captcha/verify")
 def captcha_verify(qid: str = Form(...), answer: str = Form(...)):
-    """验证数学验证码答案，成功返回一次性 token"""
+    """验证数学验证码答案，成功返回 token"""
     record = _CAPTCHA_STORE.get(qid)
     if not record:
         return {"success": False, "error": "验证已过期，请重新获取"}
@@ -776,34 +776,10 @@ def captcha_verify(qid: str = Form(...), answer: str = Form(...)):
             del _CAPTCHA_STORE[qid]
             # 生成一个一次性验证 token（用于后端防重放）
             token = _secrets.token_hex(16)
-            _CAPTCHA_TOKENS.add(token)
             return {"success": True, "token": token}
     except ValueError:
         pass
     return {"success": False, "error": "答案错误"}
-
-# ── 一次性人机验证 token 存储（登录/注册提交时校验并消费） ──
-_CAPTCHA_TOKENS: set = set()
-
-
-def verify_captcha_token(token: str) -> bool:
-    """校验一次性数学验证码 token；成功即消费（防重放）。"""
-    if not token:
-        return False
-    if token in _CAPTCHA_TOKENS:
-        _CAPTCHA_TOKENS.discard(token)
-        return True
-    return False
-
-
-def verify_human(cf_turnstile_response: str, captcha_token: str) -> bool:
-    """统一人机验证入口：数学验证码为现行方案（必需），Turnstile 仅兼容且需已配密钥。
-    注意：不能直接 `or verify_turnstile()`——未配密钥时它恒返回 True，会让验证形同虚设。"""
-    if verify_captcha_token(captcha_token):
-        return True
-    if TURNSTILE_SECRET_KEY and verify_turnstile(cf_turnstile_response):
-        return True
-    return False
 
 # ── Cloudflare Turnstile 人机验证（已弃用，保留兼容）─────────
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
@@ -834,14 +810,15 @@ def verify_turnstile(token: str) -> bool:
 @app.post("/api/auth/register")
 def auth_register(username: str = Form(...), email: str = Form(...),
                   password: str = Form(...), code: str = Form(...),
-                  cf_turnstile_response: str = Form(""), captcha_token: str = Form("")):
+                  cf_turnstile_response: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
-    # 先人机验证，再消费注册验证码——否则验证码被消费后用户重试必失败
-    if not (verify_human(cf_turnstile_response, captcha_token)):
-        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
+    # 先验证注册验证码（不管 Turnstile）
     if not verify_registration_code(email, code):
         return {"success": False, "error": "验证码无效或已过期"}
+    # 验证码正确 → 需要人机验证
+    if not verify_turnstile(cf_turnstile_response):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     try:
         user = create_user(username, email, password)
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
@@ -853,19 +830,19 @@ def auth_register(username: str = Form(...), email: str = Form(...),
 
 @app.post("/api/auth/login")
 def auth_login(username_or_email: str = Form(...), password: str = Form(...),
-               cf_turnstile_response: str = Form(""), captcha_token: str = Form("")):
+               cf_turnstile_response: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
-    # 先人机验证
-    if not (verify_human(cf_turnstile_response, captcha_token)):
-        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
-    # 验证账号密码
+    # 先验证账号密码（不管 Turnstile）
     try:
         user = authenticate_user(username_or_email, password)
     except PermissionError as e:
         return {"success": False, "error": str(e)}
     if not user:
         return {"success": False, "error": "用户名或密码错误"}
+    # 密码正确 → 需要人机验证
+    if not verify_turnstile(cf_turnstile_response):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
     terms_accepted = user.get("terms_accepted", 0)
     needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
@@ -909,12 +886,9 @@ def auth_send_login_code(email: str = Form(...)):
 
 @app.post("/api/auth/login-with-code")
 def auth_login_with_code(email: str = Form(...), code: str = Form(...),
-                         cf_turnstile_response: str = Form(""), captcha_token: str = Form("")):
+                         cf_turnstile_response: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
-    # 先人机验证，再消费登录验证码（避免验证码被消费后重试失败）
-    if not (verify_human(cf_turnstile_response, captcha_token)):
-        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     try:
         from auth import get_user_by_email
         if not verify_verification_code(email=email, code=code, purpose="login"):
@@ -922,6 +896,9 @@ def auth_login_with_code(email: str = Form(...), code: str = Form(...),
         user = get_user_by_email(email)
         if not user:
             return {"success": False, "error": "账号不存在"}
+        # 验证码正确 → 需要人机验证
+        if not verify_turnstile(cf_turnstile_response):
+            return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
         terms_accepted = user.get("terms_accepted", 0)
         needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
