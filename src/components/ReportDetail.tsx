@@ -164,6 +164,37 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
           );
         })()}
 
+        {/* ── 噪声通道与伪影（数据存在但此前未渲染） ── */}
+        {(() => {
+          const noisy = (signalQuality as any).noisy_channels || (analysis as any).noisy_channels || [];
+          const artifacts = (signalQuality as any).possible_artifacts || (analysis as any).possible_artifacts || [];
+          if (noisy.length === 0 && artifacts.length === 0) return null;
+          return (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {noisy.length > 0 && (
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
+                  <h3 className="mb-2 text-sm font-semibold text-[var(--color-text)]">{t("noisyChannels")}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {noisy.map((n: string) => (
+                      <span key={n} className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/40 dark:text-red-400">{n}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {artifacts.length > 0 && (
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
+                  <h3 className="mb-2 text-sm font-semibold text-[var(--color-text)]">{t("scoringArtifact")}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {artifacts.map((a: string) => (
+                      <span key={a} className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
       </section>
 
       {/* ── Section 3: Frequency Analysis ───────────── */}

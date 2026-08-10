@@ -763,7 +763,7 @@ def captcha_generate():
 
 @app.post("/api/auth/captcha/verify")
 def captcha_verify(qid: str = Form(...), answer: str = Form(...)):
-    """验证数学验证码答案，成功返回 token"""
+    """验证数学验证码答案，成功返回一次性 token"""
     record = _CAPTCHA_STORE.get(qid)
     if not record:
         return {"success": False, "error": "验证已过期，请重新获取"}
@@ -776,10 +776,34 @@ def captcha_verify(qid: str = Form(...), answer: str = Form(...)):
             del _CAPTCHA_STORE[qid]
             # 生成一个一次性验证 token（用于后端防重放）
             token = _secrets.token_hex(16)
+            _CAPTCHA_TOKENS.add(token)
             return {"success": True, "token": token}
     except ValueError:
         pass
     return {"success": False, "error": "答案错误"}
+
+# ── 一次性人机验证 token 存储（登录/注册提交时校验并消费） ──
+_CAPTCHA_TOKENS: set = set()
+
+
+def verify_captcha_token(token: str) -> bool:
+    """校验一次性数学验证码 token；成功即消费（防重放）。"""
+    if not token:
+        return False
+    if token in _CAPTCHA_TOKENS:
+        _CAPTCHA_TOKENS.discard(token)
+        return True
+    return False
+
+
+def verify_human(cf_turnstile_response: str, captcha_token: str) -> bool:
+    """统一人机验证入口：数学验证码为现行方案（必需），Turnstile 仅兼容且需已配密钥。
+    注意：不能直接 `or verify_turnstile()`——未配密钥时它恒返回 True，会让验证形同虚设。"""
+    if verify_captcha_token(captcha_token):
+        return True
+    if TURNSTILE_SECRET_KEY and verify_turnstile(cf_turnstile_response):
+        return True
+    return False
 
 # ── Cloudflare Turnstile 人机验证（已弃用，保留兼容）─────────
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
@@ -810,15 +834,14 @@ def verify_turnstile(token: str) -> bool:
 @app.post("/api/auth/register")
 def auth_register(username: str = Form(...), email: str = Form(...),
                   password: str = Form(...), code: str = Form(...),
-                  cf_turnstile_response: str = Form("")):
+                  cf_turnstile_response: str = Form(""), captcha_token: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
-    # 先验证注册验证码（不管 Turnstile）
+    # 先人机验证，再消费注册验证码——否则验证码被消费后用户重试必失败
+    if not (verify_human(cf_turnstile_response, captcha_token)):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     if not verify_registration_code(email, code):
         return {"success": False, "error": "验证码无效或已过期"}
-    # 验证码正确 → 需要人机验证
-    if not verify_turnstile(cf_turnstile_response):
-        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     try:
         user = create_user(username, email, password)
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
@@ -830,19 +853,19 @@ def auth_register(username: str = Form(...), email: str = Form(...),
 
 @app.post("/api/auth/login")
 def auth_login(username_or_email: str = Form(...), password: str = Form(...),
-               cf_turnstile_response: str = Form("")):
+               cf_turnstile_response: str = Form(""), captcha_token: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
-    # 先验证账号密码（不管 Turnstile）
+    # 先人机验证
+    if not (verify_human(cf_turnstile_response, captcha_token)):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
+    # 验证账号密码
     try:
         user = authenticate_user(username_or_email, password)
     except PermissionError as e:
         return {"success": False, "error": str(e)}
     if not user:
         return {"success": False, "error": "用户名或密码错误"}
-    # 密码正确 → 需要人机验证
-    if not verify_turnstile(cf_turnstile_response):
-        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
     terms_accepted = user.get("terms_accepted", 0)
     needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
@@ -886,9 +909,12 @@ def auth_send_login_code(email: str = Form(...)):
 
 @app.post("/api/auth/login-with-code")
 def auth_login_with_code(email: str = Form(...), code: str = Form(...),
-                         cf_turnstile_response: str = Form("")):
+                         cf_turnstile_response: str = Form(""), captcha_token: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
+    # 先人机验证，再消费登录验证码（避免验证码被消费后重试失败）
+    if not (verify_human(cf_turnstile_response, captcha_token)):
+        return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     try:
         from auth import get_user_by_email
         if not verify_verification_code(email=email, code=code, purpose="login"):
@@ -896,9 +922,6 @@ def auth_login_with_code(email: str = Form(...), code: str = Form(...),
         user = get_user_by_email(email)
         if not user:
             return {"success": False, "error": "账号不存在"}
-        # 验证码正确 → 需要人机验证
-        if not verify_turnstile(cf_turnstile_response):
-            return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
         terms_accepted = user.get("terms_accepted", 0)
         needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
@@ -1005,6 +1028,12 @@ def _has_active_code(conn, user_id=None, email=None, purpose=None):
             return False, 0
         last_created = _dt.fromisoformat(row["created_at"])
         expires_at = _dt.fromisoformat(row["expires_at"])
+        # SQLite CURRENT_TIMESTAMP 是 naive UTC；统一补 tzinfo 再与 aware now 比较，
+        # 否则 aware - naive 抛 TypeError 被 except 吞掉 → 60 秒拦截永远失效
+        if last_created.tzinfo is None:
+            last_created = last_created.replace(tzinfo=_tz.utc)
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=_tz.utc)
         now = _dt.now(_tz.utc)
         if now >= expires_at:
             return False, 0
@@ -1083,7 +1112,10 @@ def auth_verification_code(credentials: HTTPAuthorizationCredentials = Depends(s
         row = conn.execute("SELECT created_at FROM verification_codes WHERE user_id=? AND purpose=? AND used=0 ORDER BY created_at DESC LIMIT 1", (user_id, "password_change")).fetchone()
         if row and row["created_at"]:
             from datetime import datetime as _dt
-            elapsed = (_dt.now(_tz.utc) - _dt.fromisoformat(row["created_at"])).total_seconds()
+            _last = _dt.fromisoformat(row["created_at"])
+            if _last.tzinfo is None:
+                _last = _last.replace(tzinfo=_tz.utc)
+            elapsed = (_dt.now(_tz.utc) - _last).total_seconds()
             if elapsed < 60:
                 raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=f"请等待{int(60-elapsed)}秒后再获取验证码")
     finally:
@@ -1202,7 +1234,10 @@ def auth_send_email_change_code(credentials: HTTPAuthorizationCredentials = Depe
         row = conn.execute("SELECT created_at FROM verification_codes WHERE user_id=? AND purpose=? AND used=0 ORDER BY created_at DESC LIMIT 1", (user_id, f"email_change:{new_email}")).fetchone()
         if row and row["created_at"]:
             from datetime import datetime as _dt
-            elapsed = (_dt.now(_tz.utc) - _dt.fromisoformat(row["created_at"])).total_seconds()
+            _last = _dt.fromisoformat(row["created_at"])
+            if _last.tzinfo is None:
+                _last = _last.replace(tzinfo=_tz.utc)
+            elapsed = (_dt.now(_tz.utc) - _last).total_seconds()
             if elapsed < 60:
                 conn.close()
                 raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=f"请等待{int(60-elapsed)}秒后再获取验证码")
@@ -1266,7 +1301,10 @@ def auth_send_delete_account_code(credentials: HTTPAuthorizationCredentials = De
         row = conn.execute("SELECT created_at FROM verification_codes WHERE user_id=? AND purpose=? AND used=0 ORDER BY created_at DESC LIMIT 1", (user_id, "delete_account")).fetchone()
         if row and row["created_at"]:
             from datetime import datetime as _dt
-            elapsed = (_dt.now(_tz.utc) - _dt.fromisoformat(row["created_at"])).total_seconds()
+            _last = _dt.fromisoformat(row["created_at"])
+            if _last.tzinfo is None:
+                _last = _last.replace(tzinfo=_tz.utc)
+            elapsed = (_dt.now(_tz.utc) - _last).total_seconds()
             if elapsed < 60:
                 conn.close()
                 raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=f"请等待{int(60-elapsed)}秒后再获取验证码")
@@ -1323,6 +1361,9 @@ async def auth_update_profile(request: Request, credentials: HTTPAuthorizationCr
     avatar_color = body.get("avatar_color", "").strip()
     # 头像颜色白名单（与前端 src/app/account/page.tsx AVATAR_COLORS 保持一致）
     ALLOWED_AVATAR_COLORS = {"#EF4444", "#F97316", "#EAB308", "#22C55E", "#3B82F6", "#8B5CF6", "#EC4899", "#14B8A6"}
+    # 兼容数据库旧默认值 'blue' → 归一化为色板蓝色，避免新用户无法保存资料
+    if avatar_color == "blue":
+        avatar_color = "#3B82F6"
     if username is not None and username != "":
         sys.path.insert(0, BASE_DIR)
         from auth import _visual_length, _is_unicode_letter_start, _has_special_symbol
@@ -1463,16 +1504,20 @@ async def submit_survey(request: Request, credentials: HTTPAuthorizationCredenti
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(SURVEY_LOG, "a") as f:
             f.write(json.dumps({"timestamp": ts, "user_id": user_id, **body}, ensure_ascii=False) + "\n")
-        # 标记该用户已完成问卷
+        # 持久化到 survey_submissions 表（永久存储，替代易碎的纯文件日志）
         try:
             import sqlite3
             db_path = os.path.join(BASE_DIR, "neuroaccess.db")
             conn = sqlite3.connect(db_path)
+            conn.execute(
+                "INSERT INTO survey_submissions (user_id, data, created_at) VALUES (?,?,?)",
+                (user_id, json.dumps(body, ensure_ascii=False), ts),
+            )
             conn.execute("UPDATE users SET survey_completed = 1 WHERE id = ?", (user_id,))
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"[survey] mark user survey_completed failed: {e}")
+            print(f"[survey] DB save failed: {e}")
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}

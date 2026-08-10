@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 import { MessageSquare, Send, CheckCircle } from "lucide-react";
 
 export interface FeedbackEntry {
@@ -31,9 +32,13 @@ interface FeedbackPanelProps {
 
 export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
   const { t } = useLang();
+  const { token } = useAuth();
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [savedLocally, setSavedLocally] = useState(false);
+
+  // 反馈携带登录 token，让后端能关联到账号（feedback.user_id）
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   // 挂载时自动把上次因网络失败缓存在本地的反馈补传到服务器（防丢失）
   useEffect(() => {
@@ -46,7 +51,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
         try {
           const resp = await fetch("/api/feedback", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authHeaders },
             body: JSON.stringify({ name: "", email: "", type: entry.reportId ? "report" : "general", message: entry.message, rating: "" }),
           });
           if (resp.ok) retried++;
@@ -72,7 +77,7 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
     try {
       const resp = await fetch("/api/feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) throw new Error("API failed");

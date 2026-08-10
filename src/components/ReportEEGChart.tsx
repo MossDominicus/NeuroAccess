@@ -2,7 +2,7 @@
 
 import { useLang } from "@/lib/language-context";
 import { Download, Waves, ZoomIn, ZoomOut, Move, Maximize2 } from "lucide-react";
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { computeBandDominantCounts } from "@/lib/band-waveform-generator";
 
 interface ReportEEGChartProps {
@@ -29,9 +29,11 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
   const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
   const reportId = id || "";
-  const imageUrl = reportId
-    ? `/api/waveform-image?rid=${encodeURIComponent(reportId)}&_t=${Date.now()}`
-    : null;
+  // 只在 reportId 变化时重建 URL（带时间戳破缓存）；缩放/平移的 setState 重渲染不再刷新图片
+  const imageUrl = useMemo(
+    () => (reportId ? `/api/waveform-image?rid=${encodeURIComponent(reportId)}&_t=${Date.now()}` : null),
+    [reportId]
+  );
 
   // 频段计数 = 每个频段"主导"的通道数（逐通道 FFT 算主导频段），不是百分比
   // 优先从 waveform_preview.channels 取通道数；为空时回退 analysis.channel_count
@@ -39,7 +41,8 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
   const nTotal = wpChCount > 0 ? wpChCount : (analysis?.channel_count || 0);
   const wpChannels = analysis?.waveform_preview?.channels || {};
   const wpSr = analysis?.waveform_preview?.sampling_rate || analysis?.sampling_rate || 0;
-  const domCounts = computeBandDominantCounts(wpChannels, wpSr);
+  const wpTimes = analysis?.waveform_preview?.times;
+  const domCounts = computeBandDominantCounts(wpChannels, wpSr, wpTimes);
   const bandCount: Record<string, number> = domCounts || { delta: 0, theta: 0, alpha: 0, beta: 0 };
 
   const onDownload = async () => {

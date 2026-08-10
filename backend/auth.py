@@ -397,7 +397,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, username, email, avatar_url, avatar_color, created_at, terms_accepted FROM users WHERE id = ?",
+            "SELECT id, username, email, avatar_url, avatar_color, created_at, terms_accepted, survey_completed FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
         if row:

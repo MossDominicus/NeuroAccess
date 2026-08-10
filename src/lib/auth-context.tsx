@@ -231,10 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const tf = (key: string, fb: string) => { const v = t(key); return v === key ? fb : v; };
 
-  const login = async (usernameOrEmail: string, password: string, cfToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
+  const login = async (usernameOrEmail: string, password: string, captchaToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
     try {
       const params = new URLSearchParams({ username_or_email: usernameOrEmail, password });
-      if (cfToken) params.append("cf_turnstile_response", cfToken);
+      if (captchaToken) params.append("captcha_token", captchaToken);
       const resp = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -266,10 +266,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (username: string, email: string, password: string, code: string = "", cfToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean }> => {
+  const register = async (username: string, email: string, password: string, code: string = "", captchaToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean }> => {
     try {
       const params = new URLSearchParams({ username, email, password, code });
-      if (cfToken) params.append("cf_turnstile_response", cfToken);
+      if (captchaToken) params.append("captcha_token", captchaToken);
       const resp = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -326,10 +326,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithCode = async (email: string, code: string, cfToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
+  const loginWithCode = async (email: string, code: string, captchaToken?: string): Promise<{ success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean }> => {
     try {
       const params = new URLSearchParams({ email, code });
-      if (cfToken) params.append("cf_turnstile_response", cfToken);
+      if (captchaToken) params.append("captcha_token", captchaToken);
       const resp = await fetch(`${API_BASE}/api/auth/login-with-code`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },

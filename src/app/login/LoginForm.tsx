@@ -8,7 +8,7 @@ import { useLang } from "@/lib/language-context";
 import Link from "next/link";
 import { translations } from "@/lib/translations";
 import AuthSettingsBar from "@/components/AuthSettingsBar";
-import TurnstileModal from "@/components/TurnstileModal";
+import CaptchaModal from "@/components/CaptchaModal";
 
 interface LoginFormProps {
   lang: string;
@@ -44,9 +44,8 @@ export default function LoginForm({ lang }: LoginFormProps) {
   // ── Shared state ──
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  // ── Turnstile 人机验证 ──
-  const [turnstileOpen, setTurnstileOpen] = useState(false);
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  // ── 人机验证（数学验证码） ──
+  const [captchaOpen, setCaptchaOpen] = useState(false);
   const pendingLoginRef = useRef<{ type: "password" | "code"; args: Record<string, string> } | null>(null);
 
   // Cleanup countdown
@@ -74,9 +73,9 @@ export default function LoginForm({ lang }: LoginFormProps) {
       const result = await login(usernameOrEmail, password);
       if (result.success) {
         router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
-      } else if (result.needsCaptcha && turnstileSiteKey) {
+      } else if (result.needsCaptcha) {
         pendingLoginRef.current = { type: "password", args: { usernameOrEmail, password } };
-        setTurnstileOpen(true);
+        setCaptchaOpen(true);
       } else {
         setError(result.error || tf("loginFailed", "Login failed"));
       }
@@ -96,9 +95,9 @@ export default function LoginForm({ lang }: LoginFormProps) {
       const result = await loginWithCode(codeEmail, code);
       if (result.success) {
         router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
-      } else if (result.needsCaptcha && turnstileSiteKey) {
+      } else if (result.needsCaptcha) {
         pendingLoginRef.current = { type: "code", args: { codeEmail, code } };
-        setTurnstileOpen(true);
+        setCaptchaOpen(true);
       } else {
         setError(result.error || tf("verificationCodeFailed", "Verification failed"));
       }
@@ -141,20 +140,20 @@ export default function LoginForm({ lang }: LoginFormProps) {
     }
   };
 
-  // ── Turnstile 人机验证回调 ──
-  const handleTurnstileVerify = async (cfToken: string) => {
+  // ── 人机验证回调（数学验证码） ──
+  const handleCaptchaVerify = async (captchaToken: string) => {
     try {
       const pending = pendingLoginRef.current;
-      if (!pending) { setTurnstileOpen(false); return; }
+      if (!pending) { setCaptchaOpen(false); return; }
       let result: { success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean };
       if (pending.type === "password") {
-        result = await login(pending.args.usernameOrEmail, pending.args.password, cfToken);
+        result = await login(pending.args.usernameOrEmail, pending.args.password, captchaToken);
       } else {
-        result = await loginWithCode(pending.args.codeEmail, pending.args.code, cfToken);
+        result = await loginWithCode(pending.args.codeEmail, pending.args.code, captchaToken);
       }
       if (result.success) { window.location.replace("/"); }
-      else { setTurnstileOpen(false); setError(result.error || tf("loginFailed", "Login failed")); }
-    } catch (err: any) { setTurnstileOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
+      else { setCaptchaOpen(false); setError(result.error || tf("loginFailed", "Login failed")); }
+    } catch (err: any) { setCaptchaOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
     finally { pendingLoginRef.current = null; }
   };
 
@@ -285,7 +284,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
           {tf("loginHint", "You will be redirected after login.")}
         </p>
         </div>
-        <TurnstileModal siteKey={turnstileSiteKey} open={turnstileOpen} onVerify={handleTurnstileVerify} onClose={() => { setTurnstileOpen(false); pendingLoginRef.current = null; }} />
+        <CaptchaModal open={captchaOpen} onVerify={handleCaptchaVerify} onClose={() => { setCaptchaOpen(false); pendingLoginRef.current = null; }} />
       </motion.div>
   );
 }

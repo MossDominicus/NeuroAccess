@@ -164,9 +164,17 @@ export function computeBandWaveforms(
 export function computeBandDominantCounts(
   channels: Record<string, number[]>,
   samplingRate: number,
+  times?: number[],
 ): { delta: number; theta: number; alpha: number; beta: number } | null {
   const chNames = Object.keys(channels);
   if (chNames.length === 0 || samplingRate <= 0) return null;
+  // 后端对波形做过 step 降采样，直接用原始采样率算频轴会把频率读高（如 250Hz→step3 后真实≈83Hz）。
+  // 优先用 times 数组推真实采样间隔，拿不到再退回 samplingRate。
+  let fs = samplingRate;
+  if (times && times.length > 1) {
+    const dt = times[1] - times[0];
+    if (dt > 0 && dt < 1) fs = 1 / dt;
+  }
   const counts: { delta: number; theta: number; alpha: number; beta: number } = { delta: 0, theta: 0, alpha: 0, beta: 0 };
   for (const ch of chNames) {
     const data = channels[ch];
@@ -181,7 +189,7 @@ export function computeBandDominantCounts(
     mean /= n;
     for (let i = 0; i < n; i++) re[i] = data[i] - mean;
     fft(re, im);
-    const freqRes = samplingRate / fftN;
+    const freqRes = fs / fftN;
     let bestPower = -1;
     let bestName: string = "delta";
     for (const band of BANDS) {

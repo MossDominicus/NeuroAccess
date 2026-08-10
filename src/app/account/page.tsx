@@ -31,10 +31,11 @@ export default function AccountPage() {
   const codeSendingRef = useRef(false);
 
   // ---------- 编辑资料 ----------
+  // 兼容旧默认值 'blue'（数据库老默认值），归一化为色板里的 #3B82F6
+  const normalizeAvatarColor = (c?: string) =>
+    c === "blue" ? "#3B82F6" : (c && AVATAR_COLORS.includes(c) ? c : AVATAR_COLORS[0]);
   const [editUsername, setEditUsername] = useState(user?.username || "");
-  const [editAvatarUrl, setEditAvatarUrl] = useState(
-    user?.avatar_color && AVATAR_COLORS.includes(user.avatar_color) ? user.avatar_color : AVATAR_COLORS[0]
-  );
+  const [editAvatarUrl, setEditAvatarUrl] = useState(normalizeAvatarColor(user?.avatar_color));
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
@@ -74,7 +75,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (user) {
       setEditUsername(user.username || "");
-      setEditAvatarUrl(user?.avatar_color || "blue");
+      setEditAvatarUrl(normalizeAvatarColor(user?.avatar_color));
     }
   }, [user]);
 

@@ -39,10 +39,15 @@ export async function downloadCSV(reportId: string, fileName: string) {
       ]);
     }
 
+    // 波形预览经过后端 step 降采样，原始采样率 ≠ 实际点间距；
+    // 从 times 数组推真实采样率用于头部注释，避免误导。
+    let effSr: number | null = null;
+    if (times.length > 1 && times[1] > times[0]) effSr = Math.round(1 / (times[1] - times[0]));
+
     const csv = "\uFEFF" + [
       `# File: ${fileName}`,
       `# Channels: ${chNames.length}`,
-      `# Sampling rate: ${analysis.sampling_rate ?? "N/A"} Hz`,
+      `# Sampling rate: ${effSr ?? analysis.sampling_rate ?? "N/A"} Hz (waveform preview, downsampled)`,
       `# Duration: ${analysis.duration ?? analysis.recording_duration_seconds ?? "N/A"} s`,
       `# Unit: μV (microvolts)`,
       `# Raw waveform time series from waveform_preview`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 interface BandPowerChartProps {
   data: any[];
@@ -23,7 +23,7 @@ export default function BandPowerChart({ data }: BandPowerChartProps) {
         />
         <Bar dataKey="value" radius={[8, 8, 0, 0]}>
           {data.map((entry: any, index: number) => (
-            <Bar key={index} dataKey="value" fill={entry.fill} />
+            <Cell key={index} fill={entry.fill} />
           ))}
         </Bar>
       </BarChart>
