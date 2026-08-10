@@ -399,7 +399,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
             // 先尝试 polling（后端后台线程已在 /analyze 中启动）
             if (analysisId) {
               let aiReady = false;
-              for (let attempt = 0; attempt < 40; attempt++) {
+              for (let attempt = 0; attempt < 60; attempt++) {
                 if (runIdRef.current !== myRunId) return;
                 await new Promise((r) => setTimeout(r, 3000));
                 if (runIdRef.current !== myRunId) return;

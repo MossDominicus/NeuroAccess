@@ -847,7 +847,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
     def _call_level(level: str) -> str:
         try:
             prompt = _build_prompt(a, level, lang)
-            ollama = call_ollama(prompt, timeout=75, max_tokens=_MAX_TOKENS.get(level, 400))
+            ollama = call_ollama(prompt, timeout=100, max_tokens=_MAX_TOKENS.get(level, 400))
             text = str(ollama.get("text", "")).strip() if ollama.get("success") else ""
             if not text or (level == "beginner" and contains_beginner_jargon(text)):
                 reason = "empty/jargon" if not text else "beginner jargon"
@@ -876,9 +876,9 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
         future_research = executor.submit(_call_level, "research")
         for key, future in [("beginner", future_beginner), ("student", future_student), ("research", future_research)]:
             try:
-                # 90s 必须 > call_ollama 的 75s：研究档 max_tokens 大、生成慢，
-                # 之前 45s 就把还没跑完的 AI 结果丢了 → 用户看到模板
-                results[key] = future.result(timeout=90)
+                # 130s 必须 > call_ollama 的 100s：研究档 max_tokens 大、生成慢，
+                # 之前 45s/90s 就把还没跑完的 AI 结果丢了 → 用户看到模板
+                results[key] = future.result(timeout=130)
             except Exception as e:
                 print(f"[explanations] fallback {key}({lang}): future timeout/err {e}", flush=True)
                 results[key] = fallbacks[key]
@@ -893,7 +893,9 @@ def generate_explanations(analysis: Dict, primary_lang: str = "zh") -> Dict[str,
     # 主语言：调用 OpenRouter（3 路并行）
     try:
         results[primary_lang] = _generate_explanations_for_lang(analysis, primary_lang)
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f"[explanations] generate_explanations TOP-LEVEL failed for {primary_lang}: {e}\n{traceback.format_exc()}", flush=True)
         results[primary_lang] = {
             "beginner": template_beginner(analysis, primary_lang),
             "student": template_student(analysis, primary_lang),
