@@ -1544,6 +1544,27 @@ async def api_save_report(report: Dict[str, Any], credentials: HTTPAuthorization
         rid = str(report.get("id") or "")
         if not rid:
             return {"success": False, "error": "Missing report id"}
+        # ── 保存前用磁盘持久化缓存里的 AI 文案覆盖模板 ──
+        # 用户常在前端轮询换入 AI 之前就保存 → 报告里仍是模板；
+        # 这里直接从分析缓存取 AI 文案覆盖，确保保存的总是最新最好的版本。
+        try:
+            aid = (report.get("analysis") or {}).get("analysis_id")
+            if aid:
+                cached = _EXPLANATIONS_CACHE.get(aid)
+                if cached is None:
+                    _load_explanations_cache_from_disk()
+                    cached = _EXPLANATIONS_CACHE.get(aid)
+                if cached and cached.get("ready") and cached.get("explanations"):
+                    cur_an = report.setdefault("analysis", {})
+                    cur_expl = cur_an.setdefault("explanations", {})
+                    for lang, tdict in (cached["explanations"] or {}).items():
+                        target = cur_expl.setdefault(lang, {})
+                        if isinstance(tdict, dict):
+                            for tier, txt in tdict.items():
+                                if isinstance(txt, str) and txt.strip():
+                                    target[tier] = txt
+        except Exception:
+            pass
         data_json = json.dumps(report, ensure_ascii=False)
         conn = get_db()
         conn.execute(
