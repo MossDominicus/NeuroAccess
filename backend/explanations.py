@@ -300,8 +300,7 @@ def template_student(a: Dict, lang: str) -> str:
             f"The dominant band is the {dom_str}. "
             f"About {n_n} channel(s) appear noisier than the rest"
             + (f" (e.g., {n_s})" if ns else "")
-            + ", which can affect local readings.\n\n"
-            f"Note: This summary describes the recording as a whole, not individual sensors."
+            + ", which can affect local readings."
         )
     if lang == "zh":
         return (
@@ -311,8 +310,7 @@ def template_student(a: Dict, lang: str) -> str:
             f"主导频段是 {dom_str}。"
             f"约 {n_n} 个通道信号偏弱"
             + (f"（如 {n_s}）" if ns else "")
-            + "，可能影响局部数据的可信度。\n\n"
-            f"提示：以上是对整段记录的总体描述，不是对单个传感器的逐一解读。"
+            + "，可能影响局部数据的可信度。"
         )
     # fallback English
     return (
@@ -322,8 +320,7 @@ def template_student(a: Dict, lang: str) -> str:
         f"The dominant band is the {dom_str}. "
         f"About {n_n} channel(s) appear noisier than the rest"
         + (f" (e.g., {n_s})" if ns else "")
-        + ", which can affect local readings.\n\n"
-        f"Note: This summary describes the recording as a whole, not individual sensors."
+        + ", which can affect local readings."
     )
 
 
@@ -453,15 +450,16 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"You are writing ONLY the Beginner explanation for an EEG literacy website.\n"
             f"Output language: {output_lang}.\n"
             f"Audience: ordinary non-expert users who know nothing about EEG.\n\n"
-            f"TASK: Write 7-9 short sentences (ONE paragraph, plain words), covering EACH of these facts in its own sentence:\n"
+            f"TASK: Write 8-10 short sentences (ONE paragraph, plain words), covering EACH of these facts in its own sentence:\n"
             f"  (a) how long the recording is;\n"
             f"  (b) how many sensing positions were used;\n"
             f"  (c) what kind of brain activity dominates — mostly slow waves, mostly fast waves, or a balanced mix;\n"
             f"  (d) about how much of the activity that is (in words, e.g. 'about half');\n"
             f"  (e) whether the recording is clear or noisy overall;\n"
             f"  (f) whether any specific areas were noticeably harder to read;\n"
-            f"  (g) whether any obvious interference was present and roughly how widespread it was.\n"
-            f"Do not skip any item — write all seven; add an eighth or ninth sentence only if it adds a genuinely new fact.\n\n"
+            f"  (g) whether any obvious interference was present and roughly how widespread it was;\n"
+            f"  (h) whether the signal looked steady across the whole recording or changed noticeably over time.\n"
+            f"Do not skip any item — write all eight; add a ninth or tenth sentence only if it adds a genuinely new fact.\n\n"
             f"STYLE RULES:\n"
             f"- Use everyday words a complete beginner understands. NO technical terms: do NOT use alpha/beta/delta/theta, "
             f"bandpower, PSD, SNR, sampling rate, channel, or artifact. Say 'slow brainwaves' / 'fast brainwaves' or describe it in plain words.\n"
@@ -512,7 +510,7 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- Output language MUST be fully {output_lang}. NO English words mixed in (except technical "
             f"abbreviations: EEG, PSD, SNR, Nyquist, EEG 001/002 channel patterns). Everything else in {output_lang}.\n"
             f"- Use the real numbers from the JSON (percentages, quality score, counts).\n"
-            f"- 3 paragraphs, each 3-4 sentences. TOTAL around 300-380 words. Substantive, no filler, no repetition.\n"
+            f"- 3 paragraphs, each 4-5 sentences. TOTAL around 400-500 words. Substantive, no filler, no repetition.\n"
             f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
         )
     # research
@@ -573,7 +571,7 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"(the website already displays a unified disclaimer; do not repeat it inside the explanation).\n"
         f"- Do NOT fabricate or overstate problems (e.g., do not claim hidden low-frequency noise or "
         f"threats to analyses unless the JSON explicitly shows them).\n"
-        f"- 3 paragraphs, each 4-6 sentences. TOTAL 500-650 words — the LONGEST section of the report. "
+        f"- 3 paragraphs, each 5-6 sentences. TOTAL 600-750 words — the LONGEST section of the report. "
         f"Every sentence must add information a researcher could not get by reading the raw parameters; "
         f"ALL required items from the three paragraph specs above must appear — a missing item is a failure.\n"
         f"{uncertainty}{boundary}\nEEG JSON:\n{payload}\n"
@@ -772,8 +770,8 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
         "student":  template_student(a, lang),
         "research": template_research(a, lang),
     }
-    # 各档的 max_tokens：入门短小、学习中等、研究最长（400-500 字，默认 400 tokens 会被截断）
-    _MAX_TOKENS = {"beginner": 300, "student": 700, "research": 1100}
+    # 各档的 max_tokens：入门短小、学习中等、研究最长（600-750 字目标，留足余量防截断）
+    _MAX_TOKENS = {"beginner": 400, "student": 900, "research": 1500}
 
     def _call_level(level: str) -> str:
         try:
