@@ -15,6 +15,12 @@ const BAND_ORDER = ["delta", "theta", "alpha", "beta"];
 const BAND_COLORS: Record<string, string> = {
   delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e",
 };
+// 把 bandpower 百分比格式化成 "12.1%"；无数据时返回 "—"，避免误导的 "(0)"
+function bandPercentLabel(v: unknown): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return `${n}%`;
+}
 
 export default function ReportEEGChart({ reportFileName, analysis, id }: ReportEEGChartProps) {
   const { t } = useLang();
@@ -34,7 +40,9 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
 
   // 频段计数
   const bp = analysis?.frequency_analysis?.bandpower_percent || analysis?.bandpower_percent || {};
-  const nTotal = analysis?.waveform_preview?.channels ? Object.keys(analysis.waveform_preview.channels).length : 0;
+  // 优先从 waveform_preview.channels 取通道数；为空时回退 analysis.channel_count
+  const wpChCount = analysis?.waveform_preview?.channels ? Object.keys(analysis.waveform_preview.channels).length : 0;
+  const nTotal = wpChCount > 0 ? wpChCount : (analysis?.channel_count || 0);
   const bandCount: Record<string, number> = { delta: 0, theta: 0, alpha: 0, beta: 0 };
   if (nTotal > 0) {
     const total = (bp.delta || 0) + (bp.theta || 0) + (bp.alpha || 0) + (bp.beta || 0) || 1;
@@ -133,7 +141,7 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
             {BAND_ORDER.map(b => (
               <span key={b} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
                 <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: BAND_COLORS[b] }} />
-                {b.charAt(0).toUpperCase() + b.slice(1)} ({bandCount[b] || 0})
+                {b.charAt(0).toUpperCase() + b.slice(1)} ({bandPercentLabel(bp[b])})
               </span>
             ))}
           </div>
