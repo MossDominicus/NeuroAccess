@@ -27,15 +27,45 @@ import i18n
 _EXPLANATIONS_CACHE: Dict[str, Dict] = {}
 _EXPLANATIONS_CACHE_ORDER: List[str] = []  # 按插入顺序记录 key
 _EXPLANATIONS_CACHE_MAX = 50  # 最多缓存 50 个 AI 解释
+# 磁盘持久化：后端重启（部署/崩溃）不丢 AI 文案，否则前端轮询拿到 None 就一直显示模板
+_EXPLANATIONS_CACHE_FILE = os.path.join(os.path.dirname(__file__), "explanations_cache.json")
+_EXPLANATIONS_LOCK = threading.Lock()
+
+def _load_explanations_cache_from_disk():
+    """模块启动时从磁盘恢复缓存（上次进程的 AI 文案）"""
+    try:
+        if os.path.exists(_EXPLANATIONS_CACHE_FILE):
+            with open(_EXPLANATIONS_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                _EXPLANATIONS_CACHE.update(data)
+                _EXPLANATIONS_CACHE_ORDER.extend(list(data.keys()))
+    except Exception:
+        pass
+
+def _persist_explanations_cache_to_disk():
+    """把当前内存缓存写回磁盘（原子写：先写临时文件再替换）"""
+    try:
+        tmp = _EXPLANATIONS_CACHE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_EXPLANATIONS_CACHE, f, ensure_ascii=False)
+        os.replace(tmp, _EXPLANATIONS_CACHE_FILE)
+    except Exception:
+        pass
 
 def _cache_explanations(aid: str, data: Dict):
-    """存入缓存，超出上限时删除最旧的"""
+    """存入缓存（内存+磁盘），超出上限时删除最旧的"""
     global _EXPLANATIONS_CACHE_ORDER
-    _EXPLANATIONS_CACHE[aid] = data
-    _EXPLANATIONS_CACHE_ORDER.append(aid)
-    if len(_EXPLANATIONS_CACHE_ORDER) > _EXPLANATIONS_CACHE_MAX:
-        old = _EXPLANATIONS_CACHE_ORDER.pop(0)
-        _EXPLANATIONS_CACHE.pop(old, None)
+    with _EXPLANATIONS_LOCK:
+        _EXPLANATIONS_CACHE[aid] = data
+        _EXPLANATIONS_CACHE_ORDER.append(aid)
+        if len(_EXPLANATIONS_CACHE_ORDER) > _EXPLANATIONS_CACHE_MAX:
+            old = _EXPLANATIONS_CACHE_ORDER.pop(0)
+            _EXPLANATIONS_CACHE.pop(old, None)
+        _persist_explanations_cache_to_disk()
+
+# 模块加载时恢复上次进程的 AI 文案缓存（后端重启不丢）
+_load_explanations_cache_from_disk()
 
 # ── 验证码发送防重限流（内存级，比 DB 快）─────────────────
 _code_rate_limit: Dict[str, float] = {}
@@ -61,7 +91,7 @@ def _bg_generate_explanations(aid: str, enhanced: Dict, lang: str):
         explanations = generate_explanations(enhanced, lang)
         _cache_explanations(aid, {"explanations": explanations, "ready": True})
     except Exception as e:
-        print(f"[BG-EXPLAIN] Failed for {aid}: {e}")
+        print(f"[BG-EXPLAIN] Failed for {aid}: {e}", flush=True)
         _cache_explanations(aid, {"explanations": None, "ready": True, "error": str(e)})
 
 BASE_DIR   = os.path.dirname(__file__)
@@ -467,6 +497,10 @@ async def explain(request: Request):
 @app.get("/api/analysis/explanations/{analysis_id}")
 async def get_explanations(analysis_id: str):
     cached = _EXPLANATIONS_CACHE.get(analysis_id)
+    if cached is None:
+        # 重启后内存缓存为空 → 从磁盘恢复
+        _load_explanations_cache_from_disk()
+        cached = _EXPLANATIONS_CACHE.get(analysis_id)
     if cached is None:
         return {"success": False, "error": "Unknown analysis_id"}
     if cached.get("ready"):
