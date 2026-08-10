@@ -420,10 +420,15 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
     boundary     = (
         "CRITICAL BOUNDARIES - You MUST follow these rules:\n"
         "1. NEVER provide medical diagnosis, disease labels, treatment advice, or normal/abnormal judgment.\n"
-        "2. NEVER interpret bandpower values as indicators of mental states (e.g., do NOT say 'high alpha means relaxation' or 'low beta means poor attention').\n"
+        "2. You MUST interpret what the brainwave pattern typically means in cautious, educational terms. "
+        "For example: 'fast-wave (beta) dominant activity is commonly associated with wakefulness, alertness, or active thinking'; "
+        "'alpha-dominant activity often accompanies relaxed wakefulness, typically with eyes closed'; "
+        "'slow-wave (delta/theta) dominance is more typical of drowsiness or deep sleep'. "
+        "ALWAYS phrase such statements as general physiological correlates with 'typically / commonly / may be associated with' — "
+        "NEVER state what THIS specific person was feeling, thinking, or doing, and NEVER diagnose or judge the recording as normal/abnormal.\n"
         "3. NEVER suggest what the user should do based on EEG data (no lifestyle, medication, or therapy advice).\n"
-        "4. NEVER claim to detect emotions, attention levels, cognitive states, personality traits, or intelligence.\n"
-        "5. ALWAYS use cautious language (e.g., 'may be associated with', 'could reflect', 'might indicate') when describing patterns.\n"
+        "4. NEVER claim to detect the actual emotions, attention levels, cognitive states, personality traits, or intelligence of the person who was recorded.\n"
+        "5. ALWAYS use cautious language (e.g., 'typically associated with', 'commonly seen in', 'may reflect') when describing patterns.\n"
         "6. This is for EEG literacy, education, and accessibility ONLY.\n"
         "7. Do NOT add a general disclaimer at the end of every explanation; the website already displays limitation notices separately.\n"
         "8. NEVER list individual channel names (e.g., 'EEG 001, EEG 002, ...'). Refer to them collectively as 'the channels' or 'the recording'.\n"
@@ -468,6 +473,9 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- NEVER write the wave names alpha/beta/theta/delta/gamma (even translated) — always say 'slow waves' or 'fast waves'.\n"
             f"- Never dump percentages or parameter lists. You MAY say 'about half of the activity was in the slower range' "
             f"to convey a proportion in words.\n"
+            f"- INCLUDE ONE plain-language sentence about what this pattern typically means — e.g., 'recordings dominated by fast waves "
+            f"usually come from someone who is awake and alert', 'mostly slow waves are more typical of drowsiness or deep sleep'. "
+            f"Phrase it as a general 'usually/typically' correlation. Do NOT claim to know what this specific person was doing or feeling.\n"
             f"- State facts only. Do NOT speculate about mental states, emotions, attention, or what the person was doing.\n"
             f"- NEVER mention channel names or channel 1, channel 2, etc.\n"
             f"- NO meta sentences ('以下是对这份记录的分析', '本文介绍了…', '总的来说…'), NO disclaimers, NO advice, NO closing invitation.\n"
@@ -490,8 +498,11 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"PARAGRAPH 2 — Brainwave bands in this recording: "
             f"Briefly explain what delta/theta/alpha/beta waves are and their rough frequency ranges, "
             f"then point to which band dominates in THIS recording with its real percentage "
-            f"(cautious wording: may reflect, could indicate) and compare the bands against each other "
-            f"using the real percentages.\n\n"
+            f"(cautious wording: typically associated with, commonly seen in, may reflect) and compare the bands against each other "
+            f"using the real percentages. For each band you define, add ONE cautious physiological correlate: "
+            f"e.g., 'fast waves (beta) commonly accompany wakefulness, alertness, or active thinking', "
+            f"'alpha often appears during relaxed wakefulness', 'slow waves (delta/theta) are more typical of drowsiness or sleep'. "
+            f"NEVER state what THIS person was actually doing or feeling.\n\n"
             f"PARAGRAPH 3 — Noise and artifacts in this recording: "
             f"In one or two sentences explain what EEG artifacts and noisy channels are, "
             f"then state how many channels were flagged noisy here (or none) and whether "
@@ -540,6 +551,10 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"(absolute power, μV²/Hz) to QUANTIFY dominance as exact ratios computed from the real values "
         f"(e.g., 'alpha power is 4.1× theta and 3.2× beta'), comparing the dominant band against EACH other band "
         f"with its own real value. Assess how physiological (1/f-like) the spectral profile is and how far it deviates. "
+        f"Then INTERPRET the profile physiologically in cautious professional terms: what awake/alert, relaxed, or drowsy "
+        f"patterns typically look like and which one this spectrum most resembles (e.g., 'a beta-dominant, 1/f-like profile "
+        f"is most consistent with wakefulness or active cortical engagement'; 'an alpha-dominant profile typically accompanies "
+        f"relaxed wakefulness'). Never diagnose the person; frame it as a general physiological correlate. "
         f"Close by naming the single most actionable finding a researcher would act on.\n\n"
         f"PARAGRAPH 2 — Methodological limits that actually bind THIS data (3-4 sentences): "
         f"State only the constraints that are REAL for this recording, quantified (frequency resolution "
@@ -791,13 +806,12 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
                 reason = "empty/jargon" if not text else "beginner jargon"
                 print(f"[explanations] fallback {level}({lang}): {reason} | {ollama.get('error','')}", flush=True)
                 return fallbacks[level]
-            # 通道名保留完整显示（不删，避免半截残留）；只清免责声明/英文标题/元话语/心智状态句，
-            # 末端做单档内去重（删同义复读），保证零凑数
+            # 通道名保留完整显示（不删，避免半截残留）；只清免责声明/英文标题/元话语，
+            # 末端做单档内去重（删同义复读），保证零凑数。
+            # 注意：不再删"心智状态"句——边界规则2要求输出"波形通常与什么状态相关"的教育性解读。
             cleaned = _dedup_sentences(
-                _strip_mental_states(
-                    _strip_meta_sentences(
-                        _strip_en_headings(_strip_disclaimers(text), lang)
-                    )
+                _strip_meta_sentences(
+                    _strip_en_headings(_strip_disclaimers(text), lang)
                 )
             )
             # AI 输出全是无效文本（被清空）→ 回退模板，避免空解释

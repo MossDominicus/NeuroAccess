@@ -1691,7 +1691,8 @@ def gen_waveform_svg(rid: str) -> str:
             return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points ({npts})</text></svg>"
         
         W, LW = 900, 65
-        laneH = max(14, min(22, 400 // nch))
+        # 自适应行高：通道多时压扁，保证 64 通道也能一屏放下（总高 ~540px）
+        laneH = max(8, min(24, int(520 / nch)))
         H = laneH * nch + 30
         colors = ["#ef4444","#facc15","#3b82f6","#22c55e"]
         
