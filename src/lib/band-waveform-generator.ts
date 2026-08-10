@@ -155,3 +155,48 @@ export function computeBandWaveforms(
     beta: result.beta,
   };
 }
+
+/**
+ * 逐通道计算"每个通道的主导频段"，统计每个频段拥有多少个通道。
+ * 图例显示的是通道数量（不是百分比）：Delta (N) 表示 N 个通道以 delta 为主。
+ * 对每个通道做去直流 + FFT，比较四个频段的总功率，取最大者为该通道主导频段。
+ */
+export function computeBandDominantCounts(
+  channels: Record<string, number[]>,
+  samplingRate: number,
+): { delta: number; theta: number; alpha: number; beta: number } | null {
+  const chNames = Object.keys(channels);
+  if (chNames.length === 0 || samplingRate <= 0) return null;
+  const counts: { delta: number; theta: number; alpha: number; beta: number } = { delta: 0, theta: 0, alpha: 0, beta: 0 };
+  for (const ch of chNames) {
+    const data = channels[ch];
+    if (!data || data.length < 64) continue;
+    const n = data.length;
+    const fftN = nextPow2(n);
+    const re = new Float64Array(fftN);
+    const im = new Float64Array(fftN);
+    // 去直流偏置
+    let mean = 0;
+    for (let i = 0; i < n; i++) mean += data[i];
+    mean /= n;
+    for (let i = 0; i < n; i++) re[i] = data[i] - mean;
+    fft(re, im);
+    const freqRes = samplingRate / fftN;
+    let bestPower = -1;
+    let bestName: string = "delta";
+    for (const band of BANDS) {
+      const lo = Math.max(1, Math.round(band.low / freqRes));
+      const hi = Math.min(fftN - 1, Math.round(band.high / freqRes));
+      let power = 0;
+      for (let k = lo; k <= hi; k++) {
+        power += re[k] * re[k] + im[k] * im[k];
+      }
+      if (power > bestPower) {
+        bestPower = power;
+        bestName = band.name;
+      }
+    }
+    if (bestName in counts) counts[bestName as keyof typeof counts] += 1;
+  }
+  return counts;
+}

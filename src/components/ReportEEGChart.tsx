@@ -3,6 +3,7 @@
 import { useLang } from "@/lib/language-context";
 import { Download, Waves, ZoomIn, ZoomOut, Move, Maximize2 } from "lucide-react";
 import { useRef, useState, useCallback, useEffect } from "react";
+import { computeBandDominantCounts } from "@/lib/band-waveform-generator";
 
 interface ReportEEGChartProps {
   reportFileName: string;
@@ -15,14 +16,6 @@ const BAND_ORDER = ["delta", "theta", "alpha", "beta"];
 const BAND_COLORS: Record<string, string> = {
   delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e",
 };
-// 把 bandpower 百分比格式化成 "12.1%"；支持数字或带%的字符串（后端返回 '10.7%' 字符串）；
-// 无数据时返回 "—"，避免误导的 "(0)"
-function bandPercentLabel(v: unknown): string {
-  if (v == null) return "—";
-  const n = Number(String(v).replace(/[^\d.\-]/g, ""));
-  if (!Number.isFinite(n)) return "—";
-  return `${n}%`;
-}
 
 export default function ReportEEGChart({ reportFileName, analysis, id }: ReportEEGChartProps) {
   const { t } = useLang();
@@ -40,18 +33,14 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
     ? `/api/waveform-image?rid=${encodeURIComponent(reportId)}&_t=${Date.now()}`
     : null;
 
-  // 频段计数
-  const bp = analysis?.frequency_analysis?.bandpower_percent || analysis?.bandpower_percent || {};
+  // 频段计数 = 每个频段"主导"的通道数（逐通道 FFT 算主导频段），不是百分比
   // 优先从 waveform_preview.channels 取通道数；为空时回退 analysis.channel_count
   const wpChCount = analysis?.waveform_preview?.channels ? Object.keys(analysis.waveform_preview.channels).length : 0;
   const nTotal = wpChCount > 0 ? wpChCount : (analysis?.channel_count || 0);
-  const bandCount: Record<string, number> = { delta: 0, theta: 0, alpha: 0, beta: 0 };
-  if (nTotal > 0) {
-    const total = (bp.delta || 0) + (bp.theta || 0) + (bp.alpha || 0) + (bp.beta || 0) || 1;
-    for (const b of BAND_ORDER) bandCount[b] = Math.round(((bp[b] || 0) / total) * nTotal);
-    const assigned = Object.values(bandCount).reduce((a, b) => a + b, 0);
-    if (assigned < nTotal) bandCount.beta += nTotal - assigned;
-  }
+  const wpChannels = analysis?.waveform_preview?.channels || {};
+  const wpSr = analysis?.waveform_preview?.sampling_rate || analysis?.sampling_rate || 0;
+  const domCounts = computeBandDominantCounts(wpChannels, wpSr);
+  const bandCount: Record<string, number> = domCounts || { delta: 0, theta: 0, alpha: 0, beta: 0 };
 
   const onDownload = async () => {
     if (!imageUrl) return;
@@ -143,7 +132,7 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
             {BAND_ORDER.map(b => (
               <span key={b} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
                 <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: BAND_COLORS[b] }} />
-                {b.charAt(0).toUpperCase() + b.slice(1)} ({bandPercentLabel(bp[b])})
+                {b.charAt(0).toUpperCase() + b.slice(1)} ({bandCount[b] ?? 0})
               </span>
             ))}
           </div>
