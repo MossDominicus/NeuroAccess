@@ -141,7 +141,7 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
           <div ref={containerRef}
                onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
                className={`w-full bg-[var(--color-bg)] overflow-auto ${isPanMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
-               style={{ minHeight: 200, maxHeight: "75vh" }}>
+               style={{ minHeight: 200 }}>
             <img ref={imgRef} src={imageUrl} alt="EEG Waveform" draggable={false} className="block w-full h-auto select-none"
                  style={{ transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`, transformOrigin: "50% 50%", minWidth: "100%" }} />
           </div>

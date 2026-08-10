@@ -190,6 +190,47 @@ def _is_near_dup(toks: set, seen: list, jac: float = 0.85) -> bool:
     return False
 
 
+_BAND_WORDS_RE = re.compile(r"\b(alpha|beta|theta|delta|gamma)\b", re.IGNORECASE)
+
+
+def _num_fact_keys(s: str) -> set:
+    """提取句子的「数字事实键」：(数值, 数字前≤2个中文字)。
+
+    '信号质量评分为63.405' → ('63.405', '分为')
+    同一事实换说法复读时键相同（如评分出现两遍）；
+    不同事实即使同数值键也不同（如 '采样率为500Hz' vs '500Hz采样'），避免误删。
+    不用数字后的上下文——后面的评语/比较词会变，反而漏掉真重复。"""
+    keys = set()
+    for m in re.finditer(r"\d+(?:\.\d+)?", s):
+        before = s[max(0, m.start() - 2):m.start()]
+        before_cjk = "".join(ch for ch in before if "\u4e00" <= ch <= "\u9fff")
+        keys.add((m.group(0), before_cjk))
+    return keys
+
+
+def _is_num_anchored_dup(s: str, seen: list, contain: float = 0.5) -> bool:
+    """数字锚定去重：与前面某句共享同一个「数字事实键」且 token 包含度 >= contain 视为重复。
+
+    专门抓模型"同一事实换说法复读"（如 '评分为63.405…' 出现两遍）。
+    规避误删：若两句包含【不同】的频段名（alpha/beta/theta/delta/gamma），
+    说明是在比较不同频段（如 '是theta的4.1倍' vs '是beta的4.1倍'），不算重复。"""
+    keys = _num_fact_keys(s)
+    if not keys:
+        return False
+    toks = _tokens_for_dedup(s)
+    bands = set(_BAND_WORDS_RE.findall(s))
+    for st_keys, st_toks, st_bands in seen:
+        if not (keys & st_keys):
+            continue
+        if bands and st_bands and bands != st_bands:
+            continue  # 不同频段间的同数值比较句，保留
+        inter = len(toks & st_toks)
+        mn = min(len(toks), len(st_toks))
+        if mn and inter / mn >= contain:
+            return True
+    return False
+
+
 def _dedup_sentences(text: str) -> str:
     """单档内去重：删除与前面句子归一化相同或高度重叠的重复句，
     防止模型同义复读凑字数。跨段落累计去重，保留段落结构。"""
@@ -199,6 +240,7 @@ def _dedup_sentences(text: str) -> str:
     out_paras: list = []
     seen_norm: list = []
     seen_toks: list = []
+    seen_num: list = []
     for para in paras:
         if not para.strip():
             continue
@@ -214,9 +256,12 @@ def _dedup_sentences(text: str) -> str:
             toks = _tokens_for_dedup(s)
             if _is_near_dup(toks, seen_toks):
                 continue
+            if _is_num_anchored_dup(s, seen_num):
+                continue
             if norm:
                 seen_norm.append(norm)
             seen_toks.append(toks)
+            seen_num.append((_num_fact_keys(s), toks, set(_BAND_WORDS_RE.findall(s))))
             kept.append(seg)
         if kept:
             out_paras.append("".join(kept))
