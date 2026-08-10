@@ -15,9 +15,11 @@ const BAND_ORDER = ["delta", "theta", "alpha", "beta"];
 const BAND_COLORS: Record<string, string> = {
   delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e",
 };
-// 把 bandpower 百分比格式化成 "12.1%"；无数据时返回 "—"，避免误导的 "(0)"
+// 把 bandpower 百分比格式化成 "12.1%"；支持数字或带%的字符串（后端返回 '10.7%' 字符串）；
+// 无数据时返回 "—"，避免误导的 "(0)"
 function bandPercentLabel(v: unknown): string {
-  const n = Number(v);
+  if (v == null) return "—";
+  const n = Number(String(v).replace(/[^\d.\-]/g, ""));
   if (!Number.isFinite(n)) return "—";
   return `${n}%`;
 }
