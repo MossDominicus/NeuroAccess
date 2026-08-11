@@ -102,6 +102,150 @@ app = FastAPI(title="NeuroAccess Backend", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["https://neuroaccess.cloud", "http://localhost:3000"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
+# =====================================================================
+# 安全防火墙（应用层）— 只拦截明确恶意/高频请求，不改任何现有功能
+# 开关：环境变量 FIREWALL_ENABLED=0 可一键关闭（默认开启）
+# =====================================================================
+import collections as _collections
+import urllib.parse as _urllib_parse
+from fastapi.responses import JSONResponse as _JSONResponse
+
+_FW_ENABLED = os.environ.get("FIREWALL_ENABLED", "1") == "1"
+
+# 每 IP 限流（max_requests, window_seconds）
+_FW_RATE = {
+    "auth":    (15, 60),    # 登录/注册/验证码：防爆破
+    "upload":  (10, 60),    # /api/analyze 文件分析：防滥用
+    "poll":    (180, 60),   # AI 解释轮询（前端 3s×60 次）：须宽松
+    "default": (300, 60),   # 普通 API
+}
+_FW_HITS: dict = {}
+_FW_CLEANUP_COUNTER = 0
+
+# 恶意/扫描器路径特征（不含本站任何真实路径）
+_FW_BAD_PATH_MARKERS = (
+    "/.env", "/.git/", "/.svn/", "/.aws/", "/.ssh/",
+    "/wp-admin", "/wp-login.php", "/wp-content", "/wp-includes",
+    "/phpmyadmin", "/pma/", "/adminer", "/manager/html", "/actuator",
+    "/console", "/jenkins", "/solr/", "/web.config", "/server-status",
+    "/server-info", "/etc/passwd", "/proc/self/", "/cgi-bin/", "/shell",
+    "/webshell", "/cmd.php", "/shell.php", "/config.php", "/info.php",
+    "/test.php", "/dump.sql", "/backup.zip", "/.htaccess", "/.bash_history",
+    "/laravel", "/thinkphp", "/v1/", "/swagger", "/graphql",
+)
+# 查询串/URL 中的注入与 XSS 特征（只查 URL 与查询参数，不查请求体，避免误伤正常内容）
+_FW_BAD_QUERY_PATTERNS = (
+    "union select", "union+select", "union%20select", "union all select",
+    "or 1=1", "or+1=1", "or 1=1--", "' or '", "select * from",
+    "select+*+from", "drop table", "delete from", "insert into", "update set",
+    "xp_cmdshell", "information_schema", "load_file", "into outfile",
+    "benchmark(", "sleep(", "pg_sleep", "waitfor delay",
+    "javascript:", "onerror=", "onload=", "onclick=", "<script", "</script>",
+    "alert(", "document.cookie", "confirm(", "prompt(", "svg onload",
+    "base64_decode", "eval(", "assert(", "system(", "passthru(", "shell_exec",
+)
+# 明确恶意扫描器 UA（不拦 python-requests/curl 等常见合法客户端）
+_FW_BAD_UA = (
+    "sqlmap", "nikto", "nmap", "masscan", "gobuster", "dirb", "wfuzz",
+    "acunetix", "nessus", "openvas", "burpsuite", "hydra", "medusa",
+    "python-urllib", "libwww-perl", "go-http-client", "scrapy", "httpclient",
+    "zgrab", "expanse", "censys", "nuclei", "xray", "l9explore", "nessus",
+    "crawler", "spiderbot", "webscan", "fuzz",
+)
+
+def _fw_client_ip(request: Request) -> str:
+    """取真实客户端 IP：Cloudflare 头优先，其次 X-Forwarded-For，最后 socket。"""
+    cf = request.headers.get("cf-connecting-ip") or ""
+    if cf:
+        return cf.strip().split(",")[0][:64]
+    xff = request.headers.get("x-forwarded-for") or ""
+    if xff:
+        return xff.strip().split(",")[0][:64]
+    if request.client:
+        return (request.client.host or "0.0.0.0")[:64]
+    return "0.0.0.0"
+
+def _fw_group(path: str) -> str:
+    if path.startswith("/api/auth/"):
+        return "auth"
+    if path in ("/api/analyze",) or path == "/api/explain":
+        return "upload" if path == "/api/analyze" else "poll"
+    if path.startswith("/api/analysis/explanations/") or path.startswith("/api/analysis/explanation/"):
+        return "poll"
+    return "default"
+
+def _fw_rate_ok(ip: str, group: str, now: float) -> bool:
+    limit, window = _FW_RATE[group]
+    key = group + "|" + ip
+    dq = _FW_HITS.get(key)
+    if dq is None:
+        dq = _collections.deque()
+        _FW_HITS[key] = dq
+    while dq and now - dq[0] > window:
+        dq.popleft()
+    if len(dq) >= limit:
+        return False
+    dq.append(now)
+    return True
+
+def _fw_cleanup(now: float):
+    global _FW_CLEANUP_COUNTER
+    _FW_CLEANUP_COUNTER += 1
+    if _FW_CLEANUP_COUNTER % 200 != 0 and len(_FW_HITS) < 20000:
+        return
+    stale = [k for k, dq in _FW_HITS.items() if not dq or now - dq[-1] > 3600]
+    for k in stale:
+        del _FW_HITS[k]
+
+@app.middleware("http")
+async def security_firewall(request: Request, call_next):
+    """防火墙主入口：命中即 403/429，其余原样放行。"""
+    if not _FW_ENABLED:
+        return await call_next(request)
+    now = _time.time()
+    path = request.url.path
+    # 健康检查与根路径放行
+    if path in ("/", "/api/health", "/health"):
+        return await call_next(request)
+    # 1) 危险 HTTP 方法
+    if request.method in ("TRACE", "CONNECT", "TRACK"):
+        return _JSONResponse(status_code=405, content={"detail": "请求方法不允许"})
+    # 2) 恶意路径/路径穿越/空字节
+    raw_lower = path.lower()
+    try:
+        decoded_lower = _urllib_parse.unquote(path).lower()
+    except Exception:
+        decoded_lower = raw_lower
+    if any(m in raw_lower or m in decoded_lower for m in _FW_BAD_PATH_MARKERS):
+        return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
+    if "/../" in decoded_lower or "/..%2f" in raw_lower or "%2e%2e" in raw_lower or "%00" in raw_lower or "\x00" in decoded_lower:
+        return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
+    # 3) 查询串注入/XSS 特征
+    q = request.url.query.lower()
+    if any(p in q for p in _FW_BAD_QUERY_PATTERNS):
+        return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
+    # 4) 明确恶意扫描器 UA
+    ua = (request.headers.get("user-agent") or "").lower()
+    if any(b in ua for b in _FW_BAD_UA):
+        return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
+    # 5) 请求体大小护栏（只读 Content-Length 头，不影响上传流式传输）
+    cl = request.headers.get("content-length")
+    if cl and cl.isdigit():
+        size = int(cl)
+        ct = (request.headers.get("content-type") or "").lower()
+        if "multipart" in ct:
+            if size > 260 * 1024 * 1024:
+                return _JSONResponse(status_code=413, content={"detail": "文件过大"})
+        elif size > 20 * 1024 * 1024:
+            return _JSONResponse(status_code=413, content={"detail": "请求体过大"})
+    # 6) 限流
+    ip = _fw_client_ip(request)
+    if not _fw_rate_ok(ip, _fw_group(path), now):
+        return _JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后再试"})
+    _fw_cleanup(now)
+    return await call_next(request)
+
+
 # 导入分析引擎
 try:
     from analysis import analyze_edf
