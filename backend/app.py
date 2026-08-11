@@ -168,9 +168,11 @@ def _fw_client_ip(request: Request) -> str:
 def _fw_group(path: str) -> str:
     if path.startswith("/api/auth/"):
         return "auth"
-    if path in ("/api/analyze",) or path == "/api/explain":
-        return "upload" if path == "/api/analyze" else "poll"
+    if path == "/api/analyze" or path == "/api/explain":
+        # 两者都是昂贵接口（文件分析 / 最长180s的AI生成）→ 严一点防滥用
+        return "upload"
     if path.startswith("/api/analysis/explanations/") or path.startswith("/api/analysis/explanation/"):
+        # 前端轮询 3s×60 次 → 必须宽松
         return "poll"
     return "default"
 
@@ -238,8 +240,8 @@ async def security_firewall(request: Request, call_next):
                 return _JSONResponse(status_code=413, content={"detail": "文件过大"})
         elif size > 20 * 1024 * 1024:
             return _JSONResponse(status_code=413, content={"detail": "请求体过大"})
-    # 6) 健康检查免限流（但不免上面 1-5 的恶意检查）
-    if path in ("/", "/api/health", "/health"):
+    # 6) 健康检查与 CORS 预检免限流（但不免上面 1-5 的恶意检查）
+    if path in ("/", "/api/health", "/health") or request.method == "OPTIONS":
         return await call_next(request)
     # 7) 限流
     ip = _fw_client_ip(request)
