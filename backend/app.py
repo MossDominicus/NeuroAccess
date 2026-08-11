@@ -222,7 +222,7 @@ async def security_firewall(request: Request, call_next):
         q = _urllib_parse.unquote(request.url.query).lower().replace("+", " ")
     except Exception:
         q = request.url.query.lower()
-    if any(p in q for p in _FW_BAD_QUERY_PATTERNS):
+    if any(p in q for p in _FW_BAD_QUERY_PATTERNS) or "\x00" in q or "\r" in q or "\n" in q:
         return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
     # 4) 明确恶意扫描器 UA
     ua = (request.headers.get("user-agent") or "").lower()
