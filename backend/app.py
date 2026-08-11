@@ -144,13 +144,13 @@ _FW_BAD_QUERY_PATTERNS = (
     "alert(", "document.cookie", "confirm(", "prompt(", "svg onload",
     "base64_decode", "eval(", "assert(", "system(", "passthru(", "shell_exec",
 )
-# 明确恶意扫描器 UA（不拦 python-requests/curl 等常见合法客户端）
+# 明确恶意扫描器 UA（收紧名单：只拦攻击工具，不误伤搜索引擎爬虫/合法自动化）
 _FW_BAD_UA = (
     "sqlmap", "nikto", "nmap", "masscan", "gobuster", "dirb", "wfuzz",
     "acunetix", "nessus", "openvas", "burpsuite", "hydra", "medusa",
-    "python-urllib", "libwww-perl", "go-http-client", "scrapy", "httpclient",
-    "zgrab", "expanse", "censys", "nuclei", "xray", "l9explore", "nessus",
-    "crawler", "spiderbot", "webscan", "fuzz",
+    "python-urllib", "libwww-perl", "zgrab", "expanse", "censys",
+    "nuclei", "xray", "l9explore", "sqlmap", "fimap", "shelldump",
+    "w3af", "wpscan", "joomscan", "aircrack", "metasploit",
 )
 
 def _fw_client_ip(request: Request) -> str:
@@ -204,9 +204,6 @@ async def security_firewall(request: Request, call_next):
         return await call_next(request)
     now = _time.time()
     path = request.url.path
-    # 健康检查与根路径放行
-    if path in ("/", "/api/health", "/health"):
-        return await call_next(request)
     # 1) 危险 HTTP 方法
     if request.method in ("TRACE", "CONNECT", "TRACK"):
         return _JSONResponse(status_code=405, content={"detail": "请求方法不允许"})
@@ -220,8 +217,11 @@ async def security_firewall(request: Request, call_next):
         return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
     if "/../" in decoded_lower or "/..%2f" in raw_lower or "%2e%2e" in raw_lower or "%00" in raw_lower or "\x00" in decoded_lower:
         return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
-    # 3) 查询串注入/XSS 特征
-    q = request.url.query.lower()
+    # 3) 查询串注入/XSS 特征（先 URL 解码，再匹配）
+    try:
+        q = _urllib_parse.unquote(request.url.query).lower().replace("+", " ")
+    except Exception:
+        q = request.url.query.lower()
     if any(p in q for p in _FW_BAD_QUERY_PATTERNS):
         return _JSONResponse(status_code=403, content={"detail": "请求被防火墙拦截"})
     # 4) 明确恶意扫描器 UA
@@ -238,7 +238,10 @@ async def security_firewall(request: Request, call_next):
                 return _JSONResponse(status_code=413, content={"detail": "文件过大"})
         elif size > 20 * 1024 * 1024:
             return _JSONResponse(status_code=413, content={"detail": "请求体过大"})
-    # 6) 限流
+    # 6) 健康检查免限流（但不免上面 1-5 的恶意检查）
+    if path in ("/", "/api/health", "/health"):
+        return await call_next(request)
+    # 7) 限流
     ip = _fw_client_ip(request)
     if not _fw_rate_ok(ip, _fw_group(path), now):
         return _JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后再试"})
