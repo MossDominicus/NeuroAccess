@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSyncExternalStore, useCallback } from "react";
-import { Loader2, Menu, X, LayoutDashboard, FileText, BookOpen, Stethoscope, Activity, Settings } from "lucide-react";
+import { Loader2, Menu, X, LayoutDashboard, FileText, BookOpen, Stethoscope, Activity, Settings, User, LogOut } from "lucide-react";
 const SettingsPanel = dynamic(() => import("./SettingsPanel"), { ssr: false, loading: () => null });
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
@@ -41,9 +41,12 @@ const getLoginText = (lang: string): string => {
 
 export default function TopNav({ lang: serverLang }: TopNavProps) {
   const { t, lang: clientLang } = useLang();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+
+  // 路由变化时自动关闭移动端侧边栏（防止点击 Link 后菜单仍开）
+  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
 
   // SSR 期间 serverLang 正确，客户端水合后 clientLang 正确
   const lang = serverLang || clientLang;
@@ -164,8 +167,8 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
               })}
             </ul>
           </nav>
-          {/* 移动端设置按钮 */}
-          <div className="p-4 border-t border-[var(--color-border)]">
+          {/* 移动端底部：设置 / 账户 / 退出 */}
+          <div className="p-4 border-t border-[var(--color-border)] space-y-1">
             <button
               onClick={() => { setMobileMenuOpen(false); setSettingsOpen(true); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] transition-colors"
@@ -173,6 +176,25 @@ export default function TopNav({ lang: serverLang }: TopNavProps) {
               <Settings className="w-5 h-5 flex-shrink-0" />
               <span className="font-medium">{t("settings")}</span>
             </button>
+            {user && (
+              <Link
+                href="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] transition-colors"
+              >
+                <User className="w-5 h-5 flex-shrink-0" />
+                <span className="font-medium">{t("accountSettings")}</span>
+              </Link>
+            )}
+            {user && (
+              <button
+                onClick={() => { setMobileMenuOpen(false); logout(); router.push("/"); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] transition-colors"
+              >
+                <LogOut className="w-5 h-5 flex-shrink-0" />
+                <span className="font-medium">{t("logout")}</span>
+              </button>
+            )}
           </div>
       </div>
     </div>
