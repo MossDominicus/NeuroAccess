@@ -23,12 +23,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = "https://neuroaccess.cloud";
 
   return {
-    title: "NeuroAccess — EEG Education Platform",
+    title: "NeuroAccess",
     description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
     applicationName: "NeuroAccess",
     alternates: { canonical: baseUrl },
     openGraph: {
-      title: "NeuroAccess — EEG Education Platform",
+      title: "NeuroAccess",
       description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
       url: baseUrl,
       siteName: "NeuroAccess",
@@ -45,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: "NeuroAccess — EEG Education Platform",
+      title: "NeuroAccess",
       description: "Upload your EEG data and get AI-powered analysis reports. A free, non-profit educational platform for brainwave science.",
       images: [`${baseUrl}/neuroaccess-logo-512.png`],
     },
