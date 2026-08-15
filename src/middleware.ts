@@ -6,6 +6,8 @@ const publicPaths = [
   "/login", "/register",
   // 法律条款页（注册时需要查看，保持公开）
   "/privacy", "/terms", "/disclaimer",
+  // 学校免费计划（公开推广页）
+  "/schools",
   // 静态资源与 API
   "/api/",
   "/_next/",
