@@ -19,7 +19,7 @@ export default function PublicPreviewFooter({ lang: serverLang }: PublicPreviewF
 
   return (
     <footer className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)]/50 px-6 py-3 text-center text-xs text-[var(--color-text-secondary)]">
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-2 flex-wrap">
         <Link href="/disclaimer" className="underline hover:text-[var(--color-primary)] transition-colors">
           {tf("disclaimerTitle", "Disclaimer")}
         </Link>
@@ -30,6 +30,10 @@ export default function PublicPreviewFooter({ lang: serverLang }: PublicPreviewF
         <span className="text-[var(--color-border)]">·</span>
         <Link href="/terms" className="underline hover:text-[var(--color-primary)] transition-colors">
           {tf("termsOfService", "Terms of Service")}
+        </Link>
+        <span className="text-[var(--color-border)]">·</span>
+        <Link href="/schools" className="underline hover:text-[var(--color-primary)] transition-colors">
+          {tf("freeForSchools", "Free for Schools")}
         </Link>
       </div>
     </footer>
