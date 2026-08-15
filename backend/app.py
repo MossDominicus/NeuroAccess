@@ -959,7 +959,7 @@ def verify_turnstile(token: str) -> bool:
 @app.post("/api/auth/register")
 def auth_register(username: str = Form(...), email: str = Form(...),
                   password: str = Form(...), code: str = Form(...),
-                  cf_turnstile_response: str = Form("")):
+                  cf_turnstile_response: str = Form(""), invite_code: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
     # 先验证注册验证码（不管 Turnstile）
@@ -970,12 +970,76 @@ def auth_register(username: str = Form(...), email: str = Form(...),
         return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
     try:
         user = create_user(username, email, password)
+        # 学校邀请码：注册时填写则自动加入对应学校
+        org_id = None
+        if invite_code:
+            conn = _get_org_conn()
+            row = conn.execute("SELECT id, name FROM organizations WHERE invite_code = ?", (invite_code.strip(),)).fetchone()
+            conn.close()
+            if row:
+                org_id = row["id"]
+                conn = _get_org_conn()
+                conn.execute("UPDATE users SET org_id = ? WHERE id = ?", (org_id, user["id"]))
+                conn.commit()
+                conn.close()
+            else:
+                # 邀请码无效不阻断注册，仅提示
+                pass
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
         return {"success": True, "token": token, "user": {"id": user["id"], "username": user["username"],
                 "email": user["email"], "phone": user.get("phone", ""),
-                "avatar_url": user.get("avatar_url", ""), "avatar_color": user.get("avatar_color", "blue")}}
+                "avatar_url": user.get("avatar_url", ""), "avatar_color": user.get("avatar_color", "blue"),
+                "org_id": org_id}}
     except ValueError as e:
         return {"success": False, "error": str(e)}
+
+@app.post("/api/orgs/register")
+def org_register(org_name: str = Form(...), contact_name: str = Form(""), contact_email: str = Form("")):
+    """学校/机构自助入驻：创建一个机构并生成邀请码（公开接口）"""
+    import secrets as _sec
+    name = org_name.strip()[:120]
+    if not name:
+        return {"success": False, "error": "请填写学校/机构名称"}
+    code = "NA-" + _sec.token_hex(3).upper()
+    try:
+        conn = _get_org_conn()
+        cur = conn.execute(
+            "INSERT INTO organizations (name, contact_name, contact_email, invite_code) VALUES (?,?,?,?)",
+            (name, contact_name.strip()[:80], contact_email.strip()[:120], code),
+        )
+        conn.commit()
+        org_id = cur.lastrowid
+        conn.close()
+        return {"success": True, "org_id": org_id, "invite_code": code, "name": name}
+    except Exception as e:
+        return {"success": False, "error": f"入驻失败: {e}"}
+
+
+@app.get("/api/orgs/my")
+def org_my(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """查询当前用户所属学校"""
+    token = credentials.credentials
+    payload = verify_token(token)
+    if not payload:
+        return {"success": False, "error": "登录凭证无效"}
+    conn = _get_org_conn()
+    row = conn.execute(
+        "SELECT o.name, o.id FROM users u JOIN organizations o ON u.org_id = o.id WHERE u.id = ?",
+        (int(payload["sub"]),),
+    ).fetchone()
+    conn.close()
+    if row:
+        return {"success": True, "org_id": row["id"], "org_name": row["name"]}
+    return {"success": False, "org_id": None, "org_name": None}
+
+
+def _get_org_conn():
+    import sqlite3 as _sqlite3
+    _base = os.path.dirname(os.path.abspath(__file__))
+    conn = _sqlite3.connect(os.path.join(_base, "neuroaccess.db"))
+    conn.row_factory = _sqlite3.Row
+    return conn
+
 
 @app.post("/api/auth/login")
 def auth_login(username_or_email: str = Form(...), password: str = Form(...),

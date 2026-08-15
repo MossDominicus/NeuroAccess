@@ -176,6 +176,25 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP")
     except Exception:
         pass
+    # ── 学校/机构免费计划 ──
+    # organizations 表：学校自助入驻后生成机构邀请码
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS organizations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            contact_name TEXT DEFAULT '',
+            contact_email TEXT DEFAULT '',
+            invite_code TEXT UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    # users 增加 org_id（学生注册时填邀请码自动入校）
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN org_id INTEGER")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 

@@ -34,6 +34,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +43,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   // ── Turnstile 人机验证 ──
   const [turnstileOpen, setTurnstileOpen] = useState(false);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-  const pendingRegRef = useRef<{ username: string; email: string; password: string; code: string } | null>(null);
+  const pendingRegRef = useRef<{ username: string; email: string; password: string; code: string; inviteCode?: string } | null>(null);
   const [devCode, setDevCode] = useState("");
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sendingRef = useRef(false);
@@ -88,10 +89,10 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
     if (password !== confirmPassword) { setError(tf("passwordMismatch", "Passwords do not match")); return; }
     setSubmitting(true);
     try {
-      const result = await register(username, email, password, code);
+      const result = await register(username, email, password, code, undefined, inviteCode);
       if (result.success) { router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800); }
       else if (result.needsCaptcha && turnstileSiteKey) {
-        pendingRegRef.current = { username, email, password, code };
+        pendingRegRef.current = { username, email, password, code, inviteCode };
         setTurnstileOpen(true);
       }
       else { setError(result.error || tf("registerFailed", "Registration failed")); }
@@ -104,7 +105,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
     try {
       const pending = pendingRegRef.current;
       if (!pending) { setError("验证状态丢失，请重新注册"); setTurnstileOpen(false); return; }
-      const result = await register(pending.username, pending.email, pending.password, pending.code, cfToken);
+      const result = await register(pending.username, pending.email, pending.password, pending.code, cfToken, pending.inviteCode);
       if (result.success) { window.location.assign("/"); }
       else { setTurnstileOpen(false); setError(result.error || tf("registerFailed", "Registration failed")); }
     } catch (err: any) { setTurnstileOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
@@ -153,6 +154,12 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
               <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
                 {tf("emailNotConfigured", "Email service not configured, dev code")}: <code className="font-mono font-bold text-base">{devCode}</code>
               </p>)}
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("inviteCode", "School invite code (optional)")}</label>
+            <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
+              placeholder={tf("inviteCodePlaceholder", "e.g. NA-8F2C1A")} maxLength={16} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("password", "Password")}</label>
