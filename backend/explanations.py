@@ -83,6 +83,18 @@ def call_ollama(prompt: str, timeout: int = 120, max_tokens: int = 400) -> Dict[
     return call_openrouter(prompt, timeout=timeout, max_tokens=max_tokens)
 
 
+def _fmt_duration(a: Dict, lang: str) -> str:
+    """按语言格式化录音时长：en→'20 seconds'/'1 min 5 s'，zh→'20秒'/'1分5秒'"""
+    sec = a.get("recording_duration_seconds") or a.get("duration_seconds")
+    if isinstance(sec, (int, float)) and sec >= 0:
+        s = int(round(sec))
+        m, r = divmod(s, 60)
+        if lang == "zh":
+            return f"{m}分{r}秒" if m > 0 else f"{r}秒"
+        return f"{m} min {r} s" if m > 0 else f"{r} seconds"
+    return str(a.get("duration") or "?")
+
+
 def _quality_level(score: Any, lang: str) -> str:
     s = safe_float(score, -1)
     if s >= 80: return "good" if lang == "en" else ("较好" if lang == "zh" else "good")
@@ -296,7 +308,7 @@ def template_beginner(a: Dict, lang: str) -> str:
     bp    = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
     dom   = _dominant_band_from_percent(bp) if bp else None
     ch_n  = a.get("channel_count")
-    dur   = a.get("duration")
+    dur   = _fmt_duration(a, lang)
     dom_plain = _band_plain_name(dom, lang)
     pct_num   = round(_pct(bp[dom])) if dom and bp.get(dom) is not None else None
     n_s   = ("没有明显不清晰的区域" if lang == "zh" else "no noticeably unclear areas") if n == 0 else (
@@ -334,7 +346,7 @@ def template_student(a: Dict, lang: str) -> str:
     q    = _quality_level(a.get("signal_quality_score"), lang)
     ch_n = a.get("channel_count")
     sr   = a.get("sampling_rate")
-    dur  = a.get("duration")
+    dur  = _fmt_duration(a, lang)
     bp_s = _band_pct_display(bp)
     dom_str = (f"alpha/theta/beta range" if not dom_band else f"{dom_band} band") if lang == "en" else (f"{dom_band} 频段" if dom_band else "未知频段")
     if lang == "en":
@@ -377,7 +389,7 @@ def template_research(a: Dict, lang: str) -> str:
     n_n  = len(ns)
     ch_n = a.get("channel_count")
     sr   = a.get("sampling_rate")
-    dur  = a.get("duration")
+    dur  = _fmt_duration(a, lang)
     sq   = a.get("signal_quality_score")
     sq3  = _rnd(sq, 3)
     bp_s = _band_pct_display(bp)
