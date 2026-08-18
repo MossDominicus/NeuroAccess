@@ -48,7 +48,7 @@ export async function downloadCSV(reportId: string, fileName: string) {
       `# File: ${fileName}`,
       `# Channels: ${chNames.length}`,
       `# Sampling rate: ${effSr ?? analysis.sampling_rate ?? "N/A"} Hz (waveform preview, downsampled)`,
-      `# Duration: ${analysis.duration ?? analysis.recording_duration_seconds ?? "N/A"} s`,
+      `# Duration: ${(() => { const d = analysis.duration ?? analysis.recording_duration_seconds ?? "N/A"; return typeof d === "number" ? d + " s" : d; })()}`,
       `# Unit: μV (microvolts)`,
       `# Raw waveform time series from waveform_preview`,
       ``,

@@ -931,33 +931,10 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
         freq = quick_bandpower(seg_data_uv, seg_sfreq)
         literacy = quick_literacy_scores(quality, overview)
     
-    # ── 3. 波形预览（从分段数据直接提取，避免二次读取文件）────
-    # fast_load_segment 已载入前60s，取前8s
-    preview_n = min(int(20.0 * seg_sfreq), seg_data_uv.shape[1]) if seg_data_uv is not None else 0
-    if preview_n > 100 and seg_data_uv is not None and seg_ch_names is not None:
-        p_data = seg_data_uv[:, :preview_n]
-        p_ch = min(p_data.shape[0], MAX_PREVIEW_CHANNELS)
-        p_data = p_data[:p_ch]
-        p_names = seg_ch_names[:p_ch]
-        p_times = np.arange(preview_n) / seg_sfreq
-        target_points = 1200
-        p_step = max(1, preview_n // target_points)
-        if preview_n // p_step < 500:
-            p_step = max(1, preview_n // 500)
-        p_channels = {}
-        for i in range(p_ch):
-            x = p_data[i].copy().astype(np.float64)
-            x = x - np.nanmedian(x)
-            p_channels[p_names[i]] = x[::p_step].astype(float).tolist()
-        waveform_preview = {
-            "times": p_times[::p_step].tolist(),
-            "channels": p_channels,
-            "channel_names": p_names,
-            "sampling_rate": float(seg_sfreq),
-            "duration_seconds": 8.0,
-        }
-    else:
-        waveform_preview = fast_preview_window(file_path, duration_sec=20.0, max_channels=MAX_PREVIEW_CHANNELS)
+    # ── 3. 波形预览（按文件完整时长显示，下采样到 ~1200 点）────
+    # 用户要求：文件时长有多久就显示多久。直接读取完整时长，
+    # 输出经 1200 点下采样，波形体积恒定；长文件仅读取耗时略增。
+    waveform_preview = fast_preview_window(file_path, duration_sec=meta["duration_seconds"], max_channels=MAX_PREVIEW_CHANNELS)
     
     # ── 4. 频段波形（从已加载数据提取，避免重复读取文件）────
     # 用前10s数据做频段滤波
