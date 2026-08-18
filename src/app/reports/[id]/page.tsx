@@ -63,47 +63,34 @@ export default function ReportDetailPage() {
             try {
               addReport(serverReport as StoredReport);
             } catch {}
+            // 报告快照只存模板，AI 在后台线程生成后存缓存；
+            // 服务端报告加载完成后按 analysis_id 拉取 AI 解释（保证不被快照覆盖）。
+            const aid = serverReport.analysis?.analysis_id;
+            if (aid) {
+              fetch(`/api/analysis/explanations/${aid}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+                .then((r) => r.json())
+                .then((data) => {
+                  if (data.success && data.explanations) {
+                    setReport((prev) =>
+                      prev ? { ...prev, analysis: { ...prev.analysis, explanations: data.explanations } } : prev
+                    );
+                    try {
+                      addReport({
+                        ...serverReport,
+                        analysis: { ...serverReport.analysis, explanations: data.explanations },
+                      } as StoredReport);
+                    } catch {}
+                  }
+                })
+                .catch(() => {});
+            }
           }
         })
         .catch(() => {});
     }
   }, [id, router]);
-
-  // 打开报告时按 analysis_id 重新拉取 AI 解释缓存：
-  // /analyze 只把模板写入报告快照，AI 在后台线程生成后存缓存；
-  // 若用户在 AI 完成前保存报告，重开时需从缓存补上真实 AI 解释。
-  useEffect(() => {
-    if (!report?.analysis?.analysis_id) return;
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("neuroaccess-token") || ""
-        : "";
-    if (!token) return;
-    let cancelled = false;
-    const aid = report.analysis.analysis_id;
-    (async () => {
-      try {
-        const resp = await fetch(`/api/analysis/explanations/${aid}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await resp.json();
-        if (cancelled || !data.success || !data.explanations) return;
-        setReport((prev) =>
-          prev ? { ...prev, analysis: { ...prev.analysis, explanations: data.explanations } } : prev
-        );
-        try {
-          addReport({
-            ...report,
-            analysis: { ...report.analysis, explanations: data.explanations },
-          } as StoredReport);
-        } catch {}
-      } catch {
-        // 缓存不可用时保持现状
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report?.analysis?.analysis_id]);
 
 
   // Loading state
