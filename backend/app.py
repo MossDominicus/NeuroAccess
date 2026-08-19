@@ -1904,6 +1904,9 @@ def waveform_image(rid: str = ""):
 
 def gen_waveform_svg(rid: str) -> str:
     """从数据库读取报告数据，生成纯SVG波形图"""
+    def esc(s):
+        return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+
     if not rid:
         return f"<svg width=400 height=100><text y=50 fill=red>Missing report ID</text></svg>"
     try:
@@ -1973,19 +1976,16 @@ def gen_waveform_svg(rid: str) -> str:
 
         # 真实时长与时间轴：x 坐标按真实时间映射（PPS 固定像素/秒），
         # 使 5 秒文件短、3 分钟文件长，长度反映真实时长。
+        LW = 65  # 左侧通道名宽度
         PPS = 60.0  # 像素/秒
         t0 = float(times[0]) if len(times) > 1 else 0.0
         dur = (float(times[-1]) - t0) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
         # 总宽度 = 左侧通道名 + 波形时长×PPS + 右侧留白
         W = int(LW + dur * PPS + 80)
-        LW = 65
         # 自适应行高：通道多时压扁，保证 64/128 通道也能一屏放下
         # 64ch → 8px/行 → 542px；128ch → 4px/行 → 542px
         laneH = max(4, min(24, int(520 / nch)))
         H = laneH * nch + 30
-        
-        def esc(s):
-            return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
         
         svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
         for i, ch in enumerate(ch_names):
@@ -1999,8 +1999,11 @@ def gen_waveform_svg(rid: str) -> str:
             sc = (laneH * 0.5) / (2 * p95)
             cl = laneH * 0.5 / sc
             # 每个采样点 x = 左侧边距 + (真实时间 - 起点) * PPS
-            m = min(len(vals), len(times))
-            pts = "M" + "".join(f" {LW + (float(times[j])-t0)*PPS:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(m))
+            # times 与 vals 等长时用真实时间；旧报告 times 缺失/过短时按均匀映射兜底
+            if len(times) == len(vals):
+                pts = "M" + "".join(f" {LW + (float(times[j])-t0)*PPS:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
+            else:
+                pts = "M" + "".join(f" {LW + j*(dur*PPS)/(npts-1):.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             # 通道曲线颜色 = 该通道主导频段的颜色（与图例数量一致）
             band = _dominant_band(vals, fs)
             svg.append(f'<path d="{pts}" stroke="{BAND_COLORS.get(band, "#ef4444")}" stroke-width="0.7" fill="none" opacity="0.85"/>')
