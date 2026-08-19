@@ -430,6 +430,30 @@ def _rnd(v, dp: int = 3):
     return v
 
 
+def _parse_duration_seconds(dur) -> float | None:
+    """从各种时长为字符串里解析出总秒数。返回 None 表示无法解析。
+    覆盖 "2分3秒"/"0分20秒"/"20秒"/"3分02秒"/"2m 3s"/"2:03"/"123.5" 等常见格式。"""
+    if isinstance(dur, (int, float)):
+        return float(dur)
+    if not isinstance(dur, str):
+        return None
+    s = dur.strip().replace(" ", "")
+    # "X分Y秒" / "XmYs" / "Xmin Ysec"
+    m = re.search(r"(?:(\d+(?:\.\d+)?)\s*(?:分|m(?:in)?)[：:]?\s*)?(\d+(?:\.\d+)?)\s*(?:秒|s(?:ec)?)", s)
+    if m:
+        minutes = float(m.group(1)) if m.group(1) else 0.0
+        return minutes * 60 + float(m.group(2))
+    # "mm:ss" / "mm:ss.x"
+    m = re.match(r"^(\d+):(\d+(?:\.\d+)?)$", s)
+    if m:
+        return float(m.group(1)) * 60 + float(m.group(2))
+    # 纯数字（可带小数/负号）
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
 def _summarize_for_ai(a: Dict) -> Dict:
     """
     只保留 AI 解释需要的「派生标量指标」，剔除所有数组 / 波形 / 时间序列数据。
@@ -444,7 +468,10 @@ def _summarize_for_ai(a: Dict) -> Dict:
         "channel_count":            overview.get("channel_count") or a.get("channel_count"),
         "sampling_rate":            overview.get("sampling_rate") or a.get("sampling_rate"),
         "duration":                 overview.get("duration") or a.get("duration"),
-        "duration_seconds":         overview.get("recording_duration_seconds") or a.get("recording_duration_seconds") or a.get("duration_seconds"),
+        "duration_seconds":         overview.get("recording_duration_seconds") or a.get("recording_duration_seconds")
+                                    or a.get("duration_seconds")
+                                    or _parse_duration_seconds(overview.get("duration"))
+                                    or _parse_duration_seconds(a.get("duration")),
         "signal_quality_score":     _rnd(sq.get("signal_quality_score") or a.get("signal_quality_score"), 3),
         # 只保留前若干项，避免超长通道列表
         "noisy_channels":           (sq.get("noisy_channels") or a.get("noisy_channels") or [])[:20],
@@ -497,6 +524,9 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         "different words; a sentence that merely restates a parameter or an earlier statement is padding and must be removed. "
         "Cover ALL of the required items listed in your task below — do not stop early. "
         "Completeness is as important as conciseness.\n"
+        "12. RECORDING LENGTH: whenever you mention how long the recording is, use the exact number in "
+        "'duration_seconds' from the JSON (e.g. 182) — never 10, 20, or any preview-window length, "
+        "and never a value you inferred. 'duration' is the human-readable form of the same value.\n"
     )
     sq = safe_float(a.get("signal_quality_score", 100), 100)
     uncertainty = ""
