@@ -527,6 +527,13 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         "12. RECORDING LENGTH: whenever you mention how long the recording is, use the exact number in "
         "'duration_seconds' from the JSON (e.g. 182) — never 10, 20, or any preview-window length, "
         "and never a value you inferred. 'duration' is the human-readable form of the same value.\n"
+        "13. VALUE OVER FORM: this explanation must be genuinely USEFUL to the reader, not a parameter dump. "
+        "Do not merely restate JSON numbers; interpret what they MEAN for this recording. Every tier must: "
+        "(a) state the single most important observation about this recording (what stands out most, with its real number); "
+        "(b) explain what that observation implies (physiological correlate, quality caveat, or analysis limitation — in cautious educational language); "
+        "(c) end with ONE concrete takeaway sentence (what the reader should understand about this recording). "
+        "A sentence that only repeats a number without any interpretation is padding and must be rewritten or deleted. "
+        "Aim for substance: shorter but insightful beats longer but hollow.\n"
     )
     sq = safe_float(a.get("signal_quality_score", 100), 100)
     uncertainty = ""
