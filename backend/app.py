@@ -1928,51 +1928,11 @@ def gen_waveform_svg(rid: str) -> str:
         if npts < 2:
             return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points ({npts})</text></svg>"
 
-        # 真实采样率：波形做过 step 降采样，直接用原始 sampling_rate 会把频率读高。
-        # 优先用 times 数组推真实采样间隔，拿不到再退回 sampling_rate。
+        # 真实采样间隔：波形做过 step 降采样，优先用 times 数组推真实间隔（用于时长换算）
         times = wp.get("times", [])
-        fs = float(wp.get("sampling_rate") or 128.0)
-        if len(times) > 1:
-            dt = times[1] - times[0]
-            if dt > 0 and dt < 1:
-                fs = 1.0 / dt
 
-        # 标准五波配色（与图例/知识库一致）：δ红 α蓝 θ黄 β绿 γ紫
-        BAND_COLORS = {
-            "delta": "#ef4444", "alpha": "#3b82f6",
-            "theta": "#facc15", "beta": "#22c55e", "gamma": "#a855f7",
-        }
-        BAND_RANGES = {
-            "delta": (0.5, 4), "theta": (4, 8), "alpha": (8, 13),
-            "beta": (13, 30), "gamma": (30, 100),
-        }
-
-        def _dominant_band(vals: list, fs_: float) -> str:
-            """计算单个通道的主导频段（与前端 computeBandDominantCounts 完全同逻辑：
-            去直流 → FFT(pad 到 2 幂) → 各频段 bin 平均功率取最大，bin 边界用 round 舍入）。"""
-            n = len(vals)
-            if n < 64 or fs_ <= 0:
-                return "delta"
-            import numpy as np
-            data = np.asarray(vals, dtype=float)
-            data = data - data.mean()
-            fftN = 1
-            while fftN < n:
-                fftN *= 2
-            spectrum = np.fft.rfft(data, fftN)
-            power = np.abs(spectrum) ** 2  # bin k 对应频率 k*fs/fftN（正频率）
-            freqRes = fs_ / fftN
-            nyq_bin = fftN // 2
-            best_name, best_power = "delta", -1.0
-            for name, (lo, hi) in BAND_RANGES.items():
-                lo_bin = max(1, int(round(lo / freqRes)))
-                hi_bin = min(nyq_bin, int(round(hi / freqRes)))
-                if hi_bin < lo_bin:
-                    continue
-                bp = float(power[lo_bin:hi_bin + 1].mean())  # 每 bin 平均功率，避免宽频段天然获胜
-                if bp > best_power:
-                    best_power, best_name = bp, name
-            return best_name
+        # 通道曲线配色：按通道顺序循环（还原真实波形观感）
+        CHANNEL_COLORS = ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#a855f7", "#14b8a6", "#f97316", "#8b5cf6"]
 
         # 真实时长与时间轴：x 坐标按真实时间映射（PPS 固定像素/秒），
         # 使 5 秒文件短、3 分钟文件长，长度反映真实时长。
@@ -2004,9 +1964,8 @@ def gen_waveform_svg(rid: str) -> str:
                 pts = "M" + "".join(f" {LW + (float(times[j])-t0)*PPS:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             else:
                 pts = "M" + "".join(f" {LW + j*(dur*PPS)/(npts-1):.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            # 通道曲线颜色 = 该通道主导频段的颜色（与图例数量一致）
-            band = _dominant_band(vals, fs)
-            svg.append(f'<path d="{pts}" stroke="{BAND_COLORS.get(band, "#ef4444")}" stroke-width="0.7" fill="none" opacity="0.85"/>')
+            # 通道曲线按通道顺序循环配色（还原真实波形观感）
+            svg.append(f'<path d="{pts}" stroke="{CHANNEL_COLORS[i % len(CHANNEL_COLORS)]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
         
         # 时间刻度：按真实时间放置（0, dur/5, …, dur）
         for i in range(6):
