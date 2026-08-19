@@ -12,11 +12,6 @@ interface ReportEEGChartProps {
   id?: string;
 }
 
-const BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
-const BAND_LABELS: Record<string, string> = {
-  alpha: "α Alpha", beta: "β Beta", delta: "δ Delta", theta: "θ Theta", gamma: "γ Gamma",
-};
-
 export default function ReportEEGChart({ reportFileName, analysis, id }: ReportEEGChartProps) {
   const { t } = useLang();
   const imgRef = useRef<HTMLImageElement>(null);
@@ -157,15 +152,6 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
             <button onClick={resetView} title={t("plotlyResetAxes")} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)]"><Maximize2 size={14} /></button>
             <span className="text-xs text-[var(--color-text-secondary)] px-2 font-mono">{Math.round(scale * 100)}%</span>
             <button onClick={onDownload} title={t("plotlyDownloadPng")} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-bg)]"><Download size={14} /></button>
-          </div>
-        </div>
-        <div className="px-5 pb-2">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {BAND_ORDER.map(b => (
-              <span key={b} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
-                {BAND_LABELS[b]}
-              </span>
-            ))}
           </div>
         </div>
         {imageUrl ? (
