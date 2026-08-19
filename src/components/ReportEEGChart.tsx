@@ -145,7 +145,7 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
                className={`w-full bg-[var(--color-bg)] overflow-auto ${isPanMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
                style={{ minHeight: 200 }}>
             <img ref={imgRef} src={imageUrl} alt="EEG Waveform" draggable={false} className="block select-none"
-                 style={{ transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`, transformOrigin: "50% 50%", minWidth: "100%" }} />
+                 style={{ transform: `scale(${scale}) translate(${panX / scale}px, ${panY / scale}px)`, transformOrigin: "50% 50%", minWidth: "100%", maxWidth: "none", height: "auto" }} />
           </div>
         ) : (
           <div className="flex items-center justify-center h-48 text-[var(--color-text-secondary)] text-sm">
