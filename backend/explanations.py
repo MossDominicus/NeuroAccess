@@ -905,6 +905,50 @@ def _strip_mental_states(text: str) -> str:
     return "\n\n".join(kept).strip()
 
 
+# ── 无效元素清理 ──
+# 删除两类无效句：
+#  1) 针对"具体个体"的心智状态解读（"该个体处于放松状态"、"记录者可能……"）—— 边界规则4禁止
+#  2) 建议/操作指导句（"建议……处理"、"应……"）—— 边界规则3禁止
+# 一般性教育关联（"alpha波通常与放松清醒相关"）不属于无效元素，保留。
+_SUBJECT_WORDS = [
+    "该个体", "这个个体", "此人", "这个人", "该人", "记录者", "被试", "受试者",
+    "被记录者", "测试者", "患者", "检测者", "the individual", "the subject",
+    "this person", "the person", "the participant", "the patient", "the recorder",
+    "the subject", "the participant",
+]
+_ADVICE_WORDS = [
+    "建议", "应", "应当", "应该", "最好", "请", "可以尝试", "务必", "需要做", "需进行", "应进行",
+    "we recommend", "it is recommended", "you should", "should be done", "we suggest",
+    "it is advised", "should perform", "should remove", "should be removed",
+]
+
+
+def _strip_invalid_sentences(text: str) -> str:
+    """删除个体状态解读句与建议句；保留一般性频段-状态教育关联。按句切分，保留段落。"""
+    if not text:
+        return text
+    lines = [ln for ln in str(text).split("\n") if ln.strip()]
+    kept = []
+    for ln in lines:
+        segs = re.split(r"(?<=[。！？!?；;])|(?<=\.)(?<!\d\.)(?!\d)", ln)
+        kept_segs = []
+        for seg in segs:
+            s = seg.strip()
+            if not s:
+                continue
+            low = s.lower()
+            # 个体状态解读：句中有具体对象 + 心智词
+            if any(w in low for w in _SUBJECT_WORDS) and any(w in low for w in _MENTAL_WORDS):
+                continue
+            # 建议/指导句
+            if any(w in low for w in _ADVICE_WORDS):
+                continue
+            kept_segs.append(seg)
+        if kept_segs:
+            kept.append("".join(kept_segs))
+    return "\n\n".join(kept).strip()
+
+
 def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]:
     """为指定语言生成三层解释；三层各独立调用 Ollama（并行），失败用模板兜底"""
     a     = analysis.copy()
@@ -928,10 +972,13 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
                 return fallbacks[level]
             # 通道名保留完整显示（不删，避免半截残留）；只清免责声明/英文标题/元话语，
             # 末端做单档内去重（删同义复读），保证零凑数。
-            # 注意：不再删"心智状态"句——边界规则2要求输出"波形通常与什么状态相关"的教育性解读。
+            # 注意：一般性频段-状态教育关联（"alpha通常与放松清醒相关"）保留；
+            # 删除针对具体个体的状态解读与建议句（无效元素），再做去重。
             cleaned = _dedup_sentences(
-                _strip_meta_sentences(
-                    _strip_en_headings(_strip_disclaimers(text), lang)
+                _strip_invalid_sentences(
+                    _strip_meta_sentences(
+                        _strip_en_headings(_strip_disclaimers(text), lang)
+                    )
                 )
             )
             # AI 输出全是无效文本（被清空）→ 回退模板，避免空解释
