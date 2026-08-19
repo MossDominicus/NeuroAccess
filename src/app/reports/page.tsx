@@ -25,6 +25,8 @@ import {
   loadReports,
   deleteReport as deleteReportFromStorage,
   deleteServerReport,
+  fetchServerReports,
+  saveReports,
   isFavorite,
   toggleFavorite,
 } from "@/lib/reports-storage";
@@ -359,6 +361,15 @@ export default function ReportsPage() {
     if (!loading) {
       setReports(loadReports());
       try { setFavorites(JSON.parse(localStorage.getItem("neuroaccess-favorites") || "[]")); } catch {}
+      // 同时从服务端拉取完整报告列表，覆盖本地缓存（多设备真相源）
+      // 修复：登录/换设备后 localStorage 为空但服务器有报告时列表不显示的问题
+      fetchServerReports().then((serverReports) => {
+        if (serverReports !== null) {
+          const merged = [...serverReports, ...loadReports().filter((lr) => !serverReports.some((sr: any) => sr.id === lr.id))];
+          saveReports(merged);
+          setReports(merged);
+        }
+      });
     }
   }, [loading]);
 
