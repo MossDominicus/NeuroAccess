@@ -149,7 +149,7 @@ export default function EegSimulatorPage() {
     { name: `θ ${t("bandTheta")}`, value: params.theta_power, range: "4-8 Hz", fill: "#60a5fa" },
     { name: `α ${t("bandAlpha")}`, value: params.alpha_power, range: "8-13 Hz", fill: "#34d399" },
     { name: `β ${t("bandBeta")}`, value: params.beta_power, range: "13-30 Hz", fill: "#fbbf24" },
-    { name: `γ ${t("bandGamma")}`, value: params.gamma_power, range: "30-100 Hz", fill: "#ec4899" },
+    { name: `γ ${t("bandGamma")}`, value: params.gamma_power, range: "30-100 Hz", fill: "#a855f7" },
   ], [params, t]);
 
   const CHANNEL_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];

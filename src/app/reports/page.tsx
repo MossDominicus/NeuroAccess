@@ -200,7 +200,7 @@ function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string,
                       band === "theta" ? "#06b6d4" :
                       band === "alpha" ? "#10b981" :
                       band === "beta"  ? "#f59e0b" :
-                      band === "gamma" ? "#ec4899" : "#ef4444",
+                      band === "gamma" ? "#a855f7" : "#ef4444",
                   }}
                 />
               </div>
@@ -299,7 +299,7 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
     ${Object.entries(bp).map(([band, value]) => {
       const max = Math.max(...Object.values(bp));
       const pct = max > 0 ? (Number(value) / max) * 100 : 0;
-      const color = band === "delta" ? "#8b5cf6" : band === "theta" ? "#06b6d4" : band === "alpha" ? "#10b981" : band === "beta" ? "#f59e0b" : band === "gamma" ? "#ec4899" : "#ef4444";
+      const color = band === "delta" ? "#8b5cf6" : band === "theta" ? "#06b6d4" : band === "alpha" ? "#10b981" : band === "beta" ? "#f59e0b" : band === "gamma" ? "#a855f7" : "#ef4444";
       return `<div class="bp-row"><span class="bp-label">${band}</span><div class="bp-bar"><div class="bp-fill" style="width:${pct}%;background:${color}"></div></div><span class="bp-val">${Number(value).toFixed(1)}</span></div>`;
     }).join("")}
   </div>` : ""}

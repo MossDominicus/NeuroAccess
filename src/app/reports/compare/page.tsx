@@ -33,7 +33,7 @@ const bandColors: Record<string, string> = {
   theta: "#06b6d4",
   alpha: "#10b981",
   beta: "#f59e0b",
-  gamma: "#ef4444",
+  gamma: "#a855f7",
 };
 
 const bandLabels: Record<string, string> = {

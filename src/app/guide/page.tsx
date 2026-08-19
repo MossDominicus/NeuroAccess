@@ -37,7 +37,7 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
       }
     },
     {
-      id: "gamma", category: "brainwaves", icon: "γ", iconColor: "#ec4899",
+      id: "gamma", category: "brainwaves", icon: "γ", iconColor: "#a855f7",
       title: t("guideGammaTitle"),
       frequency: t("guideGammaFrequency"),
       description: t("guideGammaDesc"),
