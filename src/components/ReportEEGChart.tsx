@@ -2,8 +2,9 @@
 
 import { useLang } from "@/lib/language-context";
 import { Download, Waves, ZoomIn, ZoomOut, Move, Maximize2 } from "lucide-react";
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect } from "react";
 import { computeBandDominantCounts } from "@/lib/band-waveform-generator";
+import { buildWaveformSvg, svgToDataUrl, isPlaceholderSvg } from "@/lib/waveform-svg";
 
 interface ReportEEGChartProps {
   reportFileName: string;
@@ -29,11 +30,48 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
   const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
   const reportId = id || "";
-  // 只在 reportId 变化时重建 URL（带时间戳破缓存）；缩放/平移的 setState 重渲染不再刷新图片
-  const imageUrl = useMemo(
-    () => (reportId ? `/api/waveform-image?rid=${encodeURIComponent(reportId)}&_t=${Date.now()}` : null),
-    [reportId]
-  );
+  // 最终生效的图片 URL：默认请求服务器，若报告未同步到服务器（返回占位 SVG），
+  // 回退用本地 analysis.waveform_preview 直接生成 SVG data URL。
+  const [effectiveUrl, setEffectiveUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!reportId) {
+        // 无报告 ID：直接用本地数据渲染（如果有）
+        const wp = analysis?.waveform_preview;
+        const localSvg = wp?.channels ? buildWaveformSvg(wp) : "";
+        if (!cancelled) setEffectiveUrl(localSvg ? svgToDataUrl(localSvg) : null);
+        return;
+      }
+      const serverUrl = `/api/waveform-image?rid=${encodeURIComponent(reportId)}&_t=${Date.now()}`;
+      try {
+        const resp = await fetch(serverUrl);
+        const text = await resp.text();
+        if (!cancelled) {
+          if (resp.ok && text.includes("<svg") && !isPlaceholderSvg(text)) {
+            setEffectiveUrl(serverUrl);
+          } else {
+            // 服务器没这报告（未同步）→ 用本地数据渲染
+            const wp = analysis?.waveform_preview;
+            const localSvg = wp?.channels ? buildWaveformSvg(wp) : "";
+            setEffectiveUrl(localSvg ? svgToDataUrl(localSvg) : null);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          const wp = analysis?.waveform_preview;
+          const localSvg = wp?.channels ? buildWaveformSvg(wp) : "";
+          setEffectiveUrl(localSvg ? svgToDataUrl(localSvg) : null);
+        }
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportId]);
+
+  const imageUrl = effectiveUrl;
 
   // 频段计数 = 每个频段"主导"的通道数（逐通道 FFT 算主导频段），不是百分比
   // 优先从 waveform_preview.channels 取通道数；为空时回退 analysis.channel_count

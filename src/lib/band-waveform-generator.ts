@@ -9,7 +9,7 @@
  */
 
 // ── FFT（Cooley-Tukey radix-2，原地修改）────────────────────────
-function fft(re: Float64Array, im: Float64Array): void {
+export function fft(re: Float64Array, im: Float64Array): void {
   const n = re.length;
   if (n <= 1) return;
 
@@ -49,7 +49,7 @@ function fft(re: Float64Array, im: Float64Array): void {
   }
 }
 
-function nextPow2(n: number): number {
+export function nextPow2(n: number): number {
   let p = 1;
   while (p < n) p <<= 1;
   return p;
