@@ -1904,9 +1904,6 @@ def waveform_image(rid: str = ""):
 
 def gen_waveform_svg(rid: str) -> str:
     """从数据库读取报告数据，生成纯SVG波形图"""
-    def esc(s):
-        return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
-
     if not rid:
         return f"<svg width=400 height=100><text y=50 fill=red>Missing report ID</text></svg>"
     try:
@@ -1927,25 +1924,16 @@ def gen_waveform_svg(rid: str) -> str:
         npts = len(chs[ch_names[0]]) if nch else 0
         if npts < 2:
             return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points ({npts})</text></svg>"
-
-        # 真实采样间隔：波形做过 step 降采样，优先用 times 数组推真实间隔（用于时长换算）
-        times = wp.get("times", [])
-
-        # 通道曲线配色：按通道顺序循环（还原真实波形观感）
-        CHANNEL_COLORS = ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#a855f7", "#14b8a6", "#f97316", "#8b5cf6"]
-
-        # 真实时长与时间轴：x 坐标按真实时间映射（PPS 固定像素/秒），
-        # 使 5 秒文件短、3 分钟文件长，长度反映真实时长。
-        LW = 65  # 左侧通道名宽度
-        PPS = 60.0  # 像素/秒
-        t0 = float(times[0]) if len(times) > 1 else 0.0
-        dur = (float(times[-1]) - t0) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
-        # 总宽度 = 左侧通道名 + 波形时长×PPS + 右侧留白
-        W = int(LW + dur * PPS + 80)
+        
+        W, LW = 900, 65
         # 自适应行高：通道多时压扁，保证 64/128 通道也能一屏放下
         # 64ch → 8px/行 → 542px；128ch → 4px/行 → 542px
         laneH = max(4, min(24, int(520 / nch)))
         H = laneH * nch + 30
+        colors = ["#ef4444","#facc15","#3b82f6","#22c55e"]
+        
+        def esc(s):
+            return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
         
         svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
         for i, ch in enumerate(ch_names):
@@ -1958,19 +1946,15 @@ def gen_waveform_svg(rid: str) -> str:
             p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
             sc = (laneH * 0.5) / (2 * p95)
             cl = laneH * 0.5 / sc
-            # 每个采样点 x = 左侧边距 + (真实时间 - 起点) * PPS
-            # times 与 vals 等长时用真实时间；旧报告 times 缺失/过短时按均匀映射兜底
-            if len(times) == len(vals):
-                pts = "M" + "".join(f" {LW + (float(times[j])-t0)*PPS:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            else:
-                pts = "M" + "".join(f" {LW + j*(dur*PPS)/(npts-1):.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            # 通道曲线按通道顺序循环配色（还原真实波形观感）
-            svg.append(f'<path d="{pts}" stroke="{CHANNEL_COLORS[i % len(CHANNEL_COLORS)]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
+            pts = "M" + "".join(f" {LW + j*(W-LW)/(npts-1):.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
+            svg.append(f'<path d="{pts}" stroke="{colors[i%4]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
         
-        # 时间刻度：按真实时间放置（0, dur/5, …, dur）
+        # 用 times 数组尾端取实际时长（采样率经多次降采样后不准）
+        times = wp.get("times", [])
+        dur = (times[-1] - times[0]) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
         for i in range(6):
             t = i * dur / 5
-            x = LW + t * PPS
+            x = LW + (W - LW) * i / 5
             svg.append(f'<text x="{x:.1f}" y="{H-4}" fill="#667" font-size="9" text-anchor="middle">{t:.1f}s</text>')
         svg.append("</svg>")
         return "".join(svg)
