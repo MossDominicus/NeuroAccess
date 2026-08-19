@@ -179,7 +179,11 @@ function ExplanationCards({ analysis }: { analysis: any }) {
 function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string, string> | undefined }) {
   const { t } = useLang();
   if (!bandpowerPercent || Object.keys(bandpowerPercent).length === 0) return null;
-  const entries = Object.entries(bandpowerPercent);
+  // 固定频段展示顺序：α β δ θ γ（a, b, d, t, g）
+  const BAND_DISPLAY_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
+  const entries = BAND_DISPLAY_ORDER
+    .filter((b) => bandpowerPercent[b] !== undefined)
+    .map((b) => [b, bandpowerPercent[b]] as [string, string]);
   const maxVal = Math.max(...entries.map(([, v]) => parseFloat(v)), 1);
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
@@ -196,10 +200,10 @@ function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string,
                   style={{
                     width: `${Math.min((num / maxVal) * 100, 100)}%`,
                     backgroundColor:
-                      band === "delta" ? "#8b5cf6" :
-                      band === "theta" ? "#06b6d4" :
-                      band === "alpha" ? "#10b981" :
-                      band === "beta"  ? "#f59e0b" :
+                      band === "delta" ? "#ef4444" :
+                      band === "alpha" ? "#3b82f6" :
+                      band === "theta" ? "#facc15" :
+                      band === "beta"  ? "#22c55e" :
                       band === "gamma" ? "#a855f7" : "#ef4444",
                   }}
                 />
@@ -299,7 +303,7 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
     ${Object.entries(bp).map(([band, value]) => {
       const max = Math.max(...Object.values(bp));
       const pct = max > 0 ? (Number(value) / max) * 100 : 0;
-      const color = band === "delta" ? "#8b5cf6" : band === "theta" ? "#06b6d4" : band === "alpha" ? "#10b981" : band === "beta" ? "#f59e0b" : band === "gamma" ? "#a855f7" : "#ef4444";
+      const color = band === "delta" ? "#ef4444" : band === "alpha" ? "#3b82f6" : band === "theta" ? "#facc15" : band === "beta" ? "#22c55e" : band === "gamma" ? "#a855f7" : "#ef4444";
       return `<div class="bp-row"><span class="bp-label">${band}</span><div class="bp-bar"><div class="bp-fill" style="width:${pct}%;background:${color}"></div></div><span class="bp-val">${Number(value).toFixed(1)}</span></div>`;
     }).join("")}
   </div>` : ""}

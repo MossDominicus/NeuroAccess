@@ -12,7 +12,7 @@ interface ReportEEGChartProps {
   id?: string;
 }
 
-const BAND_ORDER = ["delta", "theta", "alpha", "beta", "gamma"];
+const BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
 const BAND_COLORS: Record<string, string> = {
   delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e", gamma: "#a855f7",
 };

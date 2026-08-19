@@ -145,10 +145,10 @@ export default function EegSimulatorPage() {
   }, [resultData]);
 
   const bandData = useMemo(() => [
-    { name: `δ ${t("bandDelta")}`, value: params.delta_power, range: "0.5-4 Hz", fill: "#a78bfa" },
-    { name: `θ ${t("bandTheta")}`, value: params.theta_power, range: "4-8 Hz", fill: "#60a5fa" },
-    { name: `α ${t("bandAlpha")}`, value: params.alpha_power, range: "8-13 Hz", fill: "#34d399" },
-    { name: `β ${t("bandBeta")}`, value: params.beta_power, range: "13-30 Hz", fill: "#fbbf24" },
+    { name: `α ${t("bandAlpha")}`, value: params.alpha_power, range: "8-13 Hz", fill: "#3b82f6" },
+    { name: `β ${t("bandBeta")}`, value: params.beta_power, range: "13-30 Hz", fill: "#22c55e" },
+    { name: `δ ${t("bandDelta")}`, value: params.delta_power, range: "0.5-4 Hz", fill: "#ef4444" },
+    { name: `θ ${t("bandTheta")}`, value: params.theta_power, range: "4-8 Hz", fill: "#facc15" },
     { name: `γ ${t("bandGamma")}`, value: params.gamma_power, range: "30-100 Hz", fill: "#a855f7" },
   ], [params, t]);
 
@@ -275,8 +275,8 @@ export default function EegSimulatorPage() {
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">{t("bandPower")}</h3>
                 {renderSlider(`${t("bandAlpha")} (8-13 Hz)`, "alpha_power", 0, 2, 0.1)}
                 {renderSlider(`${t("bandBeta")} (13-30 Hz)`, "beta_power", 0, 2, 0.1)}
-                {renderSlider(`${t("bandTheta")} (4-8 Hz)`, "theta_power", 0, 2, 0.1)}
                 {renderSlider(`${t("bandDelta")} (0.5-4 Hz)`, "delta_power", 0, 2, 0.1)}
+                {renderSlider(`${t("bandTheta")} (4-8 Hz)`, "theta_power", 0, 2, 0.1)}
                 {renderSlider(`${t("bandGamma")} (30-100 Hz)`, "gamma_power", 0, 2, 0.1)}
               </div>
 
@@ -284,8 +284,8 @@ export default function EegSimulatorPage() {
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">{t("bandFrequency")}</h3>
                 {renderSlider(`${t("bandAlpha")} Freq (Hz)`, "alpha_freq", 8, 13, 0.5)}
                 {renderSlider(`${t("bandBeta")} Freq (Hz)`, "beta_freq", 13, 30, 1)}
-                {renderSlider(`${t("bandTheta")} Freq (Hz)`, "theta_freq", 4, 8, 0.5)}
                 {renderSlider(`${t("bandDelta")} Freq (Hz)`, "delta_freq", 0.5, 4, 0.5)}
+                {renderSlider(`${t("bandTheta")} Freq (Hz)`, "theta_freq", 4, 8, 0.5)}
                 {renderSlider(`${t("bandGamma")} Freq (Hz)`, "gamma_freq", 30, 100, 1)}
               </div>
 

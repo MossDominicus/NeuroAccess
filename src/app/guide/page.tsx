@@ -12,7 +12,7 @@ import { BookOpen, Search } from "lucide-react";
 function getCards(t: (key: string) => string): KnowledgeCardData[] {
   return [
     {
-      id: "alpha", category: "brainwaves", icon: "α", iconColor: "#059669",
+      id: "alpha", category: "brainwaves", icon: "α", iconColor: "#3b82f6",
       title: t("guideAlphaTitle"),
       frequency: t("guideAlphaFrequency"),
       description: t("guideAlphaDesc"),
@@ -25,7 +25,7 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
       }
     },
     {
-      id: "beta", category: "brainwaves", icon: "β", iconColor: "#2563eb",
+      id: "beta", category: "brainwaves", icon: "β", iconColor: "#22c55e",
       title: t("guideBetaTitle"),
       frequency: t("guideBetaFrequency"),
       description: t("guideBetaDesc"),
@@ -34,6 +34,30 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
         why: t("guideBetaWhy"),
         ranges: t("guideBetaRanges"),
         cannotTell: t("guideBetaCannotTell"),
+      }
+    },
+    {
+      id: "delta", category: "brainwaves", icon: "δ", iconColor: "#ef4444",
+      title: t("guideDeltaTitle"),
+      frequency: t("guideDeltaFrequency"),
+      description: t("guideDeltaDesc"),
+      details: {
+        what: t("guideDeltaWhat"),
+        why: t("guideDeltaWhy"),
+        ranges: t("guideDeltaRanges"),
+        cannotTell: t("guideDeltaCannotTell"),
+      }
+    },
+    {
+      id: "theta", category: "brainwaves", icon: "θ", iconColor: "#facc15",
+      title: t("guideThetaTitle"),
+      frequency: t("guideThetaFrequency"),
+      description: t("guideThetaDesc"),
+      details: {
+        what: t("guideThetaWhat"),
+        why: t("guideThetaWhy"),
+        ranges: t("guideThetaRanges"),
+        cannotTell: t("guideThetaCannotTell"),
       }
     },
     {
@@ -46,30 +70,6 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
         why: t("guideGammaWhy"),
         ranges: t("guideGammaRanges"),
         cannotTell: t("guideGammaCannotTell"),
-      }
-    },
-    {
-      id: "theta", category: "brainwaves", icon: "θ", iconColor: "#7c3aed",
-      title: t("guideThetaTitle"),
-      frequency: t("guideThetaFrequency"),
-      description: t("guideThetaDesc"),
-      details: {
-        what: t("guideThetaWhat"),
-        why: t("guideThetaWhy"),
-        ranges: t("guideThetaRanges"),
-        cannotTell: t("guideThetaCannotTell"),
-      }
-    },
-    {
-      id: "delta", category: "brainwaves", icon: "δ", iconColor: "#dc2626",
-      title: t("guideDeltaTitle"),
-      frequency: t("guideDeltaFrequency"),
-      description: t("guideDeltaDesc"),
-      details: {
-        what: t("guideDeltaWhat"),
-        why: t("guideDeltaWhy"),
-        ranges: t("guideDeltaRanges"),
-        cannotTell: t("guideDeltaCannotTell"),
       }
     },
     {

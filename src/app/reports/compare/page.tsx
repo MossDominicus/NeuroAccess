@@ -29,18 +29,18 @@ function scoreColor(q: number | null | undefined): string {
 }
 
 const bandColors: Record<string, string> = {
-  delta: "#8b5cf6",
-  theta: "#06b6d4",
-  alpha: "#10b981",
-  beta: "#f59e0b",
+  delta: "#ef4444",
+  theta: "#facc15",
+  alpha: "#3b82f6",
+  beta: "#22c55e",
   gamma: "#a855f7",
 };
 
 const bandLabels: Record<string, string> = {
-  delta: "Delta",
-  theta: "Theta",
   alpha: "Alpha",
   beta: "Beta",
+  delta: "Delta",
+  theta: "Theta",
   gamma: "Gamma",
 };
 
