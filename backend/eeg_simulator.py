@@ -49,10 +49,12 @@ def _generate_eeg_realistic(
     beta_power: float = 0.5,
     theta_power: float = 0.3,
     delta_power: float = 0.8,
+    gamma_power: float = 0.1,
     alpha_freq: float = 10.0,
     beta_freq: float = 20.0,
     theta_freq: float = 6.0,
     delta_freq: float = 3.0,
+    gamma_freq: float = 50.0,
     noise_level: float = 0.1,
     artifact_blink: bool = False,
     artifact_muscle: bool = False,
@@ -92,10 +94,14 @@ def _generate_eeg_realistic(
         ("theta", theta_power, 4.0, 8.0, theta_freq),
         ("alpha", alpha_power, 8.0, 13.0, alpha_freq),
         ("beta",  beta_power, 13.0, 30.0, beta_freq),
+        ("gamma", gamma_power, 30.0, 100.0, gamma_freq),
     ]
 
     for name, power, lo, hi, peak_freq in bands:
         if power <= 0:
+            continue
+        # gamma 受奈奎斯特限制：采样率低于 2×hi 时无法可靠合成
+        if hi >= sampling_rate / 2:
             continue
         # Filtered noise in band
         band_noise = np.random.randn(n_channels, n_samples)
@@ -196,10 +202,12 @@ def _generate_eeg_realistic(
             "beta_power": beta_power,
             "theta_power": theta_power,
             "delta_power": delta_power,
+            "gamma_power": gamma_power,
             "alpha_freq": alpha_freq,
             "beta_freq": beta_freq,
             "theta_freq": theta_freq,
             "delta_freq": delta_freq,
+            "gamma_freq": gamma_freq,
             "noise_level": noise_level,
             "artifact_blink": artifact_blink,
             "artifact_muscle": artifact_muscle,
@@ -216,10 +224,12 @@ def generate_synthetic_eeg(
     beta_power: float = 0.5,
     theta_power: float = 0.3,
     delta_power: float = 0.8,
+    gamma_power: float = 0.1,
     alpha_freq: float = 10.0,
     beta_freq: float = 20.0,
     theta_freq: float = 6.0,
     delta_freq: float = 3.0,
+    gamma_freq: float = 50.0,
     noise_level: float = 0.1,
     artifact_blink: bool = False,
     artifact_muscle: bool = False,
@@ -237,10 +247,12 @@ def generate_synthetic_eeg(
         beta_power=beta_power,
         theta_power=theta_power,
         delta_power=delta_power,
+        gamma_power=gamma_power,
         alpha_freq=alpha_freq,
         beta_freq=beta_freq,
         theta_freq=theta_freq,
         delta_freq=delta_freq,
+        gamma_freq=gamma_freq,
         noise_level=noise_level,
         artifact_blink=artifact_blink,
         artifact_muscle=artifact_muscle,

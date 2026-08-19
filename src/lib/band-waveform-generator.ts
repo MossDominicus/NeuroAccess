@@ -61,6 +61,7 @@ const BANDS: { name: string; low: number; high: number }[] = [
   { name: "theta", low: 4, high: 8 },
   { name: "alpha", low: 8, high: 13 },
   { name: "beta",  low: 13, high: 30 },
+  { name: "gamma", low: 30, high: 100 },
 ];
 
 /**
@@ -72,7 +73,7 @@ export function computeBandWaveforms(
   times: number[],
   channels: Record<string, number[]>,
   samplingRate: number,
-): { times: number[]; delta: number[]; theta: number[]; alpha: number[]; beta: number[] } | null {
+): { times: number[]; delta: number[]; theta: number[]; alpha: number[]; beta: number[]; gamma: number[] } | null {
   const chNames = Object.keys(channels);
   if (chNames.length === 0 || times.length < 50 || samplingRate <= 0) return null;
 
@@ -107,7 +108,7 @@ export function computeBandWaveforms(
   const freqRes = samplingRate / fftN;
 
   // 4. 对每个频段做带通 IFFT
-  const result: Record<string, number[]> = { delta: [], theta: [], alpha: [], beta: [] };
+  const result: Record<string, number[]> = { delta: [], theta: [], alpha: [], beta: [], gamma: [] };
 
   for (const band of BANDS) {
     // 复制 FFT 结果
@@ -116,7 +117,14 @@ export function computeBandWaveforms(
 
     // 清零频段外的所有频率分量
     const lowBin = Math.max(1, Math.round(band.low / freqRes)); // 跳过 DC (bin 0)
-    const highBin = Math.min(fftN - 1, Math.round(band.high / freqRes));
+    // gamma 上限受奈奎斯特约束（低采样率时截断到 fs/2）
+    const nyqBin = Math.floor(fftN / 2);
+    const highBin = Math.min(nyqBin, Math.round(band.high / freqRes));
+    // 可用带宽过窄（<2 bin）时跳过，避免退化信号
+    if (highBin - lowBin < 2) {
+      result[band.name] = new Array(nSamples).fill(0);
+      continue;
+    }
 
     for (let k = 0; k < fftN; k++) {
       if (k < lowBin || k > highBin) {
@@ -153,19 +161,20 @@ export function computeBandWaveforms(
     theta: result.theta,
     alpha: result.alpha,
     beta: result.beta,
+    gamma: result.gamma,
   };
 }
 
 /**
  * 逐通道计算"每个通道的主导频段"，统计每个频段拥有多少个通道。
  * 图例显示的是通道数量（不是百分比）：Delta (N) 表示 N 个通道以 delta 为主。
- * 对每个通道做去直流 + FFT，比较四个频段的总功率，取最大者为该通道主导频段。
+ * 对每个通道做去直流 + FFT，比较五个频段的总功率，取最大者为该通道主导频段。
  */
 export function computeBandDominantCounts(
   channels: Record<string, number[]>,
   samplingRate: number,
   times?: number[],
-): { delta: number; theta: number; alpha: number; beta: number } | null {
+): { delta: number; theta: number; alpha: number; beta: number; gamma: number } | null {
   const chNames = Object.keys(channels);
   if (chNames.length === 0 || samplingRate <= 0) return null;
   // 后端对波形做过 step 降采样，直接用原始采样率算频轴会把频率读高（如 250Hz→step3 后真实≈83Hz）。
@@ -175,7 +184,8 @@ export function computeBandDominantCounts(
     const dt = times[1] - times[0];
     if (dt > 0 && dt < 1) fs = 1 / dt;
   }
-  const counts: { delta: number; theta: number; alpha: number; beta: number } = { delta: 0, theta: 0, alpha: 0, beta: 0 };
+  const counts: { delta: number; theta: number; alpha: number; beta: number; gamma: number } =
+    { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 };
   for (const ch of chNames) {
     const data = channels[ch];
     if (!data || data.length < 64) continue;
@@ -190,12 +200,13 @@ export function computeBandDominantCounts(
     for (let i = 0; i < n; i++) re[i] = data[i] - mean;
     fft(re, im);
     const freqRes = fs / fftN;
+    const nyqBin = Math.floor(fftN / 2); // FFT 有效最高 bin（奈奎斯特）
     let bestPower = -1;
     let bestName: string = "delta";
     for (const band of BANDS) {
       const lo = Math.max(1, Math.round(band.low / freqRes));
-      const hi = Math.min(fftN - 1, Math.round(band.high / freqRes));
-      // 用"每bin平均功率"而不是"总累加"，避免宽频段（beta ~17 bin）天然赢过窄频段（delta ~3 bin）
+      const hi = Math.min(nyqBin, Math.round(band.high / freqRes)); // gamma 上限受采样率约束
+      // 用"每bin平均功率"而不是"总累加"，避免宽频段天然赢过窄频段
       let power = 0;
       let nBins = 0;
       for (let k = lo; k <= hi; k++) {

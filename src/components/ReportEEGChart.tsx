@@ -12,9 +12,9 @@ interface ReportEEGChartProps {
   id?: string;
 }
 
-const BAND_ORDER = ["delta", "theta", "alpha", "beta"];
+const BAND_ORDER = ["delta", "theta", "alpha", "beta", "gamma"];
 const BAND_COLORS: Record<string, string> = {
-  delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e",
+  delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e", gamma: "#a855f7",
 };
 
 export default function ReportEEGChart({ reportFileName, analysis, id }: ReportEEGChartProps) {
@@ -43,7 +43,7 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
   const wpSr = analysis?.waveform_preview?.sampling_rate || analysis?.sampling_rate || 0;
   const wpTimes = analysis?.waveform_preview?.times;
   const domCounts = computeBandDominantCounts(wpChannels, wpSr, wpTimes);
-  const bandCount: Record<string, number> = domCounts || { delta: 0, theta: 0, alpha: 0, beta: 0 };
+  const bandCount: Record<string, number> = domCounts || { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 };
 
   const onDownload = async () => {
     if (!imageUrl) return;

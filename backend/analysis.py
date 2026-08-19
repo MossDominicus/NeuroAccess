@@ -29,7 +29,20 @@ BANDS = {
     'theta': (4, 8),
     'alpha': (8, 13),
     'beta':  (13, 30),
+    'gamma': (30, 100),
 }
+
+
+def band_limits(band_name: str, sfreq: float) -> tuple:
+    """返回某个频段在该采样率下实际可计算的频率范围。
+
+    gamma 上限受奈奎斯特频率约束：128 Hz 采样只能可靠评估到 64 Hz，
+    250 Hz 采样到 125 Hz（>100 则仍取 100）。低采样率时 gamma 频段
+    自动截断，保证报告数值可信。
+    """
+    low, high = BANDS.get(band_name, (0.5, 100))
+    nyq = sfreq / 2.0
+    return (low, min(high, nyq))
 
 # ── 文件格式支持 ──────────────────────────────────────
 # 支持 EDF / BDF / GDF 1.99（加载与单位统一由 _load_raw_any / _raw_to_uv 处理）
@@ -315,7 +328,9 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
     total_power_per_ch = np.sum(all_psds, axis=1) * df
     
     for band_name, (fmin, fmax) in BANDS.items():
-        band_mask = (freqs >= fmin) & (freqs <= fmax)
+        # gamma 上限按采样率截断（奈奎斯特约束），低频段不受影响
+        lo, hi = band_limits(band_name, sfreq)
+        band_mask = (freqs >= lo) & (freqs <= hi)
         # NumPy 2.x removed np.trapz → use np.trapezoid with fallback
         _trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
         if _trapz is None:
@@ -341,7 +356,8 @@ def quick_bandpower(data_uv: np.ndarray, sfreq: float) -> Dict[str, Any]:
     
     # 频率分布（用于图表，覆盖全频段至 100Hz，降采样至<=200点，确保足够细节）
     freq_dist = []
-    display_mask = (freqs >= 1.5) & (freqs <= 40.0)
+    display_hi = min(100.0, np.max(freqs))
+    display_mask = (freqs >= 1.5) & (freqs <= display_hi)
     display_freqs = freqs[display_mask]
     display_psd = avg_psd[display_mask]
     # 至少保留 64 个点，最多 200 个点
@@ -810,9 +826,9 @@ def quick_literacy_scores(quality: Dict, overview: Dict) -> Dict[str, float]:
 
 
 def quick_band_waveforms_from_data(data_uv: np.ndarray, sfreq: float, times: np.ndarray) -> Dict[str, Any]:
-    """计算频段波形（Delta/Theta/Alpha/Beta）—— 使用已加载数据，无需重复读文件
+    """计算频段波形（Delta/Theta/Alpha/Beta/Gamma）—— 使用已加载数据，无需重复读文件
     
-    返回 {times, delta, theta, alpha, beta}
+    返回 {times, delta, theta, alpha, beta, gamma}
     """
     try:
         n_samples = data_uv.shape[1]
@@ -821,7 +837,12 @@ def quick_band_waveforms_from_data(data_uv: np.ndarray, sfreq: float, times: np.
         result: Dict[str, Any] = {"times": times_list}
         
         for band_name, (low, high) in BANDS.items():
-            b, a = butter(4, [low / nyq, high / nyq], btype="band")
+            lo, hi = band_limits(band_name, sfreq)
+            # gamma 在低采样率下若可用带宽过窄则跳过（避免滤波器退化）
+            if hi - lo < 2.0:
+                result[band_name] = []
+                continue
+            b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
             filtered = filtfilt(b, a, data_uv, axis=1)
             avg = np.nanmean(filtered, axis=0)
             result[band_name] = avg.tolist()
@@ -829,13 +850,13 @@ def quick_band_waveforms_from_data(data_uv: np.ndarray, sfreq: float, times: np.
         return result
     except Exception as e:
         print(f"[WARN] quick_band_waveforms_from_data failed: {e}")
-        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": []}
+        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": [], "gamma": []}
 
 
 def quick_band_waveforms(file_path: str, duration_seconds: float = 10.0) -> Dict[str, Any]:
-    """计算频段波形（Delta/Theta/Alpha/Beta）—— 只读前10s，scipy滤波（独立使用场景）
+    """计算频段波形（Delta/Theta/Alpha/Beta/Gamma）—— 只读前10s，scipy滤波（独立使用场景）
     
-    返回 {times, delta, theta, alpha, beta}
+    返回 {times, delta, theta, alpha, beta, gamma}
     """
     try:
         data_uv, ch_names, sfreq, times = fast_load_segment(
@@ -843,7 +864,7 @@ def quick_band_waveforms(file_path: str, duration_seconds: float = 10.0) -> Dict
         )
     except Exception as e:
         print(f"[WARN] quick_band_waveforms: {e}")
-        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": []}
+        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": [], "gamma": []}
     
     try:
         n_samples = data_uv.shape[1]
@@ -852,7 +873,11 @@ def quick_band_waveforms(file_path: str, duration_seconds: float = 10.0) -> Dict
         result: Dict[str, Any] = {"times": times_list}
         
         for band_name, (low, high) in BANDS.items():
-            b, a = butter(4, [low / nyq, high / nyq], btype="band")
+            lo, hi = band_limits(band_name, sfreq)
+            if hi - lo < 2.0:
+                result[band_name] = []
+                continue
+            b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
             filtered = filtfilt(b, a, data_uv, axis=1)
             avg = np.nanmean(filtered, axis=0)
             result[band_name] = avg.tolist()

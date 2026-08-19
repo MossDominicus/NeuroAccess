@@ -207,12 +207,13 @@ export default function ReportDetail({ report }: { report: StoredReport }) {
         </div>
         {/* Bandpower 百分比概览 */}
         {Object.keys(bandpowerPercent).length > 0 && (
-          <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {[
               { key: "delta", bandKey: "bandDelta", color: "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400" },
               { key: "theta", bandKey: "bandTheta", color: "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400" },
               { key: "alpha", bandKey: "bandAlpha", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
               { key: "beta", bandKey: "bandBeta", color: "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400" },
+              { key: "gamma", bandKey: "bandGamma", color: "bg-pink-100 text-pink-700 dark:bg-pink-950/30 dark:text-pink-400" },
             ].map(({ key, bandKey, color }) => (
               <div key={key} className={`rounded-xl px-4 py-3 text-center ${color}`}>
                 <div className="text-lg font-bold">{(bandpowerPercent as any)[key] || "0%"}</div>

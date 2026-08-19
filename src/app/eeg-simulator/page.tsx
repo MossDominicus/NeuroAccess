@@ -24,9 +24,9 @@ const BandPowerChart = nextDynamic(() => import("./BandPowerChart"), {
 
 const PARAM_HELP_KEYS: Record<string, string> = {
   alpha_power: "alphaPowerHelp", beta_power: "betaPowerHelp",
-  theta_power: "thetaPowerHelp", delta_power: "deltaPowerHelp",
+  theta_power: "thetaPowerHelp", delta_power: "deltaPowerHelp", gamma_power: "gammaPowerHelp",
   alpha_freq: "alphaFreqHelp", beta_freq: "betaFreqHelp",
-  theta_freq: "thetaFreqHelp", delta_freq: "deltaFreqHelp",
+  theta_freq: "thetaFreqHelp", delta_freq: "deltaFreqHelp", gamma_freq: "gammaFreqHelp",
   noise_level: "noiseHelp",
   artifact_blink: "artifactBlinkHelp", artifact_muscle: "artifactMuscleHelp",
   artifact_powerline: "artifactPowerlineHelp",
@@ -34,8 +34,8 @@ const PARAM_HELP_KEYS: Record<string, string> = {
 
 const DEFAULT_PARAMS = {
   duration_sec: 10, sampling_rate: 250, n_channels: 8,
-  alpha_power: 1.0, beta_power: 0.5, theta_power: 0.3, delta_power: 0.8,
-  alpha_freq: 10.0, beta_freq: 20.0, theta_freq: 6.0, delta_freq: 3.0,
+  alpha_power: 1.0, beta_power: 0.5, theta_power: 0.3, delta_power: 0.8, gamma_power: 0.1,
+  alpha_freq: 10.0, beta_freq: 20.0, theta_freq: 6.0, delta_freq: 3.0, gamma_freq: 50.0,
   noise_level: 0.1,
   artifact_blink: false, artifact_muscle: false, artifact_powerline: false,
 };
@@ -149,6 +149,7 @@ export default function EegSimulatorPage() {
     { name: `θ ${t("bandTheta")}`, value: params.theta_power, range: "4-8 Hz", fill: "#60a5fa" },
     { name: `α ${t("bandAlpha")}`, value: params.alpha_power, range: "8-13 Hz", fill: "#34d399" },
     { name: `β ${t("bandBeta")}`, value: params.beta_power, range: "13-30 Hz", fill: "#fbbf24" },
+    { name: `γ ${t("bandGamma")}`, value: params.gamma_power, range: "30-100 Hz", fill: "#ec4899" },
   ], [params, t]);
 
   const CHANNEL_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
@@ -276,6 +277,7 @@ export default function EegSimulatorPage() {
                 {renderSlider(`${t("bandBeta")} (13-30 Hz)`, "beta_power", 0, 2, 0.1)}
                 {renderSlider(`${t("bandTheta")} (4-8 Hz)`, "theta_power", 0, 2, 0.1)}
                 {renderSlider(`${t("bandDelta")} (0.5-4 Hz)`, "delta_power", 0, 2, 0.1)}
+                {renderSlider(`${t("bandGamma")} (30-100 Hz)`, "gamma_power", 0, 2, 0.1)}
               </div>
 
               <div className="mb-6">
@@ -284,6 +286,7 @@ export default function EegSimulatorPage() {
                 {renderSlider(`${t("bandBeta")} Freq (Hz)`, "beta_freq", 13, 30, 1)}
                 {renderSlider(`${t("bandTheta")} Freq (Hz)`, "theta_freq", 4, 8, 0.5)}
                 {renderSlider(`${t("bandDelta")} Freq (Hz)`, "delta_freq", 0.5, 4, 0.5)}
+                {renderSlider(`${t("bandGamma")} Freq (Hz)`, "gamma_freq", 30, 100, 1)}
               </div>
 
               <div className="mb-6">
