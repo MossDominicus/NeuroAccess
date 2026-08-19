@@ -68,10 +68,10 @@ export function buildWaveformSvg(wp: any): string {
   }
 
   const LW = 65;
-  const PPS = 60.0;
+  const PLOT_W = 835;
   const t0 = times.length > 1 ? times[0] : 0;
-  const dur = times.length > 1 ? times[times.length - 1] - t0 : npts / fs;
-  const W = Math.round(LW + dur * PPS + 80);
+  const dur = times.length > 1 ? Math.max(times[times.length - 1] - t0, 1e-9) : Math.max(npts / fs, 1e-9);
+  const W = LW + PLOT_W + 15;
   const laneH = Math.max(4, Math.min(24, Math.round(520 / nch)));
   const H = laneH * nch + 30;
 
@@ -97,13 +97,13 @@ export function buildWaveformSvg(wp: any): string {
     let pts = "M";
     if (times.length === vals.length) {
       for (let j = 0; j < vals.length; j++) {
-        const x = LW + (times[j] - t0) * PPS;
+        const x = LW + ((times[j] - t0) / dur) * PLOT_W;
         const vy = y - Math.max(-cl, Math.min(cl, vals[j])) * sc;
         pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
       }
     } else {
       for (let j = 0; j < vals.length; j++) {
-        const x = LW + (j * dur * PPS) / (npts - 1);
+        const x = LW + (j / (npts - 1)) * PLOT_W;
         const vy = y - Math.max(-cl, Math.min(cl, vals[j])) * sc;
         pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
       }
@@ -116,7 +116,7 @@ export function buildWaveformSvg(wp: any): string {
 
   for (let i = 0; i < 6; i++) {
     const t = (i * dur) / 5;
-    const x = LW + t * PPS;
+    const x = LW + (i / 5) * PLOT_W;
     svg.push(
       `<text x="${x.toFixed(1)}" y="${H - 4}" fill="#667" font-size="9" text-anchor="middle">${t.toFixed(1)}s</text>`
     );

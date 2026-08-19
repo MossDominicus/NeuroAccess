@@ -1974,14 +1974,14 @@ def gen_waveform_svg(rid: str) -> str:
                     best_power, best_name = bp, name
             return best_name
 
-        # 真实时长与时间轴：x 坐标按真实时间映射（PPS 固定像素/秒），
-        # 使 5 秒文件短、3 分钟文件长，长度反映真实时长。
+        # 时间轴：SVG 固定合理宽度，x 坐标按真实时间映射到固定宽度内，
+        # 时间刻度按真实时长分布（5 秒文件标 0~5s，3 分钟文件标 0~180s）。
         LW = 65  # 左侧通道名宽度
-        PPS = 60.0  # 像素/秒
+        PLOT_W = 835  # 波形绘图区固定宽度
         t0 = float(times[0]) if len(times) > 1 else 0.0
         dur = (float(times[-1]) - t0) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
-        # 总宽度 = 左侧通道名 + 波形时长×PPS + 右侧留白
-        W = int(LW + dur * PPS + 80)
+        dur = max(dur, 1e-9)
+        W = LW + PLOT_W + 15
         # 自适应行高：通道多时压扁，保证 64/128 通道也能一屏放下
         # 64ch → 8px/行 → 542px；128ch → 4px/行 → 542px
         laneH = max(4, min(24, int(520 / nch)))
@@ -1998,20 +1998,20 @@ def gen_waveform_svg(rid: str) -> str:
             p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
             sc = (laneH * 0.5) / (2 * p95)
             cl = laneH * 0.5 / sc
-            # 每个采样点 x = 左侧边距 + (真实时间 - 起点) * PPS
+            # 每个采样点 x = 左侧边距 + (真实时间 - 起点)/总时长 * 绘图区宽
             # times 与 vals 等长时用真实时间；旧报告 times 缺失/过短时按均匀映射兜底
             if len(times) == len(vals):
-                pts = "M" + "".join(f" {LW + (float(times[j])-t0)*PPS:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
+                pts = "M" + "".join(f" {LW + (float(times[j])-t0)/dur*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             else:
-                pts = "M" + "".join(f" {LW + j*(dur*PPS)/(npts-1):.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
+                pts = "M" + "".join(f" {LW + j/(npts-1)*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             # 通道曲线颜色 = 该通道主导频段的颜色（与图例数量一致）
             band = _dominant_band(vals, fs)
             svg.append(f'<path d="{pts}" stroke="{BAND_COLORS.get(band, "#ef4444")}" stroke-width="0.7" fill="none" opacity="0.85"/>')
         
-        # 时间刻度：按真实时间放置（0, dur/5, …, dur）
+        # 时间刻度：按真实时间分布（0, dur/5, …, dur）
         for i in range(6):
             t = i * dur / 5
-            x = LW + t * PPS
+            x = LW + (i / 5) * PLOT_W
             svg.append(f'<text x="{x:.1f}" y="{H-4}" fill="#667" font-size="9" text-anchor="middle">{t:.1f}s</text>')
         svg.append("</svg>")
         return "".join(svg)
