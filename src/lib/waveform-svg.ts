@@ -2,51 +2,8 @@
 // 用途：当报告未同步到服务器（/api/waveform-image 返回 Report not found）时，
 // 直接用本地 analysis.waveform_preview 数据渲染波形图，保证波形图始终可见。
 
-import { fft, nextPow2 } from "@/lib/band-waveform-generator";
-
-const BAND_COLORS: Record<string, string> = {
-  delta: "#ef4444", alpha: "#3b82f6",
-  theta: "#facc15", beta: "#22c55e", gamma: "#a855f7",
-};
-const BAND_RANGES: Record<string, [number, number]> = {
-  delta: [0.5, 4], theta: [4, 8], alpha: [8, 13],
-  beta: [13, 30], gamma: [30, 100],
-};
-
-function dominantBand(vals: number[], fs: number): string {
-  const n = vals.length;
-  if (n < 64 || fs <= 0) return "delta";
-  let mean = 0;
-  for (let i = 0; i < n; i++) mean += vals[i];
-  mean /= n;
-  const fftN = nextPow2(n);
-  const re = new Float64Array(fftN);
-  const im = new Float64Array(fftN);
-  for (let i = 0; i < n; i++) re[i] = vals[i] - mean;
-  fft(re, im);
-  const freqRes = fs / fftN;
-  const nyqBin = Math.floor(fftN / 2);
-  let bestName = "delta";
-  let bestPower = -1;
-  for (const name of Object.keys(BAND_RANGES)) {
-    const [lo, hi] = BAND_RANGES[name];
-    const loBin = Math.max(1, Math.round(lo / freqRes));
-    const hiBin = Math.min(nyqBin, Math.round(hi / freqRes));
-    if (hiBin < loBin) continue;
-    let power = 0;
-    let nBins = 0;
-    for (let k = loBin; k <= hiBin; k++) {
-      power += re[k] * re[k] + im[k] * im[k];
-      nBins += 1;
-    }
-    const meanPower = nBins > 0 ? power / nBins : 0;
-    if (meanPower > bestPower) {
-      bestPower = meanPower;
-      bestName = name;
-    }
-  }
-  return bestName;
-}
+// 通道曲线配色：按通道顺序循环（还原真实波形观感）
+const CHANNEL_COLORS = ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#a855f7", "#14b8a6", "#f97316", "#8b5cf6"];
 
 function esc(s: unknown): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -108,9 +65,9 @@ export function buildWaveformSvg(wp: any): string {
         pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
       }
     }
-    const band = dominantBand(vals, fs);
+    // 通道曲线颜色：按通道顺序循环（每通道一色，便于区分）
     svg.push(
-      `<path d="${pts}" stroke="${BAND_COLORS[band] || "#ef4444"}" stroke-width="0.7" fill="none" opacity="0.85"/>`
+      `<path d="${pts}" stroke="${CHANNEL_COLORS[i % CHANNEL_COLORS.length]}" stroke-width="0.7" fill="none" opacity="0.85"/>`
     );
   }
 
