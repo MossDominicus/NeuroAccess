@@ -42,6 +42,7 @@ export default function ReportDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("analysis");
 
   useEffect(() => {
+    let cancelled = false;
     const token =
       typeof window !== "undefined"
         ? localStorage.getItem("neuroaccess-token") || ""
@@ -53,43 +54,41 @@ export default function ReportDetailPage() {
     const found = getReportById(id);
     setReport(found);
 
-    // 始终从服务端拉最新完整数据（服务端 analysis.waveform_preview 永远有全通道）
-    // localStorage 可能存的旧版带不完整通道数，禁用本地缓存
-    if (found && token) {
-      fetchServerReport(id)
-        .then((serverReport) => {
-          if (serverReport?.analysis) {
-            setReport(serverReport as StoredReport);
-            try {
-              addReport(serverReport as StoredReport);
-            } catch {}
-            // 报告快照只存模板，AI 在后台线程生成后存缓存；
-            // 服务端报告加载完成后按 analysis_id 拉取 AI 解释（保证不被快照覆盖）。
-            const aid = serverReport.analysis?.analysis_id;
-            if (aid) {
-              fetch(`/api/analysis/explanations/${aid}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              })
-                .then((r) => r.json())
-                .then((data) => {
-                  if (data.success && data.explanations) {
-                    setReport((prev) =>
-                      prev ? { ...prev, analysis: { ...prev.analysis, explanations: data.explanations } } : prev
-                    );
-                    try {
-                      addReport({
-                        ...serverReport,
-                        analysis: { ...serverReport.analysis, explanations: data.explanations },
-                      } as StoredReport);
-                    } catch {}
-                  }
-                })
-                .catch(() => {});
-            }
-          }
+    // 报告数据：优先服务端完整数据，localStorage 兜底
+    // （localStorage 可能存的旧版带不完整通道数，服务端 analysis.waveform_preview 永远有全通道）
+    const loadServerReport = async () => {
+      if (!found || !token) return;
+      const serverReport = await fetchServerReport(id).catch(() => null);
+      if (!cancelled) setReport(serverReport?.analysis ? (serverReport as StoredReport) : found);
+      if (serverReport?.analysis) {
+        try { addReport(serverReport as StoredReport); } catch {}
+      }
+      // 无论报告来自服务器还是本地，都按 analysis_id 拉取 AI 解释缓存
+      const aid = (serverReport?.analysis || found.analysis)?.analysis_id;
+      if (aid) {
+        fetch(`/api/analysis/explanations/${aid}`, {
+          headers: { Authorization: `Bearer ${token}` },
         })
-        .catch(() => {});
-    }
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.success && data.explanations && !cancelled) {
+              setReport((prev) =>
+                prev ? { ...prev, analysis: { ...prev.analysis, explanations: data.explanations } } : prev
+              );
+              try {
+                addReport({
+                  ...(serverReport || found),
+                  analysis: { ...(serverReport || found).analysis, explanations: data.explanations },
+                } as StoredReport);
+              } catch {}
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    loadServerReport();
+
+    return () => { cancelled = true; };
   }, [id, router]);
 
 
