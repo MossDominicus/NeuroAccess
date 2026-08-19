@@ -922,12 +922,14 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
     filename = os.path.basename(file_path)
     minutes = int(meta["duration_seconds"] // 60)
     seconds = int(meta["duration_seconds"] % 60)
-    
+    # 时长字符串：< 60s 直接 "X 秒"（避免 "0分20秒" 这种怪格式）；>= 60s 才用 "X分Y秒"
+    duration_str = f"{seconds} 秒" if minutes == 0 else f"{minutes} 分 {seconds} 秒"
+
     overview = {
         "filename": filename,
         "channel_count": meta["channel_count"],
         "sampling_rate": meta["sampling_rate"],
-        "duration": f"{minutes}分{seconds}秒",
+        "duration": duration_str,
         "channel_names": meta["channel_names"],
         "recording_duration_seconds": meta["duration_seconds"],
     }

@@ -130,7 +130,6 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
           </div>
         </div>
         <div className="px-5 pb-2">
-          <p className="text-xs text-[var(--color-text-secondary)] mb-1">{nTotal} {t("channelCountEeg")}</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {BAND_ORDER.map(b => (
               <span key={b} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
