@@ -928,7 +928,7 @@ def _strip_mental_states(text: str) -> str:
 #  2) 建议/操作指导句（"建议……处理"、"应……"）—— 边界规则3禁止
 # 一般性教育关联（"alpha波通常与放松清醒相关"）不属于无效元素，保留。
 _SUBJECT_WORDS = [
-    "该个体", "这个个体", "此人", "这个人", "该人", "记录者", "被试", "受试者",
+    "该个体", "这个个体", "个体", "此人", "这个人", "该人", "记录者", "被试", "受试者",
     "被记录者", "测试者", "患者", "检测者", "the individual", "the subject",
     "this person", "the person", "the participant", "the patient", "the recorder",
     "the subject", "the participant",
