@@ -1903,7 +1903,7 @@ def waveform_image(rid: str = ""):
 
 
 def gen_waveform_svg(rid: str) -> str:
-    """从数据库读取报告数据，生成纯SVG波形图"""
+    """从数据库读取报告数据，生成纯SVG波形图（通道波形）"""
     def esc(s):
         return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
 
@@ -1918,64 +1918,6 @@ def gen_waveform_svg(rid: str) -> str:
             return f"<svg width=400 height=100><text y=50 fill=red>Report not found</text></svg>"
         d = json.loads(row[0])
         analysis = d.get("analysis", {}) or {}
-
-        # ── 优先展示频段波形（band_waveforms）：五条波形曲线，各用固定颜色 ──
-        # 五波配色与顺序：α蓝 #3b82f6、β绿 #22c55e、δ红 #ef4444、θ黄 #facc15、γ紫 #a855f7
-        bw = analysis.get("band_waveforms") or {}
-        band_keys = [("alpha","α Alpha"),("beta","β Beta"),("delta","δ Delta"),("theta","θ Theta"),("gamma","γ Gamma")]
-        band_colors = {
-            "alpha": "#3b82f6", "beta": "#22c55e",
-            "delta": "#ef4444", "theta": "#facc15", "gamma": "#a855f7",
-        }
-        bw_times = bw.get("times") or []
-        bands_data = [(k, label, bw.get(k) or []) for k, label in band_keys]
-        has_band = any(len(v) >= 2 for _, _, v in bands_data)
-
-        if has_band:
-            npts = max((len(v) for _, _, v in bands_data), default=0)
-            if npts < 2:
-                return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points</text></svg>"
-            LW = 65
-            PLOT_W = 835
-            times = bw_times
-            t0 = float(times[0]) if len(times) > 1 else 0.0
-            dur = (float(times[-1]) - t0) if len(times) > 1 else (npts / float(analysis.get("sampling_rate") or 128))
-            dur = max(dur, 1e-9)
-            W = LW + PLOT_W + 15
-            laneH = 52  # 五条波形，行高适中
-            H = laneH * 5 + 30
-
-            svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
-            for i, (key, label, vals) in enumerate(bands_data):
-                y = i * laneH + laneH // 2
-                svg.append(f'<line x1="{LW}" y1="{y}" x2="{W}" y2="{y}" stroke="#333" stroke-width="0.5" stroke-dasharray="3 3"/>')
-                svg.append(f'<text x="{LW-4}" y="{y+3}" fill="#aab" font-size="12" text-anchor="end">{esc(label)}</text>')
-                if len(vals) < 2:
-                    continue
-                vabs = sorted([abs(v) for v in vals])
-                p95 = vabs[min(int(len(vabs) * 0.95), len(vabs) - 1)] or 1
-                sc = (laneH * 0.5) / (2 * p95)
-                cl = laneH * 0.5 / sc
-                if len(times) == len(vals):
-                    pts = "M" + "".join(
-                        f" {LW + (float(times[j]) - t0) / dur * PLOT_W:.1f},{y - max(-cl, min(cl, vals[j])) * sc:.2f}"
-                        for j in range(len(vals))
-                    )
-                else:
-                    pts = "M" + "".join(
-                        f" {LW + j / (npts - 1) * PLOT_W:.1f},{y - max(-cl, min(cl, vals[j])) * sc:.2f}"
-                        for j in range(len(vals))
-                    )
-                # 每条频段波形固定颜色
-                svg.append(f'<path d="{pts}" stroke="{band_colors.get(key, "#ef4444")}" stroke-width="1.1" fill="none" opacity="0.95"/>')
-            for i in range(6):
-                t = i * dur / 5
-                x = LW + (i / 5) * PLOT_W
-                svg.append(f'<text x="{x:.1f}" y="{H-4}" fill="#667" font-size="9" text-anchor="middle">{t:.1f}s</text>')
-            svg.append("</svg>")
-            return "".join(svg)
-
-        # ── 回退：无频段波形时展示通道波形 ──
         wp = analysis.get("waveform_preview", {}) or {}
         chs = wp.get("channels", {}) or {}
         if not chs:
@@ -1987,14 +1929,16 @@ def gen_waveform_svg(rid: str) -> str:
         if npts < 2:
             return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points ({npts})</text></svg>"
 
-        # 时间轴数据
         times = wp.get("times", [])
 
-        # 通道曲线配色：每个通道在色相环上均匀取色（hsl 色相均匀分布），
-        # 保证每条波形一个独立且可区分的颜色——颜色用于区分不同波形，而非随机。
-        def _channel_color(i: int, n: int) -> str:
-            hue = (i * 360.0 / n) % 360
-            return f"hsl({hue:.0f}, 70%, 55%)"
+        # 通道曲线配色：五波标准配色循环（α蓝 β绿 δ红 θ黄 γ紫），
+        # 每条通道波形依次取色，颜色用于区分不同波形。
+        BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"]
+        BAND_COLORS = {
+            "alpha": "#3b82f6", "beta": "#22c55e",
+            "delta": "#ef4444", "theta": "#facc15", "gamma": "#a855f7",
+        }
+        CHANNEL_COLORS = [BAND_COLORS[b] for b in BAND_ORDER]
 
         # 时间轴：SVG 固定合理宽度，x 坐标按真实时间映射到固定宽度内，
         # 时间刻度按真实时长分布（5 秒文件标 0~5s，3 分钟文件标 0~180s）。
@@ -2008,7 +1952,7 @@ def gen_waveform_svg(rid: str) -> str:
         # 64ch → 8px/行 → 542px；128ch → 4px/行 → 542px
         laneH = max(4, min(24, int(520 / nch)))
         H = laneH * nch + 30
-        
+
         svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
         for i, ch in enumerate(ch_names):
             y = i * laneH + laneH//2
@@ -2020,15 +1964,13 @@ def gen_waveform_svg(rid: str) -> str:
             p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
             sc = (laneH * 0.5) / (2 * p95)
             cl = laneH * 0.5 / sc
-            # 每个采样点 x = 左侧边距 + (真实时间 - 起点)/总时长 * 绘图区宽
-            # times 与 vals 等长时用真实时间；旧报告 times 缺失/过短时按均匀映射兜底
             if len(times) == len(vals):
                 pts = "M" + "".join(f" {LW + (float(times[j])-t0)/dur*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             else:
                 pts = "M" + "".join(f" {LW + j/(npts-1)*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            # 通道曲线颜色：每个通道色相环均匀取色（独立可区分，用于区分不同波形）
-            svg.append(f'<path d="{pts}" stroke="{_channel_color(i, nch)}" stroke-width="0.7" fill="none" opacity="0.85"/>')
-        
+            # 通道曲线颜色：五波标准配色循环（α蓝 β绿 δ红 θ黄 γ紫）
+            svg.append(f'<path d="{pts}" stroke="{CHANNEL_COLORS[i % len(CHANNEL_COLORS)]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
+
         # 时间刻度：按真实时间分布（0, dur/5, …, dur）
         for i in range(6):
             t = i * dur / 5

@@ -2,91 +2,21 @@
 // 用途：当报告未同步到服务器（/api/waveform-image 返回 Report not found）时，
 // 直接用本地 analysis 数据渲染波形图，保证波形图始终可见。
 
-// 五波配色与顺序：α蓝 #3b82f6、β绿 #22c55e、δ红 #ef4444、θ黄 #facc15、γ紫 #a855f7
-const BAND_KEYS: [string, string][] = [
-  ["alpha", "α Alpha"],
-  ["beta", "β Beta"],
-  ["delta", "δ Delta"],
-  ["theta", "θ Theta"],
-  ["gamma", "γ Gamma"],
-];
+// 五波标准配色（α蓝 β绿 δ红 θ黄 γ紫）
+const BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
 const BAND_COLORS: Record<string, string> = {
   alpha: "#3b82f6", beta: "#22c55e",
   delta: "#ef4444", theta: "#facc15", gamma: "#a855f7",
 };
+const CHANNEL_COLORS = BAND_ORDER.map((b) => BAND_COLORS[b]);
 
 function esc(s: unknown): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/** 渲染五条频段波形（band_waveforms） */
-function buildBandWaveformsSvg(bw: any): string {
-  const times: number[] = bw?.times || [];
-  const bandsData = BAND_KEYS.map(([key, label]) => [key, label, (bw?.[key] || []) as number[]] as const);
-  const hasBand = bandsData.some(([, , v]) => v.length >= 2);
-  if (!hasBand) return "";
-  const npts = Math.max(...bandsData.map(([, , v]) => v.length));
-  if (npts < 2) return "";
-
-  const LW = 65;
-  const PLOT_W = 835;
-  const t0 = times.length > 1 ? times[0] : 0;
-  const dur = times.length > 1 ? Math.max(times[times.length - 1] - t0, 1e-9) : Math.max(npts / 128, 1e-9);
-  const W = LW + PLOT_W + 15;
-  const laneH = 52;
-  const H = laneH * 5 + 30;
-
-  const svg: string[] = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:#1a1a2e;font-family:monospace">`,
-  ];
-
-  for (let i = 0; i < bandsData.length; i++) {
-    const [, label, vals] = bandsData[i];
-    const y = i * laneH + laneH / 2;
-    svg.push(
-      `<line x1="${LW}" y1="${y}" x2="${W}" y2="${y}" stroke="#333" stroke-width="0.5" stroke-dasharray="3 3"/>`
-    );
-    svg.push(
-      `<text x="${LW - 4}" y="${y + 3}" fill="#aab" font-size="12" text-anchor="end">${esc(label)}</text>`
-    );
-    if (vals.length < 2) continue;
-    const vabs = vals.map((v) => Math.abs(v)).sort((a, b) => a - b);
-    const p95 = vabs[Math.min(Math.round(vabs.length * 0.95), vabs.length - 1)] || 1;
-    const sc = (laneH * 0.5) / (2 * p95);
-    const cl = laneH * 0.5 / sc;
-    let pts = "M";
-    if (times.length === vals.length) {
-      for (let j = 0; j < vals.length; j++) {
-        const x = LW + ((times[j] - t0) / dur) * PLOT_W;
-        const vy = y - Math.max(-cl, Math.min(cl, vals[j])) * sc;
-        pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
-      }
-    } else {
-      for (let j = 0; j < vals.length; j++) {
-        const x = LW + (j / (npts - 1)) * PLOT_W;
-        const vy = y - Math.max(-cl, Math.min(cl, vals[j])) * sc;
-        pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
-      }
-    }
-    const key = BAND_KEYS[i][0];
-    svg.push(
-      `<path d="${pts}" stroke="${BAND_COLORS[key] || "#ef4444"}" stroke-width="1.1" fill="none" opacity="0.95"/>`
-    );
-  }
-
-  for (let i = 0; i < 6; i++) {
-    const t = (i * dur) / 5;
-    const x = LW + (i / 5) * PLOT_W;
-    svg.push(
-      `<text x="${x.toFixed(1)}" y="${H - 4}" fill="#667" font-size="9" text-anchor="middle">${t.toFixed(1)}s</text>`
-    );
-  }
-  svg.push("</svg>");
-  return svg.join("");
-}
-
-/** 渲染通道波形（waveform_preview，回退用） */
-function buildChannelWaveformSvg(wp: any): string {
+/** 渲染通道波形（waveform_preview） */
+export function buildWaveformSvg(analysis: any): string {
+  const wp = analysis?.waveform_preview;
   const chs = wp?.channels || {};
   const chNames = Object.keys(chs);
   if (chNames.length === 0) return "";
@@ -142,8 +72,8 @@ function buildChannelWaveformSvg(wp: any): string {
         pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
       }
     }
-    const hue = ((i * 360) / nch) % 360;
-    const color = `hsl(${hue.toFixed(0)}, 70%, 55%)`;
+    // 通道曲线颜色：五波标准配色循环（α蓝 β绿 δ红 θ黄 γ紫），用于区分不同波形
+    const color = CHANNEL_COLORS[i % CHANNEL_COLORS.length];
     svg.push(
       `<path d="${pts}" stroke="${color}" stroke-width="0.7" fill="none" opacity="0.85"/>`
     );
@@ -158,16 +88,6 @@ function buildChannelWaveformSvg(wp: any): string {
   }
   svg.push("</svg>");
   return svg.join("");
-}
-
-/**
- * 根据 analysis 数据生成波形 SVG。
- * 优先展示频段波形（band_waveforms），缺失时回退通道波形（waveform_preview）。
- */
-export function buildWaveformSvg(analysis: any): string {
-  const bandSvg = buildBandWaveformsSvg(analysis?.band_waveforms);
-  if (bandSvg) return bandSvg;
-  return buildChannelWaveformSvg(analysis?.waveform_preview);
 }
 
 export function svgToDataUrl(svg: string): string {
