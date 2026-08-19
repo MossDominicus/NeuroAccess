@@ -1903,7 +1903,7 @@ def waveform_image(rid: str = ""):
 
 
 def gen_waveform_svg(rid: str) -> str:
-    """从数据库读取报告数据，生成纯SVG波形图（通道波形）"""
+    """从数据库读取报告数据，生成纯SVG波形图"""
     def esc(s):
         return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
 
@@ -1930,15 +1930,40 @@ def gen_waveform_svg(rid: str) -> str:
             return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points ({npts})</text></svg>"
 
         times = wp.get("times", [])
+        # 真实采样率：波形做过 step 降采样，优先用 times 推真实间隔
+        fs = float(wp.get("sampling_rate") or 128.0)
+        if len(times) > 1:
+            dt = times[1] - times[0]
+            if dt > 0 and dt < 1:
+                fs = 1.0 / dt
 
-        # 通道曲线配色：五波标准配色循环（α蓝 β绿 δ红 θ黄 γ紫），
-        # 每条通道波形依次取色，颜色用于区分不同波形。
+        # 五波配色与频段范围（颜色区分的是不同频段波形）
         BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"]
         BAND_COLORS = {
             "alpha": "#3b82f6", "beta": "#22c55e",
             "delta": "#ef4444", "theta": "#facc15", "gamma": "#a855f7",
         }
-        CHANNEL_COLORS = [BAND_COLORS[b] for b in BAND_ORDER]
+        BAND_RANGES = {
+            "alpha": (8, 13), "beta": (13, 30),
+            "delta": (0.5, 4), "theta": (4, 8), "gamma": (30, 100),
+        }
+
+        def _band_pass(vals: list, lo: float, hi: float) -> list:
+            """四阶 Butterworth 带通滤波单个通道的频段波形"""
+            try:
+                from scipy.signal import butter, filtfilt
+            except Exception:
+                return vals
+            nyq = fs / 2
+            hi = min(hi, nyq)
+            if hi - lo < 1.0:
+                return [0.0] * len(vals)
+            try:
+                b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
+                import numpy as np
+                return filtfilt(b, a, np.asarray(vals, dtype=float)).tolist()
+            except Exception:
+                return [0.0] * len(vals)
 
         # 时间轴：SVG 固定合理宽度，x 坐标按真实时间映射到固定宽度内，
         # 时间刻度按真实时长分布（5 秒文件标 0~5s，3 分钟文件标 0~180s）。
@@ -1949,7 +1974,6 @@ def gen_waveform_svg(rid: str) -> str:
         dur = max(dur, 1e-9)
         W = LW + PLOT_W + 15
         # 自适应行高：通道多时压扁，保证 64/128 通道也能一屏放下
-        # 64ch → 8px/行 → 542px；128ch → 4px/行 → 542px
         laneH = max(4, min(24, int(520 / nch)))
         H = laneH * nch + 30
 
@@ -1960,16 +1984,19 @@ def gen_waveform_svg(rid: str) -> str:
             svg.append(f'<text x="{LW-4}" y="{y+3}" fill="#aab" font-size="{min(11, max(8, 200//nch))}" text-anchor="end">{esc(ch)}</text>')
             vals = chs[ch]
             if len(vals) < 2: continue
-            vabs = sorted([abs(v) for v in vals])
-            p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
-            sc = (laneH * 0.5) / (2 * p95)
-            cl = laneH * 0.5 / sc
-            if len(times) == len(vals):
-                pts = "M" + "".join(f" {LW + (float(times[j])-t0)/dur*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            else:
-                pts = "M" + "".join(f" {LW + j/(npts-1)*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            # 通道曲线颜色：五波标准配色循环（α蓝 β绿 δ红 θ黄 γ紫）
-            svg.append(f'<path d="{pts}" stroke="{CHANNEL_COLORS[i % len(CHANNEL_COLORS)]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
+            # 每个通道画出五条频段波形曲线，颜色区分频段（δ红θ黄α蓝β绿γ紫）
+            for band in BAND_ORDER:
+                lo, hi = BAND_RANGES[band]
+                band_vals = _band_pass(vals, lo, hi)
+                vabs = sorted([abs(v) for v in band_vals])
+                p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
+                sc = (laneH * 0.5) / (2 * p95)
+                cl = laneH * 0.5 / sc
+                if len(times) == len(band_vals):
+                    pts = "M" + "".join(f" {LW + (float(times[j])-t0)/dur*PLOT_W:.1f},{y - max(-cl, min(cl, band_vals[j]))*sc:.2f}" for j in range(len(band_vals)))
+                else:
+                    pts = "M" + "".join(f" {LW + j/(npts-1)*PLOT_W:.1f},{y - max(-cl, min(cl, band_vals[j]))*sc:.2f}" for j in range(len(band_vals)))
+                svg.append(f'<path d="{pts}" stroke="{BAND_COLORS[band]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
 
         # 时间刻度：按真实时间分布（0, dur/5, …, dur）
         for i in range(6):
