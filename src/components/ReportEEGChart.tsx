@@ -13,9 +13,6 @@ interface ReportEEGChartProps {
 }
 
 const BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
-const BAND_COLORS: Record<string, string> = {
-  delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e", gamma: "#a855f7",
-};
 const BAND_LABELS: Record<string, string> = {
   alpha: "α Alpha", beta: "β Beta", delta: "δ Delta", theta: "θ Theta", gamma: "γ Gamma",
 };
@@ -166,7 +163,6 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {BAND_ORDER.map(b => (
               <span key={b} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
-                <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: BAND_COLORS[b] }} />
                 {BAND_LABELS[b]}
               </span>
             ))}
