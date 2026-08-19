@@ -1917,11 +1917,70 @@ def gen_waveform_svg(rid: str) -> str:
         if not row:
             return f"<svg width=400 height=100><text y=50 fill=red>Report not found</text></svg>"
         d = json.loads(row[0])
-        wp = d.get("analysis", {}).get("waveform_preview", {}) or {}
+        analysis = d.get("analysis", {}) or {}
+
+        # ── 优先展示频段波形（band_waveforms）：五条波形曲线，各用固定颜色 ──
+        # 五波配色与顺序：α蓝 #3b82f6、β绿 #22c55e、δ红 #ef4444、θ黄 #facc15、γ紫 #a855f7
+        bw = analysis.get("band_waveforms") or {}
+        band_keys = [("alpha","α Alpha"),("beta","β Beta"),("delta","δ Delta"),("theta","θ Theta"),("gamma","γ Gamma")]
+        band_colors = {
+            "alpha": "#3b82f6", "beta": "#22c55e",
+            "delta": "#ef4444", "theta": "#facc15", "gamma": "#a855f7",
+        }
+        bw_times = bw.get("times") or []
+        bands_data = [(k, label, bw.get(k) or []) for k, label in band_keys]
+        has_band = any(len(v) >= 2 for _, _, v in bands_data)
+
+        if has_band:
+            npts = max((len(v) for _, _, v in bands_data), default=0)
+            if npts < 2:
+                return f"<svg width=400 height=100><text y=50 fill=#888>Insufficient data points</text></svg>"
+            LW = 65
+            PLOT_W = 835
+            times = bw_times
+            t0 = float(times[0]) if len(times) > 1 else 0.0
+            dur = (float(times[-1]) - t0) if len(times) > 1 else (npts / float(analysis.get("sampling_rate") or 128))
+            dur = max(dur, 1e-9)
+            W = LW + PLOT_W + 15
+            laneH = 52  # 五条波形，行高适中
+            H = laneH * 5 + 30
+
+            svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
+            for i, (key, label, vals) in enumerate(bands_data):
+                y = i * laneH + laneH // 2
+                svg.append(f'<line x1="{LW}" y1="{y}" x2="{W}" y2="{y}" stroke="#333" stroke-width="0.5" stroke-dasharray="3 3"/>')
+                svg.append(f'<text x="{LW-4}" y="{y+3}" fill="#aab" font-size="12" text-anchor="end">{esc(label)}</text>')
+                if len(vals) < 2:
+                    continue
+                vabs = sorted([abs(v) for v in vals])
+                p95 = vabs[min(int(len(vabs) * 0.95), len(vabs) - 1)] or 1
+                sc = (laneH * 0.5) / (2 * p95)
+                cl = laneH * 0.5 / sc
+                if len(times) == len(vals):
+                    pts = "M" + "".join(
+                        f" {LW + (float(times[j]) - t0) / dur * PLOT_W:.1f},{y - max(-cl, min(cl, vals[j])) * sc:.2f}"
+                        for j in range(len(vals))
+                    )
+                else:
+                    pts = "M" + "".join(
+                        f" {LW + j / (npts - 1) * PLOT_W:.1f},{y - max(-cl, min(cl, vals[j])) * sc:.2f}"
+                        for j in range(len(vals))
+                    )
+                # 每条频段波形固定颜色
+                svg.append(f'<path d="{pts}" stroke="{band_colors.get(key, "#ef4444")}" stroke-width="1.1" fill="none" opacity="0.95"/>')
+            for i in range(6):
+                t = i * dur / 5
+                x = LW + (i / 5) * PLOT_W
+                svg.append(f'<text x="{x:.1f}" y="{H-4}" fill="#667" font-size="9" text-anchor="middle">{t:.1f}s</text>')
+            svg.append("</svg>")
+            return "".join(svg)
+
+        # ── 回退：无频段波形时展示通道波形 ──
+        wp = analysis.get("waveform_preview", {}) or {}
         chs = wp.get("channels", {}) or {}
         if not chs:
             return f"<svg width=400 height=100><text y=50 fill=#888>No waveform data</text></svg>"
-        
+
         ch_names = list(chs.keys())
         nch = len(ch_names)
         npts = len(chs[ch_names[0]]) if nch else 0

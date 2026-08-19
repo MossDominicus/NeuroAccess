@@ -3,7 +3,6 @@
 import { useLang } from "@/lib/language-context";
 import { Download, Waves, ZoomIn, ZoomOut, Move, Maximize2 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
-import { computeBandDominantCounts } from "@/lib/band-waveform-generator";
 import { buildWaveformSvg, svgToDataUrl, isPlaceholderSvg } from "@/lib/waveform-svg";
 
 interface ReportEEGChartProps {
@@ -16,6 +15,9 @@ interface ReportEEGChartProps {
 const BAND_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
 const BAND_COLORS: Record<string, string> = {
   delta: "#ef4444", theta: "#facc15", alpha: "#3b82f6", beta: "#22c55e", gamma: "#a855f7",
+};
+const BAND_LABELS: Record<string, string> = {
+  alpha: "α Alpha", beta: "β Beta", delta: "δ Delta", theta: "θ Theta", gamma: "γ Gamma",
 };
 
 export default function ReportEEGChart({ reportFileName, analysis, id }: ReportEEGChartProps) {
@@ -37,10 +39,10 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      const hasLocalData = analysis?.band_waveforms || analysis?.waveform_preview?.channels;
       if (!reportId) {
         // 无报告 ID：直接用本地数据渲染（如果有）
-        const wp = analysis?.waveform_preview;
-        const localSvg = wp?.channels ? buildWaveformSvg(wp) : "";
+        const localSvg = hasLocalData ? buildWaveformSvg(analysis) : "";
         if (!cancelled) setEffectiveUrl(localSvg ? svgToDataUrl(localSvg) : null);
         return;
       }
@@ -53,15 +55,13 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
             setEffectiveUrl(serverUrl);
           } else {
             // 服务器没这报告（未同步）→ 用本地数据渲染
-            const wp = analysis?.waveform_preview;
-            const localSvg = wp?.channels ? buildWaveformSvg(wp) : "";
+            const localSvg = hasLocalData ? buildWaveformSvg(analysis) : "";
             setEffectiveUrl(localSvg ? svgToDataUrl(localSvg) : null);
           }
         }
       } catch {
         if (!cancelled) {
-          const wp = analysis?.waveform_preview;
-          const localSvg = wp?.channels ? buildWaveformSvg(wp) : "";
+          const localSvg = hasLocalData ? buildWaveformSvg(analysis) : "";
           setEffectiveUrl(localSvg ? svgToDataUrl(localSvg) : null);
         }
       }
@@ -77,11 +77,6 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
   // 优先从 waveform_preview.channels 取通道数；为空时回退 analysis.channel_count
   const wpChCount = analysis?.waveform_preview?.channels ? Object.keys(analysis.waveform_preview.channels).length : 0;
   const nTotal = wpChCount > 0 ? wpChCount : (analysis?.channel_count || 0);
-  const wpChannels = analysis?.waveform_preview?.channels || {};
-  const wpSr = analysis?.waveform_preview?.sampling_rate || analysis?.sampling_rate || 0;
-  const wpTimes = analysis?.waveform_preview?.times;
-  const domCounts = computeBandDominantCounts(wpChannels, wpSr, wpTimes);
-  const bandCount: Record<string, number> = domCounts || { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 };
 
   const onDownload = async () => {
     if (!imageUrl) return;
@@ -172,7 +167,7 @@ export default function ReportEEGChart({ reportFileName, analysis, id }: ReportE
             {BAND_ORDER.map(b => (
               <span key={b} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
                 <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: BAND_COLORS[b] }} />
-                {b.charAt(0).toUpperCase() + b.slice(1)} ({bandCount[b] ?? 0})
+                {BAND_LABELS[b]}
               </span>
             ))}
           </div>
