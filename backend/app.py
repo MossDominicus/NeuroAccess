@@ -1931,8 +1931,11 @@ def gen_waveform_svg(rid: str) -> str:
         # 时间轴数据
         times = wp.get("times", [])
 
-        # 通道曲线配色：按通道顺序循环（还原真实波形观感，不用主导频段整条染色）
-        CHANNEL_COLORS = ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#a855f7", "#14b8a6", "#f97316", "#8b5cf6"]
+        # 通道曲线配色：每个通道在色相环上均匀取色（hsl 色相均匀分布），
+        # 保证每条波形一个独立且可区分的颜色——颜色用于区分不同波形，而非随机。
+        def _channel_color(i: int, n: int) -> str:
+            hue = (i * 360.0 / n) % 360
+            return f"hsl({hue:.0f}, 70%, 55%)"
 
         # 时间轴：SVG 固定合理宽度，x 坐标按真实时间映射到固定宽度内，
         # 时间刻度按真实时长分布（5 秒文件标 0~5s，3 分钟文件标 0~180s）。
@@ -1964,8 +1967,8 @@ def gen_waveform_svg(rid: str) -> str:
                 pts = "M" + "".join(f" {LW + (float(times[j])-t0)/dur*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             else:
                 pts = "M" + "".join(f" {LW + j/(npts-1)*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
-            # 通道曲线颜色：按通道顺序循环（每通道一色，便于区分，不再全染成主导频段色）
-            svg.append(f'<path d="{pts}" stroke="{CHANNEL_COLORS[i % len(CHANNEL_COLORS)]}" stroke-width="0.7" fill="none" opacity="0.85"/>')
+            # 通道曲线颜色：每个通道色相环均匀取色（独立可区分，用于区分不同波形）
+            svg.append(f'<path d="{pts}" stroke="{_channel_color(i, nch)}" stroke-width="0.7" fill="none" opacity="0.85"/>')
         
         # 时间刻度：按真实时间分布（0, dur/5, …, dur）
         for i in range(6):

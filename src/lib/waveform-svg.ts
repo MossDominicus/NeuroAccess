@@ -2,8 +2,11 @@
 // 用途：当报告未同步到服务器（/api/waveform-image 返回 Report not found）时，
 // 直接用本地 analysis.waveform_preview 数据渲染波形图，保证波形图始终可见。
 
-// 通道曲线配色：按通道顺序循环（还原真实波形观感）
-const CHANNEL_COLORS = ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#a855f7", "#14b8a6", "#f97316", "#8b5cf6"];
+// 通道曲线配色：每个通道在色相环上均匀取色（独立可区分，用于区分不同波形）
+function channelColor(i: number, n: number): string {
+  const hue = ((i * 360) / n) % 360;
+  return `hsl(${hue.toFixed(0)}, 70%, 55%)`;
+}
 
 function esc(s: unknown): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -65,9 +68,9 @@ export function buildWaveformSvg(wp: any): string {
         pts += ` ${x.toFixed(1)},${vy.toFixed(2)}`;
       }
     }
-    // 通道曲线颜色：按通道顺序循环（每通道一色，便于区分）
+    // 通道曲线颜色：每个通道色相环均匀取色（独立可区分，用于区分不同波形）
     svg.push(
-      `<path d="${pts}" stroke="${CHANNEL_COLORS[i % CHANNEL_COLORS.length]}" stroke-width="0.7" fill="none" opacity="0.85"/>`
+      `<path d="${pts}" stroke="${channelColor(i, nch)}" stroke-width="0.7" fill="none" opacity="0.85"/>`
     );
   }
 
