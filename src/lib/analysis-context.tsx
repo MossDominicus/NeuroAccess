@@ -199,6 +199,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     if (!selected || selected.length === 0) return;
     const filesArr = Array.from(selected);
     if (filesArr.length === 0) return;
+    // 客户端先拦截超大文件（nginx client_max_body_size 50M），避免上传中途被断连、
+    // 卡在"处理中"很久才报错
+    const MAX_FILE_BYTES = 50 * 1024 * 1024;
     setFiles((prev) => [
       ...prev,
       ...filesArr.map((file) => ({
@@ -206,12 +209,14 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         file,
         name: file.name,
         size: file.size,
-        status: "pending" as Status,
+        status: (file.size > MAX_FILE_BYTES ? "failed" : "pending") as Status,
         result: undefined,
-        error: undefined,
+        error: file.size > MAX_FILE_BYTES
+          ? (t("fileTooLarge") || "文件超过 50MB 上限，无法上传")
+          : undefined,
       })),
     ]);
-  }, []);
+  }, [t]);
 
   const removeFile = useCallback((id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
@@ -302,6 +307,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
             const formData = new FormData();
             formData.append("file", item.file);
             formData.append("language", lang);
+            formData.append("report_id", item.id);
 
             const data = await safeJsonFetch(`${API_BASE}/api/analyze`, ANALYZE_TIMEOUT, {
               method: "POST",
@@ -351,39 +357,43 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
               );
             });
 
-            // 保存到 localStorage（Reports 页面立即可用）
-            // 保存 eegData 但限制到 500 点/通道（原始 2500→500，~80%空间节省）
-            // waveform 图需要 eegData.times/channels 来渲染，不存则图表空白
-            let safeEegData: any = null;
-            if (eegData) {
-              safeEegData = { ...eegData };
-              if (safeEegData.times && safeEegData.channels) {
-                const maxPts = Math.min(safeEegData.times.length, 500);
-                const step = Math.max(1, Math.floor(safeEegData.times.length / maxPts));
-                safeEegData.times = safeEegData.times.filter((_: any, i: number) => i % step === 0);
-                const chNames = Object.keys(safeEegData.channels);
-                for (const ch of chNames) {
-                  safeEegData.channels[ch] = safeEegData.channels[ch].filter((_: any, i: number) => i % step === 0);
+            // 报告暂不写入 localStorage / 服务器：等 AI 解释生成完成后才落库，
+            // 保证报告列表不会出现"解释还在生成"的半成品报告。
+            // 若 AI 解释最终拿不到，则用模板解释兜底保存，确保分析结果不丢失。
+            const persistAnalysis = (analysis: any, explanations: any) => {
+              const finalAnalysis = { ...analysis, explanations };
+              let safeEegData: any = null;
+              if (eegData) {
+                safeEegData = { ...eegData };
+                if (safeEegData.times && safeEegData.channels) {
+                  const maxPts = Math.min(safeEegData.times.length, 500);
+                  const step = Math.max(1, Math.floor(safeEegData.times.length / maxPts));
+                  safeEegData.times = safeEegData.times.filter((_: any, i: number) => i % step === 0);
+                  const chNames = Object.keys(safeEegData.channels);
+                  for (const ch of chNames) {
+                    safeEegData.channels[ch] = safeEegData.channels[ch].filter((_: any, i: number) => i % step === 0);
+                  }
+                  safeEegData.total_samples = safeEegData.times.length;
                 }
-                safeEegData.total_samples = safeEegData.times.length;
               }
-            }
-            const report: StoredReport = {
-              id: item.id,
-              fileName: item.name,
-              date: new Date().toLocaleString("zh-CN", { hour12: false }),
-              mode: "Beginner",
-              quality: (data.analysis as any)?.signal_quality_score ?? 0,
-              language: lang,
-              analysis: data.analysis,
-              eegData: safeEegData,
+              const report: StoredReport = {
+                id: item.id,
+                fileName: item.name,
+                date: new Date().toLocaleString(lang, { hour12: false }),
+                mode: "Beginner",
+                quality: (finalAnalysis as any)?.signal_quality_score ?? 0,
+                language: lang,
+                analysis: finalAnalysis,
+                eegData: safeEegData,
+              };
+              try {
+                addReport(report);
+                syncReportToServer(report); // 跨设备同步
+              } catch (e) {
+                console.warn("[AnalysisProvider] addReport failed:", e);
+              }
             };
-            try {
-              addReport(report);
-              syncReportToServer(report); // 跨设备同步
-            } catch (e) {
-              console.warn("[AnalysisProvider] addReport failed:", e);
-            }
+            let analysisSaved = false;
 
             // ── 阶段3：调用 /explain（后台生成 AI 解释）────────
             setFiles((prev) => {
@@ -410,7 +420,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                   });
                   const pollData = await pollResp.json();
                   if (pollData.success && pollData.explanations) {
-                    // AI 解释就绪
+                    // AI 解释就绪 → 此刻才把报告写入列表/服务器
+                    persistAnalysis(data.analysis, pollData.explanations);
+                    analysisSaved = true;
                     setFiles((prev) => {
                       if (runIdRef.current !== myRunId) return prev;
                       return prev.map((f) =>
@@ -419,16 +431,6 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                           : f
                       );
                     });
-                    // 同步 localStorage（使用 loadReports/saveReports 防止覆盖）
-                    try {
-                      const { loadReports, saveReports } = await import("@/lib/reports-storage");
-                      const reports = loadReports();
-                      const idx = reports.findIndex((r: any) => r.id === item.id);
-                      if (idx >= 0 && reports[idx].analysis) {
-                        reports[idx].analysis.explanations = pollData.explanations;
-                        saveReports(reports);
-                      }
-                    } catch {}
                     aiReady = true;
                     break;
                   }
@@ -447,6 +449,8 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
                     body: JSON.stringify({ analysis: analysisForExplain, language: lang }),
                   }, t);
                   if (explainResp.success && explainResp.explanations && runIdRef.current === myRunId) {
+                    persistAnalysis(data.analysis, explainResp.explanations);
+                    analysisSaved = true;
                     setFiles((prev) => {
                       if (runIdRef.current !== myRunId) return prev;
                       return prev.map((f) =>
@@ -465,6 +469,10 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 
             // ── 最终标记为 completed ───────────────────────────
             if (runIdRef.current === myRunId) {
+              // AI 解释没拿到（轮询+explain 都失败）→ 用模板解释兜底保存，保证报告不丢
+              if (!analysisSaved) {
+                persistAnalysis(data.analysis, (data.analysis as any)?.explanations);
+              }
               setFiles((prev) => {
                 if (runIdRef.current !== myRunId) return prev;
                 return prev.map((f) =>

@@ -291,15 +291,224 @@ def _dominant_band_from_percent(bp: Dict[str, Any]) -> str | None:
 
 
 def _band_pct_display(bp: Dict[str, Any]) -> str:
-    """把 bandpower_percent 渲染成 'delta: 12.1%, beta: 58.1%'，自动剥 % 防双 %"""
+    """把 bandpower_percent 渲染成 'delta: 12.1%, beta: 58.1%'，自动剥 % 防双 %。全部频段（含 gamma）。"""
     items = []
-    for k, v in list(bp.items())[:4]:
+    for k, v in bp.items():
         p = _pct(v)
         if p is None:
             items.append(f"{k}: {v}")
         else:
             items.append(f"{k}: {p:.1f}%")
     return ", ".join(items)
+
+
+def _transient_info(a: Dict) -> Dict:
+    """提取瞬态活动摘要（level/ratio_pct/channels），缺省为 none。"""
+    qd = (a.get("signal_quality") or {}).get("quality_details") or {}
+    t  = qd.get("transient_activity") or a.get("transient_activity") or {}
+    if not isinstance(t, dict):
+        return {"level": "none", "ratio_pct": 0.0, "channels": 0}
+    return {
+        "level": str(t.get("level") or "none"),
+        "ratio_pct": t.get("ratio_pct") or 0.0,
+        "channels": t.get("channels") or 0,
+    }
+
+
+def _speculate_situation(a: Dict, lang: str, style: str = "teaching") -> str:
+    """根据数据特征「推测」该 EEG 可能呈现的情况。
+
+    - 只有数据存在明确的异常特征时才推测病情方向（谨慎措辞，不做诊断）；
+      正常/无异常特征的记录则说明"整体未见明显异常倾向"，不强行关联病情。
+    - style: plain（入门大白话）/ teaching（进阶）/ research（研究专业，带数字依据）。
+    返回已按界面语言组织好的句子；不支持的风格回退 teaching。
+    """
+    bp   = a.get("bandpower_percent") or a.get("frequency_analysis", {}).get("bandpower_percent") or {}
+    dom  = _dominant_band_from_percent(bp) if bp else None
+    fa   = a.get("frequency_analysis") or {}
+    peak = _rnd(fa.get("dominant_frequency") or a.get("dominant_frequency"), 2)
+    ti   = _transient_info(a)
+    tlv  = ti.get("level", "none")
+    tr   = ti.get("ratio_pct")
+    tr_s = f"{round(float(tr)*100)}%" if isinstance(tr, (int, float)) and tr else ""
+    zh   = lang == "zh"
+
+    alpha_pct = _pct(bp.get("alpha")) or 0
+    beta_pct  = _pct(bp.get("beta")) or 0
+    theta_pct = _pct(bp.get("theta")) or 0
+    delta_pct = _pct(bp.get("delta")) or 0
+    gamma_pct = _pct(bp.get("gamma")) or 0
+    slow_pct  = delta_pct + theta_pct
+    has_bp    = any(v > 0 for v in (alpha_pct, beta_pct, theta_pct, delta_pct, gamma_pct))
+
+    def _t(research_txt: str, teaching_txt: str, plain_txt: str) -> str:
+        if style == "research":
+            return research_txt
+        if style == "plain":
+            return plain_txt
+        return teaching_txt
+
+    def _h(zh_r, zh_t, zh_p, en_r, en_t, en_p):
+        return _t(zh_r, zh_t, zh_p) if zh else _t(en_r, en_t, en_p)
+
+    # ── ① 病情方向：仅在明确的异常特征出现时推测 ──
+    hints: list = []
+
+    # R1 瞬态尖样活动 → 癫痫样活动相关
+    if tlv in ("high", "moderate"):
+        tr_zh = f"{tr_s}的" if tr_s else "相当比例的"
+        tr_en = f"{tr_s} of " if tr_s else "a notable fraction of "
+        hints.append(_h(
+            f"存在 {tr_zh}高幅瞬态尖样活动，这类模式通常与癫痫样放电相关，常见于痫样活动相关情况",
+            "记录中较频繁的高幅瞬态尖样波动，通常与癫痫样放电模式相关，常见于痫样活动相关情况",
+            "记录里的这种一阵阵的尖状波动，通常和一类脑部异常放电（癫痫样活动）的情况有关",
+            f"there is {tr_en}high-amplitude transient spike-like activity, a pattern typically associated "
+            f"with epileptiform discharges, commonly seen with epileptiform activity",
+            "the fairly frequent high-amplitude transient spike-like deflections are typically associated "
+            "with epileptiform discharge patterns, commonly seen with epileptiform activity",
+            "the recurring sharp spikes in this recording are usually linked to a type "
+            "of abnormal brain discharge (epileptiform activity)"))
+
+    # R2 弥漫性慢波为主、α 明显压低 → 代谢性脑病/神经退行
+    if dom in ("delta", "theta", "Delta", "Theta") or (slow_pct >= 45 and alpha_pct < slow_pct * 0.6):
+        hints.append(_h(
+            f"弥漫性慢波为主（δ+θ 约 {round(slow_pct)}%）且 α 明显减少，这类谱形通常与脑功能弥漫性改变相关，"
+            f"如代谢性脑病或神经退行性疾病的早期弥漫性异常",
+            "以弥漫性慢波为主且 α 活动明显减少的谱形，通常与脑功能弥漫性改变相关，"
+            "如代谢性脑病或神经退行性疾病的早期弥漫性异常",
+            "这种以慢波为主的图形，也常和大脑整体活动变慢的一些情况有关，比如代谢紊乱或神经退行性疾病的早期表现",
+            f"diffuse slow-wave dominance (delta+theta ≈ {round(slow_pct)}%) with markedly reduced alpha is "
+            f"typically associated with diffuse cerebral changes, such as metabolic encephalopathy or early "
+            f"diffuse abnormalities in neurodegenerative disease",
+            "a diffusely slow-wave-dominant profile with markedly reduced alpha is typically associated "
+            "with diffuse cerebral changes, such as metabolic encephalopathy or early "
+            "diffuse abnormalities in neurodegenerative disease",
+            "a mostly-slow pattern is also commonly linked to conditions where overall brain activity "
+            "slows down, such as metabolic disturbances or early signs of neurodegenerative disease"))
+
+    # R3 θ 明显突出（非慢波主导时）→ 注意功能相关
+    if len(hints) < 2 and theta_pct >= 30 and delta_pct < 35 and dom not in ("delta", "theta", "Delta", "Theta"):
+        hints.append(_h(
+            f"θ 活动明显增多（约 {round(theta_pct)}%），常与注意功能相关情况（如注意缺陷时 θ 增高）或困倦早期状态有关",
+            f"θ 活动明显增多（约 {round(theta_pct)}%），常与注意功能相关情况（如注意缺陷时 θ 增高）或困倦早期状态有关",
+            "这种偏慢一点的脑波（θ 波）明显比较多时，常和走神、犯困或者注意力方面的情况有关",
+            f"the markedly increased theta activity (≈{round(theta_pct)}%) commonly relates to "
+            f"attention-related conditions (e.g., elevated theta in attention deficits) or early drowsiness",
+            f"the markedly increased theta activity (≈{round(theta_pct)}%) commonly relates to "
+            f"attention-related conditions (e.g., elevated theta in attention deficits) or early drowsiness",
+            "when this slower brainwave (theta) is clearly prominent, it often relates to "
+            "daydreaming, drowsiness, or attention-related situations"))
+
+    # R7b α 峰值频率偏慢 → 认知功能下降相关
+    if len(hints) < 2 and isinstance(peak, (int, float)) and peak < 8.6 and (dom in ("alpha", "Alpha") or alpha_pct > 20):
+        hints.append(_h(
+            f"α 峰值频率偏慢（约 {peak} Hz，成人 α 峰多位于 10 Hz 附近），这类特征常见于认知功能下降相关疾病（如阿尔茨海默病早期）",
+            f"α 峰值频率偏慢（约 {peak} Hz，成人 α 峰多位于 10 Hz 附近），这类特征常见于认知功能下降相关疾病（如阿尔茨海默病早期）",
+            f"这种偏慢的脑波频率（约 {peak} Hz），也常和思考反应变慢一类的情况有关",
+            f"the alpha peak is slow (≈{peak} Hz; adult alpha peaks usually near 10 Hz), a feature commonly "
+            f"seen in cognitive-decline-related conditions (e.g., early Alzheimer's disease)",
+            f"the alpha peak is slow (≈{peak} Hz; adult alpha peaks usually near 10 Hz), a feature commonly "
+            f"seen in cognitive-decline-related conditions (e.g., early Alzheimer's disease)",
+            f"the somewhat slow brainwave frequency (≈{peak} Hz) also relates to conditions involving "
+            f"slower thinking and response"))
+
+    # ── ② 生理状态推测（按档位给出具体、丰富的状态推测） ──
+    if dom in ("alpha", "Alpha"):
+        pct_part = f"（约占 {round(alpha_pct)}%）" if alpha_pct else ""
+        pct_en = f" (≈{round(alpha_pct)}%)" if alpha_pct else ""
+        state = _h(
+            (f"α 节律主导{pct_part}，这是典型静息态的标志，通常对应放松清醒（闭眼静息）状态；"
+             f"结合波形平稳，推测这段记录更可能来自安静放松、闭目休息的情境，而不是紧张或专注用脑的情境"),
+            ("以 α 节律为主导且波形平稳，这种组合通常出现在清醒、放松、安静闭眼的状态下；"
+             "α 波增多往往意味着思维放松、没有紧张任务，推测记录者当时处于放松清醒的静息状态"),
+            "这种以中速节律为主、波形平稳的图形，通常可能来自清醒且放松的人，比如安静地闭着眼睛休息",
+            (f"alpha dominates{pct_en}, a hallmark of resting state, typically corresponding to relaxed "
+             f"wakefulness (eyes-closed resting); with a steady waveform, this recording more likely comes from "
+             f"a quiet, eyes-closed rest situation than a tense or focused one"),
+            ("With alpha as the dominant rhythm and a steady waveform, this combination typically appears during "
+             "wakeful, relaxed, quiet eyes-closed states; increased alpha usually means relaxed, unfocused thinking"),
+            "This kind of calm, steady brainwave pattern usually comes from someone who is awake and relaxed, "
+            "such as sitting quietly with eyes closed",
+        )
+    elif dom in ("beta", "Beta"):
+        pct_part = f"（约占 {round(beta_pct)}%）" if beta_pct else ""
+        pct_en = f" (≈{round(beta_pct)}%)" if beta_pct else ""
+        state = _h(
+            (f"β 快波主导{pct_part}，1/f 样谱形通常更接近清醒警觉或主动认知加工状态，"
+             f"推测这段记录更可能对应思维活跃、注意力集中的情境"),
+            "以 β 快速节律为主导，通常对应清醒警觉、思维活跃或注意力集中的状态",
+            "这种以快速节律为主的图形，通常可能来自清醒、警觉或正在专注思考的人",
+            (f"beta dominance{pct_en} with a 1/f-like profile is closer to wakeful alertness or active cognitive "
+             f"processing; this recording more likely reflects a state of active thinking or focused attention"),
+            "With fast beta as the dominant rhythm, this typically corresponds to wakeful alertness, active "
+            "thinking, or focused attention",
+            "This kind of fast brainwave pattern usually comes from someone who is awake, alert, or concentrating",
+        )
+    elif dom in ("delta", "theta", "Delta", "Theta"):
+        slow_part = f"（δ+θ 约 {round(slow_pct)}%）" if slow_pct else ""
+        slow_en = f" (delta+theta ≈ {round(slow_pct)}%)" if slow_pct else ""
+        state = _h(
+            (f"δ/θ 慢波主导{slow_part}，通常对应困倦、浅睡或深度睡眠等低唤醒状态"),
+            "以慢波（δ/θ）为主导，通常对应困倦、浅睡或深度睡眠等低唤醒状态",
+            "这种以慢波为主的图形，通常可能出现在很困倦或正在睡眠的人身上",
+            (f"delta/theta slow-wave dominance{slow_en} typically corresponds to low-arousal states such as "
+             f"drowsiness, light sleep, or deep sleep"),
+            "With slow waves (delta/theta) dominant, this typically corresponds to low-arousal states such as "
+            "drowsiness, light sleep, or deep sleep",
+            "This mostly-slow brainwave pattern usually appears in someone who is very drowsy or asleep",
+        )
+    elif dom in ("gamma", "Gamma"):
+        pct_part = f"（约占 {round(gamma_pct)}%）" if gamma_pct else ""
+        pct_en = f" (≈{round(gamma_pct)}%)" if gamma_pct else ""
+        state = _h(
+            (f"γ 高频活动主导{pct_part}，通常与主动认知加工有关，也可能包含肌肉伪迹，"
+             f"推测记录时可能处于高强度脑力活动状态，或存在肌电污染"),
+            "以 γ 高频活动为主导，通常与主动认知加工有关，也可能包含肌肉伪迹",
+            "这种最高频的脑波比较多时，通常可能和大脑高强度运转或肌肉紧张有关",
+            (f"gamma dominance{pct_en} usually relates to active cognitive processing and may include muscle "
+             f"artifact; this may reflect intense mental activity or muscle contamination"),
+            "With gamma activity dominant, this may relate to active cognitive processing, and may include "
+            "muscle artifact",
+            "When these highest-frequency waves are prominent, it may relate to intense mental activity or "
+            "muscle tension",
+        )
+    else:
+        state = _h(
+            "各频段较为均衡，无单一突出频段，通常对应普通清醒状态下的复杂脑活动",
+            "各频段较为均衡，通常对应普通清醒状态下的复杂脑活动",
+            "几种脑波都比较平均时，通常对应普通清醒状态下的复杂脑活动",
+            "a balanced spectrum with no single dominant band typically corresponds to complex brain activity "
+            "in ordinary wakefulness",
+            "With a balanced spectrum, this typically corresponds to complex brain activity in ordinary wakefulness",
+            "When brainwaves are fairly balanced, it usually corresponds to complex brain activity in ordinary "
+            "wakefulness",
+        )
+
+    # ── ③ 组装 ──
+    # 保证 state 以句号结尾，避免与后续内容粘连（如"休息 整体未见"缺标点）
+    _end_punct = (lambda s: s if s.endswith(("。", "；", "！", "？", "：", "，")) else s + "。") if zh else \
+                 (lambda s: s if s.endswith((".", ";", "!", "?", ":", ",")) else s + ".")
+    _sep = "" if zh else " "
+    state = _end_punct(state)
+    if hints:
+        disease = "；".join(hints)
+        return state + _sep + disease + "。"
+    # 无明确异常 → 正常说明，不强行关联病情
+    if gamma_pct >= 20:
+        normal = ("γ 频段偏高，通常与肌电伪迹或高认知负荷有关，需先排除头皮或肌肉紧张造成的干扰；"
+                  "除此之外整体未见明显异常倾向。"
+                  if zh else
+                  "The gamma band is relatively high, usually related to muscle artifact or high cognitive "
+                  "load; after excluding scalp or muscle-tension contamination, no obvious abnormal tendency "
+                  "is otherwise seen.")
+    elif alpha_pct < 12 and has_bp:
+        normal = ("α 活动偏低，可见于老年人或觉醒度降低等情况；整体未见明显异常倾向。"
+                  if zh else
+                  "Alpha activity is low, which can be seen in older adults or reduced arousal; overall, "
+                  "no obvious abnormal tendency is seen.")
+    else:
+        normal = ("整体未见明显异常倾向。" if zh else "Overall, no obvious abnormal tendency is seen.")
+    return state + _sep + normal
 
 
 def template_beginner(a: Dict, lang: str) -> str:
@@ -313,12 +522,15 @@ def template_beginner(a: Dict, lang: str) -> str:
     pct_num   = round(_pct(bp[dom])) if dom and bp.get(dom) is not None else None
     n_s   = ("没有明显不清晰的区域" if lang == "zh" else "no noticeably unclear areas") if n == 0 else (
         f"有 {n} 个区域读数较不清晰" if lang == "zh" else f"{n} area(s) are harder to read")
+    # 入门档正文只做事实描述，"推测可能的情况"作为专门段落追加，
+    # 避免与 _speculate_situation 重复（同一段话既出现在正文又出现在推测段 = 凑数）。
     if lang == "en":
         return (
             f"This recording lasts about {dur or 'a short period'} and its main activity is {dom_plain}"
             + (f", accounting for about {pct_num}% of total activity" if pct_num is not None else "")
             + f". Signal clarity is {q}"
             + (f"; {n_s}." if n > 0 else "; readings across all positions are clear.")
+            + "\n\nInference: " + _speculate_situation(a, "en", "plain")
         )
     if lang == "zh":
         return (
@@ -326,6 +538,7 @@ def template_beginner(a: Dict, lang: str) -> str:
             + (f"，约占全部活动的 {pct_num}%" if pct_num is not None else "")
             + f"。信号清晰度为{q}"
             + (f"，{n_s}。" if n > 0 else "，各位置的读数都比较清楚。")
+            + "\n\n推测可能的情况：" + _speculate_situation(a, "zh", "plain")
         )
     # fallback English for unsupported languages
     return (
@@ -333,6 +546,7 @@ def template_beginner(a: Dict, lang: str) -> str:
         + (f", accounting for about {pct_num}% of total activity" if pct_num is not None else "")
         + f". Signal clarity is {q}"
         + (f"; {n_s}." if n > 0 else "; readings across all positions are clear.")
+        + "\n\nInference: " + _speculate_situation(a, "en", "plain")
     )
 
 
@@ -357,7 +571,8 @@ def template_student(a: Dict, lang: str) -> str:
             f"The dominant band is the {dom_str}. "
             f"About {n_n} channel(s) appear noisier than the rest"
             + (f" (e.g., {n_s})" if ns else "")
-            + ", which can affect local readings."
+            + ", which can affect local readings.\n\n"
+            f"Possible interpretation: {_speculate_situation(a, 'en', 'teaching')}"
         )
     if lang == "zh":
         return (
@@ -367,7 +582,8 @@ def template_student(a: Dict, lang: str) -> str:
             f"主导频段是 {dom_str}。"
             f"约 {n_n} 个通道信号偏弱"
             + (f"（如 {n_s}）" if ns else "")
-            + "，可能影响局部数据的可信度。"
+            + "，可能影响局部数据的可信度。\n\n"
+            f"推测可能的情况：{_speculate_situation(a, 'zh', 'teaching')}"
         )
     # fallback English
     return (
@@ -377,7 +593,8 @@ def template_student(a: Dict, lang: str) -> str:
         f"The dominant band is the {dom_str}. "
         f"About {n_n} channel(s) appear noisier than the rest"
         + (f" (e.g., {n_s})" if ns else "")
-        + ", which can affect local readings."
+        + ", which can affect local readings.\n\n"
+        f"Possible interpretation: {_speculate_situation(a, 'en', 'teaching')}"
     )
 
 
@@ -398,28 +615,47 @@ def template_research(a: Dict, lang: str) -> str:
     if lang == "en":
         return (
             f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq3}/100 ({q_label}).\n\n"
-            f"The spectrum is dominated by the {dom_str} band; interpretation should rely on absolute power "
-            f"and cross-band ratios, not single percentages. "
-            f"{n_n} channel(s) fall below noise tolerance; per-channel analyses on them are unreliable. "
-            f"Overall quality ({q_label}) supports dataset-level spectral conclusions but limits "
-            f"fine-grained time-frequency or peak-fitting analyses."
+            f"The spectrum is dominated by the {dom_str} band. Relative bandpower percentages should be "
+            f"interpreted alongside absolute power and cross-band ratios; relying on a single percentage can be misleading "
+            f"because the underlying PSD computation (Welch method, window length and overlap) influences the numerical result. "
+            f"Across all channels, {n_n} channel(s) fall below the noise tolerance threshold, and per-channel analyses on "
+            f"those channels should be treated as unreliable. "
+            f"Overall recording quality ({q_label}) is sufficient to support dataset-level spectral conclusions "
+            f"(dominant rhythm, broad bandpower distribution), but limits analyses that require fine-grained time-frequency "
+            f"resolution, single-trial peak alignment, or source localization. "
+            f"At SR={sr} Hz, frequencies up to {int(sr/2) if isinstance(sr,(int,float)) else 'sr/2'} Hz (Nyquist) are recoverable; "
+            f"any conclusions regarding very high-frequency activity should account for this ceiling.\n\n"
+            f"Inference: {_speculate_situation(a, 'en', 'research')}"
         )
     if lang == "zh":
         return (
             f"数据集：{ch_n} 个通道，采样率 {sr} Hz，时长 {dur}；"
             f"信号质量评分 {sq3}/100（{q_label}）。\n\n"
-            f"频谱以{dom_str}为主导，解读应结合各频段的绝对功率与相对比值，而非单一百分比。"
-            f"共 {n_n} 个通道低于噪声容忍度，针对这些通道的逐通道分析应视为不可靠。"
-            f"整体质量（{q_label}）足以支撑数据集级频谱结论，但限制需要精细时频或峰值定位的分析。"
+            f"频谱以{dom_str}为主导。解读时应结合各频段的绝对功率与跨频段比值，"
+            f"而非依赖单一百分比——因为 PSD 的计算方式（Welch 方法、窗长、重叠率）"
+            f"会直接影响数值结果。全部通道中 {n_n} 个低于噪声容忍度阈值，"
+            f"针对这些通道的逐通道分析应视为不可靠。"
+            f"整体录制质量（{q_label}）足以支撑数据集级频谱结论"
+            f"（主导节律、整体频段功率分布），但限制了需要精细时频分辨率、"
+            f"单试次峰值对齐或溯源定位的分析。"
+            f"采样率 {sr} Hz 对应奈奎斯特上限约 {int(sr/2) if isinstance(sr,(int,float)) else 'sr/2'} Hz，"
+            f"任何针对极高频活动的结论都应考虑此上限。\n\n"
+            f"推测：{_speculate_situation(a, 'zh', 'research')}"
         )
     # fallback English
     return (
         f"Dataset: {ch_n} channels, SR={sr} Hz, duration={dur}; quality score {sq3}/100 ({q_label}).\n\n"
-        f"The spectrum is dominated by the {dom_str} band; interpretation should rely on absolute power "
-        f"and cross-band ratios, not single percentages. "
-        f"{n_n} channel(s) fall below noise tolerance; per-channel analyses on them are unreliable. "
-        f"Overall quality ({q_label}) supports dataset-level spectral conclusions but limits "
-        f"fine-grained time-frequency or peak-fitting analyses."
+        f"The spectrum is dominated by the {dom_str} band. Relative bandpower percentages should be "
+        f"interpreted alongside absolute power and cross-band ratios; relying on a single percentage can be misleading "
+        f"because the underlying PSD computation (Welch method, window length and overlap) influences the numerical result. "
+        f"Across all channels, {n_n} channel(s) fall below the noise tolerance threshold, and per-channel analyses on "
+        f"those channels should be treated as unreliable. "
+        f"Overall recording quality ({q_label}) is sufficient to support dataset-level spectral conclusions "
+        f"(dominant rhythm, broad bandpower distribution), but limits analyses that require fine-grained time-frequency "
+        f"resolution, single-trial peak alignment, or source localization. "
+        f"At SR={sr} Hz, frequencies up to {int(sr/2) if isinstance(sr,(int,float)) else 'sr/2'} Hz (Nyquist) are recoverable; "
+        f"any conclusions regarding very high-frequency activity should account for this ceiling.\n\n"
+        f"Inference: {_speculate_situation(a, 'en', 'research')}"
     )
 
 
@@ -464,6 +700,8 @@ def _summarize_for_ai(a: Dict) -> Dict:
     fa       = a.get("frequency_analysis") or {}
     overview = a.get("overview") or {}
     literacy = a.get("literacy_scores") or a.get("eeg_literacy_scores") or {}
+    qd       = sq.get("quality_details") or {}
+    trans    = qd.get("transient_activity") or {}
     return {
         "channel_count":            overview.get("channel_count") or a.get("channel_count"),
         "sampling_rate":            overview.get("sampling_rate") or a.get("sampling_rate"),
@@ -479,6 +717,14 @@ def _summarize_for_ai(a: Dict) -> Dict:
         "clipping_detected":        sq.get("clipping_detected") or a.get("clipping_detected"),
         "missing_data":             sq.get("missing_data") or a.get("missing_data"),
         "high_frequency_noise":     sq.get("high_frequency_noise") or a.get("high_frequency_noise"),
+        # 客观信号特征：异常值比例 + 瞬态尖峰样活动 + 最大幅度（用于客观描述，不做疾病推断）
+        "outlier_percentage":       qd.get("outlier_percentage") or _rnd(a.get("outlier_percentage"), 3),
+        "max_amplitude_uv":         trans.get("max_amplitude_uv") or a.get("max_amplitude_uv"),
+        "transient_activity":       {
+            "level": trans.get("level") or "none",
+            "ratio_pct": trans.get("ratio_pct") or 0.0,
+            "channels": trans.get("channels") or 0,
+        } if trans else None,
         # 频段只用聚合百分比 / 均值（已经是 5 个 key 的字典），丢弃逐通道 bandpower 数组；数值顺手截位
         "bandpower_percent":        {k: _rnd(v, 1) for k, v in (fa.get("bandpower_percent") or a.get("bandpower_percent") or {}).items()},
         "average_bandpower":        {k: _rnd(v, 2) for k, v in (fa.get("average_bandpower") or a.get("average_bandpower") or {}).items()},
@@ -503,18 +749,47 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
     output_lang  = LANG_NAME_MAP.get(lang, "English")
     boundary     = (
         "CRITICAL BOUNDARIES - You MUST follow these rules:\n"
-        "1. NEVER provide medical diagnosis, disease labels, treatment advice, or normal/abnormal judgment.\n"
+        "1. NEVER give THIS recording a medical diagnosis, a disease label, treatment advice, or a normal/abnormal verdict. "
+        "However, you MAY mention, in cautious educational terms, which disease/condition categories such patterns are "
+        "typically associated with in the medical and teaching literature — e.g. 'transient spike-like discharges are "
+        "patterns commonly studied in the context of epileptiform activity and epilepsy', 'diffuse slow-wave activity is "
+        "often associated with metabolic encephalopathy or early neurodegenerative changes', 'a slowed "
+        "alpha peak is commonly discussed in cognitive decline (e.g., early Alzheimer's disease)'. "
+        "Always frame such mentions as general background knowledge ('typically / commonly / may be associated with'), "
+        "NEVER as a statement that this specific recording belongs to a patient with that condition. "
+        "CRITICAL: only mention a disease/condition when the JSON actually contains the corresponding feature "
+        "(spike-like transient activity, diffuse slow-wave dominance with reduced alpha, or a slowed alpha peak). "
+        "For recordings without such features, do NOT invent or force a medical interpretation; simply state that "
+        "the recording shows no obvious abnormal tendency.\n"
         "2. You MUST interpret what the brainwave pattern typically means in cautious, educational terms. "
         "For example: 'fast-wave (beta) dominant activity is commonly associated with wakefulness, alertness, or active thinking'; "
         "'alpha-dominant activity often accompanies relaxed wakefulness, typically with eyes closed'; "
         "'slow-wave (delta/theta) dominance is more typical of drowsiness or deep sleep'. "
         "ALWAYS phrase such statements as general physiological correlates with 'typically / commonly / may be associated with' — "
         "NEVER state what THIS specific person was feeling, thinking, or doing, and NEVER diagnose or judge the recording as normal/abnormal.\n"
+        "2b. If the JSON contains 'transient_activity' with level 'mild'/'moderate'/'high', or a 'possible_artifacts' entry "
+        "mentioning 'Transient spike-like activity', you MUST describe it as an objective signal feature: e.g. "
+        "'the recording contains frequent high-amplitude transient spike-like deflections (~X% of samples across N/M channels)'. "
+        "After describing it objectively, you MAY cautiously speculate what such a pattern typically reflects in educational terms, "
+        "e.g. 'high-amplitude transient spike-like discharges are patterns commonly studied in the context of epileptiform activity "
+        "and epilepsy' — always phrased as a general correlate with "
+        "'typically / commonly / may be associated with', never as a statement about this specific recording being abnormal. "
+        "NEVER use the word 'seizure' or 'epilepsy' as a label for THIS recording; you may only mention such terms as generic "
+        "background knowledge of what researchers study, never as a verdict on this data.\n"
         "3. NEVER suggest what the user should do based on EEG data (no lifestyle, medication, or therapy advice).\n"
         "4. NEVER claim to detect the actual emotions, attention levels, cognitive states, personality traits, or intelligence of the person who was recorded.\n"
         "5. ALWAYS use cautious language (e.g., 'typically associated with', 'commonly seen in', 'may reflect') when describing patterns.\n"
+        "5b. NEVER use certainty words that assert a definite fact or 100% guarantee: banned — 'certainly', 'definitely', 'absolutely', '100%', 'guaranteed', 'proves', 'undoubtedly', 'always', 'never fails'. "
+        "Instead ALWAYS hedge with probabilistic words: 'may', 'might', 'could', 'possibly', 'probably', 'usually', 'often', 'generally', 'tends to', 'likely'. "
+        "For example write 'this pattern may reflect relaxed wakefulness' — NEVER 'this pattern definitely reflects relaxed wakefulness'.\n"
+        "5c. 中文禁止使用肯定/绝对化措辞：禁用'肯定'、'绝对'、'百分之百'、'100%'、'一定'、'必然'、'必定'、'毫无疑问'、'显然就是'、'确凿'、'肯定无疑'等。"
+        "一律使用推测性/概率性措辞：'可能'、'大概'、'或许'、'往往'、'通常'、'一般'、'倾向于'、'有较大可能'、'推测'。"
+        "例如写'这种模式可能反映放松状态'，绝不写'这种模式绝对反映了放松状态'。\n"
         "6. This is for EEG literacy, education, and accessibility ONLY.\n"
-        "7. Do NOT add a general disclaimer at the end of every explanation; the website already displays limitation notices separately.\n"
+        "7. Do NOT add ANY disclaimer, caveat, or hedging clause about medical/diagnostic limits — not at the end, not mid-sentence, not anywhere. FORBIDDEN examples: 'this does not mean the recording shows epilepsy/seizure', 'this cannot be used to diagnose', 'this is not a substitute for professional medical advice', 'consult a doctor', 'for reference only'. The website already shows limitation notices as a separate module, so your explanation must contain ZERO disclaimer sentences. Interpret the data educationally and move on.\n"
+        "7b. 中文同样禁止在解释里写任何免责/兜底句（无论句尾还是句中），例如'但这并不意味着该记录存在癫痫'、'不能替代医学诊断'、'仅供参考'、'建议咨询医生'等。网站的免责声明是独立模块，解释段落里一律不要出现这类话。\n"
+        "7c. ALSO never state that noise, artifacts, baseline drift, or data quality limitations 'may affect the accuracy/reliability of subsequent analysis' or similar quality-caveat sentences. You may DESCRIBE the noise/artifact objectively (e.g. 'several channels are noisy'), but do NOT add the follow-up clause that it affects analysis accuracy — that belongs to the separate limitation module. FORBIDDEN: 'these noise and baseline drift may affect the accuracy of subsequent analysis', 'this may affect data accuracy', 'analysis should be considered unreliable'.\n"
+        "7d. 中文同样禁止写'噪声/伪影/基线漂移可能影响后续分析的准确性'这类质量限制句。可以客观描述噪声/伪影本身（如'存在3个噪声通道'），但不要追加'可能影响准确性/可靠性/应视为不可靠'这类话，那属于独立限制模块。禁止示例：'这些噪声和基线漂移可能会影响后续分析的准确性'、'这可能会影响数据的准确性'、'逐通道分析应视为不可靠'、'存在可信度上的限制'。\n"
         "8. NEVER list individual channel names (e.g., 'EEG 001, EEG 002, ...'). Refer to them collectively as 'the channels' or 'the recording'.\n"
         "9. NEVER pad the explanation with channel lists, sampling-rate restatements, or parameter dumps. Focus on INTERPRETATION and ANALYSIS.\n"
         "10. NEVER write meta or framing sentences such as 'The following is an analysis of this recording', "
@@ -561,8 +836,15 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"  (f) whether any specific areas were noticeably harder to read (use noisy_channels);\n"
             f"  (g) whether any obvious interference was present and roughly how widespread it was (use possible_artifacts / clipping_detected / high_frequency_noise);\n"
             f"  (h) whether the signal looked steady across the whole recording or changed noticeably over time;\n"
-            f"  (i) in ONE plain-language sentence, what this pattern typically means — e.g., 'recordings dominated by fast waves "
-            f"usually come from someone who is awake and alert' or 'mostly slow waves are more typical of drowsiness or deep sleep'.\n"
+            f"  (i) in ONE plain-language sentence, SPECULATE what this pattern usually means — e.g., 'recordings dominated by fast waves "
+            f"usually come from someone who is awake and alert' or 'mostly slow waves are more typical of drowsiness or deep sleep'. "
+            f"This is an INFERENCE about the likely state or scenario, not a statement about this specific person.\n"
+            f"  (j) IF the recording shows unusual features (spike-like transient activity, mostly-slow dominant waves, or a slowed "
+            f"alpha peak), add ONE extra plain-language sentence mentioning which kind of medical condition such patterns are "
+            f"usually discussed in connection with — e.g., 'patterns like this are often discussed in connection with certain "
+            f"conditions involving abnormal brain discharges or a slowing of brain activity'. "
+            f"If the recording shows NO unusual features, do NOT invent any medical condition; instead say in plain words that "
+            f"the recording shows no obvious abnormal tendency. Phrase as general knowledge, never as a diagnosis.\n"
             f"Do NOT combine multiple items into one sentence. Do NOT stop early — cover all nine items, "
             f"but never pad to lengthen the answer.\n\n"
             f"FACTUALITY RULES (violation = FAILURE):\n"
@@ -577,10 +859,12 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- NEVER write the wave names alpha/beta/theta/delta/gamma (even translated) — always say 'slow waves' or 'fast waves'.\n"
             f"- Never dump percentages or parameter lists. You MAY say 'about half of the activity was in the slower range' "
             f"to convey a proportion in words.\n"
-            f"- INCLUDE ONE plain-language sentence about what this pattern typically means — e.g., 'recordings dominated by fast waves "
+            f"- INCLUDE ONE plain-language sentence that SPECULATES what this pattern usually means — e.g., 'recordings dominated by fast waves "
             f"usually come from someone who is awake and alert', 'mostly slow waves are more typical of drowsiness or deep sleep'. "
-            f"Phrase it as a general 'usually/typically' correlation. Do NOT claim to know what this specific person was doing or feeling.\n"
-            f"- State facts only. Do NOT speculate about mental states, emotions, attention, or what the person was doing.\n"
+            f"Phrase it as a general 'usually/typically' correlation. This is an INFERENCE about the likely state or scenario; "
+            f"do NOT claim to know what this specific person was doing or feeling.\n"
+            f"- You MAY give ONE hedged inference about what the pattern usually means ('usually comes from someone awake "
+            f"and alert', 'more typical of drowsiness'), but do NOT assert what this specific person was doing or feeling.\n"
             f"- NEVER mention channel names or channel 1, channel 2, etc.\n"
             f"- NO meta sentences ('以下是对这份记录的分析', '本文介绍了…', '总的来说…'), NO disclaimers, NO advice, NO closing invitation.\n"
             f"- Do NOT repeat the same fact twice in different words — that is padding.\n"
@@ -614,13 +898,34 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"(e.g. low sampling rate limits gamma assessment), say so briefly instead of inventing a gamma percentage. "
             f"Then name which band dominates in THIS recording "
             f"with its real percentage (cautious wording: typically associated with, commonly seen in, may reflect) "
-            f"and compare the bands against each other using the real percentages.\n"
+            f"and compare the bands against each other using the real percentages. "
+            f"Finally, add ONE explicit INFERENCE sentence: based on the dominant band and its real percentage, "
+            f"state what state or scenario this recording most plausibly corresponds to "
+            f"(e.g., wakeful alertness, relaxed eyes-closed wakefulness, drowsiness/sleep), "
+            f"using cautious wording like 'typically corresponds to' / 'may reflect'. "
+            f"Then add ONE more cautious sentence naming which disease/condition category this pattern is typically "
+            f"associated with when the data shows spike-like transient activity, diffuse slow-wave "
+            f"dominance, or a slowed alpha peak — e.g., 'epileptiform activity and epilepsy', 'metabolic encephalopathy "
+            f"or early neurodegenerative changes', 'cognitive decline (e.g., early Alzheimer's disease)'. "
+            f"If the data shows NONE of these abnormal features, do NOT invent or force a medical interpretation; "
+            f"instead state that the recording shows no obvious abnormal tendency. "
+            f"Always frame it as general background knowledge ('typically associated with…'), "
+            f"never as a diagnosis of this recording.\n"
             f"NEVER state what THIS person was actually doing or feeling.\n\n"
             f"PARAGRAPH 3 — Noise and artifacts in this recording (cover all four points): "
             f"1) explain what EEG artifacts are; 2) explain what a noisy channel means; "
             f"3) state how many channels were flagged noisy here (or none) with the real number; "
             f"4) state whether artifacts/clipping/high-frequency noise were detected in this recording. "
             f"Each point in its own sentence.\n\n"
+            f"TRANSIENT ACTIVITY (mandatory if present): If the JSON contains transient_activity with level "
+            f"'mild'/'moderate'/'high', you MUST add one more sentence (as point 5 of paragraph 3, or a short "
+            f"fourth paragraph) describing it objectively: e.g. 'this recording also shows frequent high-amplitude "
+            f"transient spike-like deflections (X% of samples across M/N channels)'. Then add ONE cautious, "
+            f"educational sentence about what such patterns typically reflect in the EEG literature, e.g. "
+            f"'high-amplitude transient spike-like discharges are a pattern commonly studied in the context of "
+            f"epileptiform activity' — always with 'typically / commonly / may be associated with', NEVER as a "
+            f"diagnosis or a normal/abnormal verdict on THIS recording, and NEVER labeling this data as "
+            f"seizure/epilepsy. If transient_activity is absent or level is 'none', do not mention it.\n\n"
             f"FACTUALITY RULES (violation = FAILURE):\n"
             f"- The arrays in the JSON are the COMPLETE truth. An EMPTY array means ZERO — write 'no channels were flagged noisy' / "
             f"'no artifacts were detected'. NEVER invent a count, never write '21 channels' unless the JSON literally lists 21 names.\n"
@@ -638,8 +943,11 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
             f"- DO NOT use markdown heading markers (### / ## / #) or 'Paragraph 1:' style section labels. "
             f"Output plain paragraphs separated by blank lines only — any markdown heading is stripped at output time.\n"
             f"- NO meta or framing sentences: do NOT write '以下/本文/本报告…', do NOT open or close with '总的来说' / '综上所述' / '总之' / '希望…'.\n"
-            f"- NEVER describe the recording in terms of mental states: do NOT say the data indicates relaxation, "
-            f"attention, emotion, cognition, sleepiness, or any psychological condition. Bandpower is a signal property, not a mind-reading.\n"
+            f"- You MAY cautiously INFER what state or scenario the pattern typically corresponds to "
+            f"(e.g., 'this pattern may reflect relaxed wakefulness', 'fast-wave dominance typically appears during "
+            f"wakeful alertness', 'slow-wave dominance usually accompanies drowsiness or sleep') — always hedged with "
+            f"'may / typically / possibly / likely'. NEVER assert what THIS specific person was feeling, thinking, "
+            f"or doing; bandpower is a signal property, not mind-reading.\n"
             f"- When stating a frequency range, ALWAYS keep the two numbers separate with a hyphen or '到' "
             f"(e.g., '8-13 Hz' or '8 到 13 Hz'); never merge them into one number (never write '813 Hz').\n"
             f"- Output language MUST be fully {output_lang}. NO English words mixed in (except technical "
@@ -684,7 +992,16 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"patterns typically look like and which one this spectrum most resembles (e.g., 'a beta-dominant, 1/f-like profile "
         f"is most consistent with wakefulness or active cortical engagement'; 'an alpha-dominant profile typically accompanies "
         f"relaxed wakefulness'). Never diagnose the person; frame it as a general physiological correlate. "
-        f"Close by naming the single most actionable finding a researcher would act on.\n\n"
+        f"End paragraph 1 with ONE explicit INFERENCE sentence naming the most plausible state or scenario for THIS recording "
+        f"(e.g., relaxed eyes-closed wakefulness, active wakefulness, drowsiness/sleep), justified by the dominant band, "
+        f"its real percentage, and the peak frequency, and hedged with 'likely / most consistent with / suggests'. "
+        f"Then add ONE more sentence, phrased as general clinical background knowledge, naming which "
+        f"disease/condition category the profile is typically associated with when the data shows spike-like transient "
+        f"activity, diffuse slow-wave dominance, or a slowed alpha peak — e.g., 'epileptiform activity and epilepsy', "
+        f"'metabolic encephalopathy or early neurodegenerative changes', 'cognitive decline (e.g., early Alzheimer's "
+        f"disease)'. If the data shows NONE of these abnormal features, do NOT invent or force a medical interpretation; "
+        f"instead state that the recording shows no obvious abnormal tendency. "
+        f"NEVER frame it as a diagnosis of this recording.\n\n"
         f"PARAGRAPH 2 — Methodological limits that actually bind THIS data (3-4 sentences): "
         f"State only the constraints that are REAL for this recording, quantified (frequency resolution "
         f"from duration, e.g. '3 min ⇒ ~0.01 Hz resolution, adequate for band ratios; 20 s ⇒ ~0.05 Hz, "
@@ -695,6 +1012,16 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"findings in ONE compact sentence. Then state the direct implication for downstream analyses "
         f"(which are safe vs risky) and end with 1 concrete preprocessing action derived from the actual "
         f"findings. No generic advice.\n\n"
+        f"TRANSIENT ACTIVITY (mandatory if present): If the JSON contains transient_activity with level "
+        f"'mild'/'moderate'/'high', you MUST give it its own sentence inside paragraph 3 (or right after it): "
+        f"first state the objective feature with its real numbers, e.g. 'the recording shows frequent high-amplitude "
+        f"transient spike-like deflections (X% of samples across M/N channels, up to Y µV)'. Then add ONE cautious, "
+        f"educational speculation about what such patterns are typically associated with in the EEG literature, "
+        f"e.g. 'high-amplitude transient spike-like discharges are a pattern commonly studied in the context of "
+        f"epileptiform activity' — always framed as general background knowledge with 'typically / commonly / "
+        f"may be associated with', NEVER as a diagnosis or a normal/abnormal verdict on THIS recording, and NEVER "
+        f"labeling this data as seizure/epilepsy. If transient_activity is absent or level is 'none', do not "
+        f"mention transient activity at all.\n\n"
         f"FACTUALITY RULES (violation = FAILURE):\n"
         f"- The arrays in the JSON are the COMPLETE truth. An EMPTY array means ZERO — report 'no channels were flagged noisy' / "
         f"'no artifacts detected'. NEVER invent a count, never write '21 channels' unless the JSON literally lists 21 names.\n"
@@ -713,8 +1040,11 @@ def _build_prompt(a: Dict, level: str, lang: str) -> str:
         f"A sentence with neither is invalid text — delete it.\n"
         f"- NEVER define terms (bandpower, sampling rate, PSD, Nyquist…). The reader is a researcher.\n"
         f"- NO meta sentences, NO concluding summary ('综上所述' / '总体来看' / '总之'), NO disclaimers, NO advice.\n"
-        f"- NEVER describe the recording in terms of mental states: do NOT say the data reflects relaxation, "
-        f"attention, emotion, cognition, sleepiness, or any psychological condition. Bandpower describes the signal, not the person.\n"
+        f"- You MAY cautiously INFER what state or scenario the spectrum most plausibly corresponds to "
+        f"(e.g., 'an alpha-dominant profile with a ~10 Hz peak is most consistent with relaxed eyes-closed wakefulness'; "
+        f"'a beta-dominant 1/f profile suggests active wakefulness or cognitive engagement') — always hedged with "
+        f"'most consistent with / suggests / likely / typically'. NEVER assert what THIS specific person was feeling, "
+        f"thinking, or doing; bandpower describes the signal, not the person.\n"
         f"- If specific channels were flagged noisy, you MAY name them (e.g., 'EEG 001, EEG 005') in the quality sentence; "
         f"keep such lists to at most 3-5 names. Otherwise refer to a channel count or 'the channels'.\n"
         f"- Write the ENTIRE explanation, including any paragraph headings, in {output_lang}. "
@@ -747,9 +1077,28 @@ DISCLAIMER_PATTERNS = [
     r"(?:但是|不过|然而|需要|请注意|重要|提醒|免责|声明|注意).*?(?:不能|无法|不应|不要|请勿|不应用来|不足以|不适合|无法判断|无法诊断|无法确定|不能反映|不代表|不说明|不表明|不等同于|不能作为|仅供参考|仅作参考|参考).*?(?:诊断|疾病|健康|智商|性格|心理|情绪|认知|功能|状态|治疗|建议|医疗|医学|专业|医生|医师|结论|判断|依据|用途)?[。；]?",
     r"(?:单次|一次|单次记录|一次记录|仅一次|单次 EEG|一次 EEG).*?(?:不能|无法|不应|不要|不足以|不适合|无法判断|无法诊断|无法确定|不能反映|不代表|不说明|不表明).*?(?:大脑|具体|功能|状态|智商|性格|心理|健康|疾病|情绪|认知|治疗|诊断|建议)?[。；]?",
     r"(?:EEG|脑电图|脑电|频谱|功率|波段|频段|分析).*?(?:不能|无法|不应|不要|不足以|不适合|无法用来|不能直接|不能简单|不能单独|不能作为).*?(?:诊断|判断|确定|说明|反映|代表|指示|预测|评估|衡量|评价).*?(?:疾病|健康|智商|性格|心理|情绪|认知|状态|功能|治疗|医疗|专业|结论)?[。；]?",
+    # 癫痫类免责短句：从分句标点 + 连接词（但/不过/这/本记录…）起，到"...癫痫发作。"整句删除
+    r'([，；。、,;\.\n])(?:但|不过|然而|而|这|本记录|本段|本次|该记录|这些|此)[^。；！？]*?(?:并不意味着|并不能说明|不代表|不说明|不表明|不能说明|无法说明)[^。；！？]*?(?:癫痫发作|癫痫|痫性发作)[。；！？]',
+    # 通用兜底免责：从标点后紧跟的"但/不过/这/本记录…"分句起点删到句末标点
+    r'([，；。、,;\.\n])(?:但|不过|然而|需要|请注意|重要|提醒|免责|声明|注意|虽然|而|这|本记录|本段|本次|该记录|这些|此)[^。；！？]*?(?:不意味|不代表|不说明|不表明|不能|无法|不应|不要|请勿|不应用来|不足以|不适合|无法判断|无法诊断|无法确定|不能反映|不能作为|不能替代|不应作为|无法作为|不构成|仅供参考|仅作参考|并非|建议咨询|咨询医生|咨询专业|专业医生|诊断|疾病|医疗|医学|替代)[^。；！？]*[。；！？]',
+    # 独立短句（整句即免责，可能无句末标点）：仅供参考 / 仅作参考 / 建议咨询医生 等
+    r'([，；。、,;\.\n]|^)[^。；！？]*?(?:仅供参考|仅作参考|参考用途|建议咨询|咨询医生|咨询专业|并非诊断|不构成诊断|不能替代|不应替代|无法替代)[^。；！？]*[。；！？]?',
+    # 纯免责短句（整句都是免责，锚定段首/行首，短句，如"并不意味着该记录存在癫痫。"）
+    r'(^|[\n])(?:这|本记录|本段|本次|该记录)?[^。；！？]{0,30}?(?:并不意味着|并不能说明|不代表|不说明|不表明|不能说明|无法说明|不能用于诊断|不能作为诊断依据)[^。；！？]{0,20}[。；！？]',
+    # 质量限制声明：噪声/伪影/漂移"可能影响分析准确性/可靠性/可信度"，从连接词起删整句（保留客观描述）
+    r'([，；。、,;\.\n])(?:这|这些|其|它|因此|所以|此外|同时|但|不过|然而)[^。；！？]*?(?:会影响|影响|降低|干扰|损害|限制|视为不可靠|应视为不可靠)[^。；！？]*?(?:准确性|可靠性|精度|可信度|准确测量|准确评估|判断)[^。；！？]*(?:[。；！？]|$)',
+    r'([，；。、,;\.\n])(?:存在|仍存在)[^。；！？]{0,20}?(?:可信度|可靠性)[^。；！？]{0,10}?(?:限制|问题)[^。；！？]*(?:[。；！？]|$)',
+    r'(^|[，；。、,;\.\n])[^。；！？，,]{0,14}?(?:应视为|可视为|视为)[^。；！？，,]{0,6}不可靠',
+    r'(^|[，；。、,;\.\n])(?:存在|仍存在)[^。；！？，,]{0,20}(?:可信度|可靠性)[^。；！？，,]{0,8}(?:限制|问题)',
+    # 段首变体：句子以"这/这些/因此/此外"开头且整句是质量限制声明 → 整句删
+    r'(^|[\n])(?:这|这些|因此|所以|此外|同时|但|不过|然而|总之|其)[^。；！？]*?(?:会影响|影响|降低|干扰|损害|限制)[^。；！？]*?(?:准确性|可靠性|精度|可信度|准确测量|准确评估|判断)[^。；！？]*(?:[。；！？]|$)',
+    # 段首纯限制短句（短句，如"逐通道分析应视为不可靠。""存在一些可信度上的限制。"）
+    r'(^|[\n])[^。；！？]{0,28}?(?:应视为不可靠|视为不可靠|存在[^。；！？]{0,15}(?:可信度|可靠性)[^。；！？]{0,8}(?:限制|问题))(?:[。；！？]|$)',
     # English
     r"(?:However|But|Please note|Important|Disclaimer|Note that|Keep in mind|It is important to).*?(?:cannot|can not|should not|does not|is not|may not|unable to|not enough|not sufficient|not suitable|not appropriate|not intended|not a substitute|not diagnostic|not medical|not clinical).*?(?:diagnose|determine|reflect|represent|indicate|predict|assess|evaluate|measure|judge|tell|show|suggest|advise|treat|medical|health|disease|condition|IQ|personality|mental|cognitive|emotional|state|function|condition|disorder|ADHD|depression|anxiety|professional|physician|doctor|clinician)?[.!?;]?",
     r"(?:single|one|individual|single-session|one-time).*?(?:recording|session|measurement|data|EEG).*?(?:cannot|can not|should not|does not|is not|may not|unable to|not enough|not sufficient).*?(?:diagnose|determine|reflect|represent|indicate|predict|assess|evaluate|measure|judge|tell|show|characterize).*?(?:brain|health|disease|condition|IQ|personality|mental|cognitive|emotional|state|function|disorder|medical|clinical)?[.!?;]?",
+    # 质量限制声明（英文）：noise/artifact "may affect accuracy/reliability" 从句
+    r"([,;.\n])(?:this|these|it|therefore|thus|so|however|but)[^.!?;]*?(?:may|might|could|can)?[^.!?;]*?(?:affect|reduce|impair|limit|unreliable)[^.!?;]*?(?:accuracy|reliability|precision|confidence|measurement|interpretation)[^.!?;]*[.!?;]?",
     # Spanish
     r"(?:Esta|Este|La|El).*?(?:información|análisis|herramienta|sistema|resultado|dato|datos|aplicación).*?(?:no debe|no se debe|no debe ser|no puede|no es|no constituye|no reemplaza|no sustituye|no proporciona|no ofrece|no pretende|solo con fines|únicamente|meramente|exclusivamente).*?(?:diagnosticar|diagnóstico|médico|médica|consejo|consulta|tratamiento|terapia|enfermedad|enfermedades|condición|condiciones|trastorno|trastornos|evaluar|determinar|juzgar|indicar|predecir|asesorar)?[.!?;]?",
     r"(?:No|Este|Estos).*?(?:debe|deben|puede|pueden).*?(?:ser utilizado|ser utilizada|ser usada|ser usado|interpretarse|considerarse|tomarse).*?(?:como|para).*?(?:diagnóstico|diagnóstico médico|reemplazo|sustituto|sustituta|alternativa).*?(?:médico|médica|profesional|clínico)?[.!?;]?",
@@ -774,19 +1123,80 @@ DISCLAIMER_PATTERNS = [
 
 
 def _strip_disclaimers(text: str) -> str:
-    """移除 LLM 输出中重复的免责声明；保留主体解释内容。"""
+    """移除 LLM 输出中的免责声明（整段或段落内嵌短句），保留主体解释内容。
+    实现：逐段对每条 DISCLAIMER_PATTERNS 做内嵌删除（re.sub），再清理残留标点。
+    纯免责段落删除后自然消失；若整段解释都被清掉则回退原文本，避免空输出。"""
     if not text:
         return text
-    # 先尝试移除独立成段的免责声明段落（以换行分隔）
-    paragraphs = [p.strip() for p in str(text).split("\n") if p.strip()]
-    cleaned = []
-    for p in paragraphs:
-        if any(re.search(pat, p, re.IGNORECASE) for pat in DISCLAIMER_PATTERNS):
-            continue
-        cleaned.append(p)
-    result = "\n\n".join(cleaned)
-    # 如果整段被删光了，退回原文本避免空输出
-    return result if result.strip() else text
+    paras = [p.strip() for p in str(text).split("\n") if p.strip()]
+    if not paras:
+        return text
+    out_paras = []
+    for p in paras:
+        cleaned_p = p
+        for pat in DISCLAIMER_PATTERNS:
+            cleaned_p = re.sub(pat, lambda m: m.group(1) if (m.groups() and m.group(1)) else "", cleaned_p, flags=re.IGNORECASE)
+        # 清理因删除产生的多余标点/空白
+        cleaned_p = re.sub(r"[,，。;；]?\s*[,，。;；]", "，", cleaned_p)
+        cleaned_p = re.sub(r"^[,，。;；\s]+", "", cleaned_p)
+        cleaned_p = re.sub(r"[,，。;；\s]+$", "", cleaned_p)
+        cleaned_p = re.sub(r"\s{2,}", " ", cleaned_p)
+        if cleaned_p.strip():
+            out_paras.append(cleaned_p.strip())
+    result = "\n\n".join(out_paras)
+    # 删除免责后允许返回空（调用方 _dedup/生成逻辑会在清空时回退模板，避免空解释）；
+    # 单个纯免责段落应被正常丢弃，因此这里直接返回 result（可能为空）。
+    return result
+
+
+# 确定性措辞 → 推测性措辞 软化替换（LLM 偶用"肯定/绝对/100%"时兜底改写）
+_CERTAINTY_REPLACEMENTS = [
+    # 中文：先处理长词，避免拆错
+    ("百分之百", "可能"),
+    ("100%", "可能"),
+    ("肯定无疑", "很可能"),
+    ("毫无疑问", "很可能"),
+    ("必然", "往往"),
+    ("必定", "很可能"),
+    ("肯定", "可能"),
+    ("确凿", "较明确"),
+    ("显然就是", "可能"),
+    ("显然", "通常"),
+    # 英文
+    ("guaranteed", "likely"),
+    ("undoubtedly", "likely"),
+    ("certainly", "likely"),
+    ("definitely", "likely"),
+    ("absolutely", "generally"),
+    ("always", "usually"),
+    ("never fails", "rarely"),
+    ("proves", "suggests"),
+    ("100%", "likely"),
+]
+# "绝对" 单独处理：仅当它是确定性副词时替换，术语"绝对功率/绝对振幅/绝对能量/绝对值"保留。
+_ABS_TERM_RE = re.compile(r"绝对(?!功率|振幅|能量|值|大小|量级|幅度)")
+# "一定" 单独处理：排除固定搭配"一定程度/一定范围/一定数量"（表示"有些"，非必然性）
+_YIDING_RE = re.compile(r"一定(?!程度|范围|数量|比例|时长的|时间的|距离)")
+# 相邻重复标点清理（软化替换后可能产生"往往。。"）
+_DUP_PUNCT_RE = re.compile(r"([。！？；])\1+")
+_SPACE_PUNCT_RE = re.compile(r"\s+([，。；！？])")
+
+
+def _soften_claims(text: str) -> str:
+    """把解释中的确定性/绝对化措辞替换为推测性措辞（'可能/大概/通常/往往'）。
+    注意：不处理免责句（由 _strip_disclaimers 负责），只软化语气。"""
+    if not text:
+        return text
+    t = text
+    for src, dst in _CERTAINTY_REPLACEMENTS:
+        t = t.replace(src, dst)
+    # 绝对 → 通常（排除"绝对功率/振幅/能量"等术语）
+    t = _ABS_TERM_RE.sub("通常", t)
+    # 一定 → 往往（排除"一定程度/范围/数量"等固定搭配）
+    t = _YIDING_RE.sub("往往", t)
+    t = _DUP_PUNCT_RE.sub(r"\1", t)
+    t = _SPACE_PUNCT_RE.sub(r"\1", t)
+    return t
 
 
 # 标题行模式：用于从非英文解释中剔除。
@@ -976,7 +1386,7 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
         "research": template_research(a, lang),
     }
     # 各档的 max_tokens：入门短小、学习中等、研究最长（600-750 字目标，留足余量防截断）
-    _MAX_TOKENS = {"beginner": 400, "student": 900, "research": 1500}
+    _MAX_TOKENS = {"beginner": 200, "student": 450, "research": 1500}
 
     def _call_level(level: str) -> str:
         try:
@@ -994,7 +1404,9 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             cleaned = _dedup_sentences(
                 _strip_invalid_sentences(
                     _strip_meta_sentences(
-                        _strip_en_headings(_strip_disclaimers(text), lang)
+                        _soften_claims(
+                            _strip_en_headings(_strip_disclaimers(text), lang)
+                        )
                     )
                 )
             )
@@ -1002,6 +1414,23 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             if not cleaned.strip():
                 print(f"[explanations] fallback {level}({lang}): cleaned-empty", flush=True)
                 return fallbacks[level]
+            # 按档位强制长度上限（保证入门 < 进阶 < 研究层次分明）
+            # 从段落末尾整句截断，避免半句。
+            _MAX_CHARS = {"beginner": 170, "student": 520, "research": 100000}
+            _cap = _MAX_CHARS.get(level, 100000)
+            if len(cleaned) > _cap:
+                import re as _re
+                _segs = _re.split(r"(?<=[。！？；\n])", cleaned)
+                _buf = ""
+                for _sg in _segs:
+                    if _sg and len(_buf) + len(_sg) <= _cap:
+                        _buf += _sg
+                    elif _sg:
+                        break
+                if _buf.strip():
+                    cleaned = _buf.strip()
+                else:
+                    cleaned = cleaned[:_cap] + "…"
             return cleaned
         except Exception as e:
             print(f"[explanations] fallback {level}({lang}): exception {e}", flush=True)
@@ -1019,6 +1448,123 @@ def _generate_explanations_for_lang(analysis: Dict, lang: str) -> Dict[str, str]
             except Exception as e:
                 print(f"[explanations] fallback {key}({lang}): future timeout/err {e}", flush=True)
                 results[key] = fallbacks[key]
+
+    # 长度顺序兜底：保证 beginner < student < research（用户已多次反馈"研究档怎么会比学习档短"）
+    # 若 LLM 不遵守隐含长度规则，对偏短的档做一次"扩展"再生成，最坏情况用模板填充
+    try:
+        _bn, _st, _rs = len(results["beginner"]), len(results["student"]), len(results["research"])
+        # 要求层次分明 1:2:3：beginner*2 < student 且 student*1.5 < research
+        if not (_bn * 2 < _st and _st * 1.5 < _rs):
+            print(f"[explanations] length order violated {lang}: b={_bn} s={_st} r={_rs}", flush=True)
+            # 入门档必须明显短于进阶档（< 0.5x）→ 过长则回退模板
+            if not (_bn * 2 < _st):
+                results["beginner"] = fallbacks["beginner"]
+                _bn = len(results["beginner"])
+            # student 不够长于 beginner → 直接用模板填充
+            if not (_bn < _st):
+                results["student"] = fallbacks["student"]
+                _st = len(results["student"])
+            # research 不够长于 student*1.5 → 尝试扩展 research（保留 AI student 内容）
+            if not (_st * 1.5 < _rs):
+                try:
+                    _ext_prompt = _build_prompt(a, "research", lang) + (
+                        "\n\n[EXPANSION REQUEST] The previous output was too short. "
+                        "Expand each paragraph with deeper technical detail: include precise frequency bands, "
+                        "amplitude relationships, dominant rhythm and its typical physiological correlate, "
+                        "data-quality caveats per weak channel group, and methodological limitations. "
+                        "Aim for AT LEAST 60% longer than the student-tier explanation."
+                    )
+                    _ext = call_ollama(_ext_prompt, timeout=120, max_tokens=2000)
+                    _ext_txt = str(_ext.get("text", "")).strip() if _ext.get("success") else ""
+                    if _ext_txt:
+                        _ext_clean = _dedup_sentences(
+                            _strip_invalid_sentences(
+                                _strip_meta_sentences(
+                                    _soften_claims(
+                                        _strip_en_headings(_strip_disclaimers(_ext_txt), lang)
+                                    )
+                                )
+                            )
+                        )
+                        if _ext_clean and len(_ext_clean) > len(results["student"]) * 1.5:
+                            results["research"] = _ext_clean
+                except Exception as _e:
+                    print(f"[explanations] research expansion failed {lang}: {_e}", flush=True)
+                # 扩展后仍不满足比例 → 保留 AI 内容，仅记日志（保证内容质量优先）
+                _rs2 = len(results["research"])
+                if not (len(results["student"]) * 1.5 < _rs2):
+                    print(f"[explanations] ratio relaxed {lang}: b={len(results['beginner'])} s={len(results['student'])} r={_rs2}", flush=True)
+    except Exception as _e:
+        print(f"[explanations] length order post-check exception {lang}: {_e}", flush=True)
+
+    # ── 推测模块兜底：三档解释都必须包含"推测可能情况"的内容 ──
+    # 用户在代码审查中明确要求：AI 解释不能只复述文件里有什么，必须推测数据可能呈现的情况。
+    # LLM 偶尔不写推测句（或写得含蓄），这里检测不到推测性语言就自动追加模板推测段。
+    try:
+        _INFERENCE_HINTS = (
+            "推测", "可能", "可能情况", "推断", "通常", "很可能", "或许", "也许",
+            "inference", "likely", "typically", "probably", "suggests", "plausibly", "consistent with",
+        )
+        # 研究档过短（LLM 输出被截断/偷懒）→ 用完整模板替换，保证内容完整且含推测段
+        if len(results.get("research") or "") < 400:
+            results["research"] = fallbacks["research"]
+            print(f"[explanations] research replaced by template (too short, {lang})", flush=True)
+    except Exception as _e:
+        print(f"[explanations] inference fallback exception {lang}: {_e}", flush=True)
+
+    # ── 最终硬性保证：只保证严格递增（beginner < student < research），不压缩内容 ──
+    # 内容质量优先：进阶解释保留 AI 生成内容，仅当严格顺序被打破时才做最小修正。
+    try:
+        _bn, _st, _rs = len(results["beginner"]), len(results["student"]), len(results["research"])
+        if not (_bn < _st < _rs):
+            import re as _re2
+            def _cut_by_sentence(text: str, max_len: int) -> str:
+                segs = _re2.split(r"(?<=[。！？；\n])", text)
+                buf = ""
+                for sg in segs:
+                    if sg and len(buf) + len(sg) <= max_len:
+                        buf += sg
+                    elif sg:
+                        break
+                return buf.strip() or text[:max_len].strip() + "…"
+            # 仅当 student 反而比 research 长时，截断 student 到 research-1（保持严格递增）
+            if len(results["student"]) >= len(results["research"]):
+                results["student"] = _cut_by_sentence(results["student"], max(40, len(results["research"]) - 1))
+            # 仅当 beginner 反而比 student 长时，截断 beginner 到 student-1
+            if len(results["beginner"]) >= len(results["student"]):
+                results["beginner"] = _cut_by_sentence(results["beginner"], max(30, len(results["student"]) - 1))
+            _bn = len(results["beginner"])
+            _st = len(results["student"])
+            _rs = len(results["research"])
+            if not (_bn < _st < _rs):
+                print(f"[explanations] strict-order fallback {lang}: b={_bn} s={_st} r={_rs}", flush=True)
+    except Exception as _e:
+        print(f"[explanations] hard-cut exception {lang}: {_e}", flush=True)
+
+    # ── 每档固定追加"推测可能的情况"专门段 ──
+    # 用户要求：入门/进阶/研究三档都必须在 AI 解释里各有一个专门的推测病情部分。
+    # 模板版（template_*）内部已含推测段；LLM 版若没有专门的"推测："段则在此强制追加。
+    # 追加前先去重：推测文本已出现在正文中则跳过（避免"推测段=正文整句复制"的凑数）。
+    try:
+        for _k, _style in (("beginner", "plain"), ("student", "teaching"), ("research", "research")):
+            _txt = results.get(_k) or ""
+            if "推测：" in _txt or "推测可能的情况" in _txt or "Inference:" in _txt:
+                continue
+            _spec = _speculate_situation(a, lang, _style)
+            if not _spec:
+                continue
+            # 去重：推测句（或其主干）已出现在正文中 → 不再追加
+            if _spec.strip() in _txt or _spec.strip()[:18] in _txt:
+                print(f"[explanations] disease section skipped (dup) for {_k} ({lang})", flush=True)
+                continue
+            if lang == "zh":
+                _label = "推测：" if _k == "research" else "推测可能的情况："
+            else:
+                _label = "Inference: "
+            results[_k] = (_txt + "\n\n" + _label + _spec).strip()
+            print(f"[explanations] disease section appended to {_k} ({lang})", flush=True)
+    except Exception as _e:
+        print(f"[explanations] disease-section append exception {lang}: {_e}", flush=True)
 
     return results
 

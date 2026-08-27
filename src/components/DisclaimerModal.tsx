@@ -30,8 +30,13 @@ export default function DisclaimerModal() {
 
     setOpenDisclaimer(() => () => setVisible(true));
 
+    // 协议弹窗（PostLoginModals）接受后广播该事件 → 立即关闭已打开的免责声明
+    const onAccepted = () => setVisible(false);
+    window.addEventListener("neuroaccess:disclaimer-accepted", onAccepted);
+
     return () => {
       setOpenDisclaimer(() => () => {});
+      window.removeEventListener("neuroaccess:disclaimer-accepted", onAccepted);
     };
   }, [user, setOpenDisclaimer]);
 

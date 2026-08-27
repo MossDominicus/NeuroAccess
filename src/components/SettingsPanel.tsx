@@ -8,6 +8,8 @@ import { useLang } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
 import { setNotificationEnabled } from "@/components/NotificationToast";
+import DownloadDataButton from "@/components/DownloadDataButton";
+import { useDownloadBtnHidden, setDownloadBtnHidden } from "@/lib/download-btn-state";
 import { Settings, Moon, Sun, Monitor, User, X, Eye, Key, MessageSquare, FileText, CheckCircle2, AlertTriangle, Cpu, Bell } from "lucide-react";
 const FeedbackPanel = dynamic(() => import("@/components/FeedbackPanel"), { ssr: false, loading: () => null });
 const SurveyPanel = dynamic(() => import("@/components/SurveyPanel"), { ssr: false, loading: () => null });
@@ -48,6 +50,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { lang, setLang, t } = useLang();
   const { theme, setTheme } = useTheme();
   const { user, token, logout, updateUser } = useAuth();
+  const downloadHidden = useDownloadBtnHidden();
 
   const [showFeedback, setShowFeedback] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
@@ -241,6 +244,26 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 </div>
               </section>
 
+          {/* 下载数据（首页按钮隐藏后在此显示） */}
+              {downloadHidden && (
+                <section>
+                  <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+                    {t("downloadData")}
+                  </h3>
+                  <div className="space-y-2">
+                    <DownloadDataButton />
+                    <button
+                      type="button"
+                      onClick={() => setDownloadBtnHidden(false)}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-xs py-2.5 transition-colors"
+                    >
+                      <Eye className="h-4 w-4" />
+                      {t("showDownloadBtn")}
+                    </button>
+                  </div>
+                </section>
+              )}
+
           {/* 关于 */}
               <section>
                 <h3 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
@@ -278,6 +301,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
                 </section>
               )}
+
             </div>
           </motion.aside>
         </motion.div>

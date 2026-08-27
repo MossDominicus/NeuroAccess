@@ -5,6 +5,9 @@
 
 const LS_KEY = "neuroaccess-eeg-gen-task";
 const RESULT_LS_KEY = "neuroaccess-eeg-gen-result";
+// 结果缓存版本：生成器算法每次大改后递增，使旧缓存失效并强制重新生成，
+// 避免用户刷新后一直看到旧算法生成的"复制感"波形。
+const RESULT_CACHE_VERSION = 3;
 
 type GenStatus = "idle" | "running" | "completed" | "failed";
 type GenListener = () => void;
@@ -58,11 +61,18 @@ function _clearState() {
 
 function _loadResult(): GenResult | null {
   if (!_isBrowser()) return null;
-  try { const raw = localStorage.getItem(RESULT_LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try {
+    const raw = localStorage.getItem(RESULT_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // 版本不匹配（旧算法生成的缓存）→ 丢弃，强制重新生成
+    if (!parsed || parsed.v !== RESULT_CACHE_VERSION) return null;
+    return parsed.data as GenResult;
+  } catch { return null; }
 }
 function _saveResult(r: GenResult) {
   if (!_isBrowser()) return;
-  try { localStorage.setItem(RESULT_LS_KEY, JSON.stringify(r)); } catch {}
+  try { localStorage.setItem(RESULT_LS_KEY, JSON.stringify({ v: RESULT_CACHE_VERSION, data: r })); } catch {}
 }
 
 // ── 通知订阅者 ──────────────────────────────────────────────
@@ -79,7 +89,7 @@ function _notifyResult() {
 
 // ── 公共 API ─────────────────────────────────────────────────
 export const EEGGenerationManager = {
-  /** 初始化：从 localStorage 恢复状态（仅在客户端调用） */
+  /** 初始化：每次进入页面都清空上次结果（用户要求：刷新/重新进入后不保留生成内容） */
   init() {
     if (_initialized || !_isBrowser()) return;
     _initialized = true;
@@ -88,7 +98,9 @@ export const EEGGenerationManager = {
       _state = { ...saved, status: "failed", error: "Generation interrupted by page refresh" };
       _saveState();
     }
+    // 清空上次生成结果：不恢复缓存，并清除残留缓存数据
     _result = null;
+    try { localStorage.removeItem(RESULT_LS_KEY); } catch {}
     _notifyResult();
   },
 
@@ -106,6 +118,16 @@ export const EEGGenerationManager = {
       _cachedResultVersion = _resultVersion;
     }
     return _cachedResult;
+  },
+
+  /** init() 是否已执行（组件用它避免在缓存恢复前误判"无结果"而自动重新生成） */
+  isInitialized(): boolean {
+    return _initialized;
+  },
+
+  /** 是否有可用结果（直接读模块状态，不受 useSyncExternalStore 快照延迟影响） */
+  hasResult(): boolean {
+    return !!_result;
   },
 
   subscribe(listener: GenListener): () => void {
@@ -161,6 +183,7 @@ export const EEGGenerationManager = {
       _state.progress = 90; _saveState(); _notify();
 
       _result = { data, params: { ...params }, generatedAt: Date.now() };
+      _saveResult(_result);
 
       _state = { status: "completed", progress: 100, startedAt: _state.startedAt, error: null, params: { ...params } };
       _saveState(); _notifyResult();

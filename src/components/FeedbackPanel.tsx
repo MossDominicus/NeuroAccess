@@ -54,7 +54,8 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
             headers: { "Content-Type": "application/json", ...authHeaders },
             body: JSON.stringify({ name: "", email: "", type: entry.reportId ? "report" : "general", message: entry.message, rating: "" }),
           });
-          if (resp.ok) retried++;
+          const data = await resp.json().catch(() => null);
+          if (resp.ok && data && data.success === true) retried++;
           else remaining.push(entry);
         } catch {
           remaining.push(entry);
@@ -80,7 +81,9 @@ export default function FeedbackPanel({ reportId }: FeedbackPanelProps) {
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(payload),
       });
-      if (!resp.ok) throw new Error("API failed");
+      const data = await resp.json().catch(() => null);
+      // 后端超长/超限等错误也返回 HTTP 200 + success:false，必须检查 success
+      if (!resp.ok || !data || data.success !== true) throw new Error("API failed");
     } catch {
       // fallback: save to localStorage if API fails
       setSavedLocally(true);

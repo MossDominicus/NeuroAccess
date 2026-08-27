@@ -136,6 +136,103 @@ function getCards(t: (key: string) => string): KnowledgeCardData[] {
         cannotTell: t("guideBandpowerCannotTell"),
       }
     },
+    // ── 特殊波形（颜色与五种基本频段区分，不与 blue/green/red/yellow/purple 相同）──
+    {
+      id: "spikes", category: "special", icon: "⚡", iconColor: "#f472b6",
+      title: t("guideSpikesTitle"),
+      frequency: t("guideSpikesFrequency"),
+      description: t("guideSpikesDesc"),
+      details: {
+        what: t("guideSpikesWhat"),
+        why: t("guideSpikesWhy"),
+        pattern: t("guideSpikesPattern"),
+        cannotTell: t("guideSpikesCannotTell"),
+      }
+    },
+    {
+      id: "sleep_spindles", category: "special", icon: "🌙", iconColor: "#14b8a6",
+      title: t("guideSpindlesTitle"),
+      frequency: t("guideSpindlesFrequency"),
+      description: t("guideSpindlesDesc"),
+      details: {
+        what: t("guideSpindlesWhat"),
+        why: t("guideSpindlesWhy"),
+        pattern: t("guideSpindlesPattern"),
+        cannotTell: t("guideSpindlesCannotTell"),
+      }
+    },
+    {
+      id: "slow_waves", category: "special", icon: "🌊", iconColor: "#84cc16",
+      title: t("guideSlowWavesTitle"),
+      frequency: t("guideSlowWavesFrequency"),
+      description: t("guideSlowWavesDesc"),
+      details: {
+        what: t("guideSlowWavesWhat"),
+        why: t("guideSlowWavesWhy"),
+        pattern: t("guideSlowWavesPattern"),
+        cannotTell: t("guideSlowWavesCannotTell"),
+      }
+    },
+    {
+      id: "k_complexes", category: "special", icon: "💤", iconColor: "#f97316",
+      title: t("guideKComplexesTitle"),
+      frequency: t("guideKComplexesFrequency"),
+      description: t("guideKComplexesDesc"),
+      details: {
+        what: t("guideKComplexesWhat"),
+        why: t("guideKComplexesWhy"),
+        pattern: t("guideKComplexesPattern"),
+        cannotTell: t("guideKComplexesCannotTell"),
+      }
+    },
+    {
+      id: "mu_rhythm", category: "special", icon: "μ", iconColor: "#06b6d4",
+      title: t("guideMuRhythmTitle"),
+      frequency: t("guideMuRhythmFrequency"),
+      description: t("guideMuRhythmDesc"),
+      details: {
+        what: t("guideMuRhythmWhat"),
+        why: t("guideMuRhythmWhy"),
+        pattern: t("guideMuRhythmPattern"),
+        cannotTell: t("guideMuRhythmCannotTell"),
+      }
+    },
+    {
+      id: "smr", category: "special", icon: "🏃", iconColor: "#64748b",
+      title: t("guideSmrTitle"),
+      frequency: t("guideSmrFrequency"),
+      description: t("guideSmrDesc"),
+      details: {
+        what: t("guideSmrWhat"),
+        why: t("guideSmrWhy"),
+        pattern: t("guideSmrPattern"),
+        cannotTell: t("guideSmrCannotTell"),
+      }
+    },
+    {
+      id: "triphasic", category: "special", icon: "≡", iconColor: "#d946ef",
+      title: t("guideTriphasicTitle"),
+      frequency: t("guideTriphasicFrequency"),
+      description: t("guideTriphasicDesc"),
+      details: {
+        what: t("guideTriphasicWhat"),
+        why: t("guideTriphasicWhy"),
+        pattern: t("guideTriphasicPattern"),
+        cannotTell: t("guideTriphasicCannotTell"),
+      }
+    },
+    {
+      id: "periodic", category: "special", icon: "🔁", iconColor: "#a16207",
+      title: t("guidePeriodicTitle"),
+      frequency: t("guidePeriodicFrequency"),
+      description: t("guidePeriodicDesc"),
+      details: {
+        what: t("guidePeriodicWhat"),
+        why: t("guidePeriodicWhy"),
+        pattern: t("guidePeriodicPattern"),
+        cannotTell: t("guidePeriodicCannotTell"),
+      }
+    },
   ];
 }
 
@@ -150,6 +247,7 @@ export default function GuidePage() {
   const categories = [
     { key: "all", label: t("all") },
     { key: "brainwaves", label: t("guideCatBrainwaves") },
+    { key: "special", label: t("guideCatSpecial") },
     { key: "technical", label: t("guideCatTechnical") },
     { key: "artifacts", label: t("guideCatArtifacts") },
   ];

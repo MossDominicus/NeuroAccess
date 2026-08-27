@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   FileText,
   Download,
@@ -14,36 +13,23 @@ import {
   Eye,
   AlertTriangle,
   Waves,
-  GitCompare,
-  Star,
-  RefreshCw,
 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
-import { useAuth } from "@/lib/auth-context";
 import { formatDuration } from "@/lib/duration";
+import { useAuth } from "@/lib/auth-context";
 import {
   StoredReport,
   loadReports,
   deleteReport as deleteReportFromStorage,
-  deleteServerReport,
-  reconcileReportsWithServer,
-  getFavorites,
-  saveFavorites,
-  isFavorite,
-  toggleFavorite,
-  markDeleted,
 } from "@/lib/reports-storage";
 
 
-/* 分数颜色 */
-function scoreColor(q: number | null | undefined): string {
-  if (q == null) return "text-[var(--color-text-secondary)]";
-  // 与评分逻辑弹窗的"分数参考区间"一致：80 实验室级 / 60 临床可用 / 40 可用 / <40 较差
-  if (q >= 80) return "text-emerald-600 dark:text-emerald-400 font-bold";
-  if (q >= 60) return "text-yellow-600 dark:text-yellow-400 font-bold";
-  if (q >= 40) return "text-orange-600 dark:text-orange-400 font-bold";
-  return "text-red-600 dark:text-red-400 font-bold";
-}
+/* 模式颜色 */
+const modeColor: Record<string, string> = {
+  Beginner: "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400",
+  Student: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+  Research: "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
+};
 
 const modeKey: Record<string, string> = {
   Beginner: "beginnerModeLabel",
@@ -61,14 +47,14 @@ function OverviewCard({ analysis }: { analysis: any }) {
     { label: t("channelCount"), value: analysis.channel_count ?? "-" },
     { label: t("samplingRate"), value: analysis.sampling_rate ?? "-" },
     { label: t("duration"),     value: formatDuration(analysis, t) },
-    { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(0) : "-" },
+    { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(6).replace(/\.?0+$/, '') : "-" },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       {items.map((it) => (
-        <div key={it.label} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:p-4 shadow-sm">
-          <div className="text-[10px] sm:text-xs text-[var(--color-text-secondary)]">{it.label}</div>
-          <div className="mt-1 truncate text-xs sm:text-sm font-bold text-[var(--color-text)]">{String(it.value)}</div>
+        <div key={it.label} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+          <div className="text-xs text-[var(--color-text-secondary)]">{it.label}</div>
+          <div className="mt-1 truncate text-sm font-bold text-[var(--color-text)]">{String(it.value)}</div>
         </div>
       ))}
     </div>
@@ -138,29 +124,17 @@ function ExplanationCards({ analysis }: { analysis: any }) {
         ))}
       </div>
 
-      {/* Confidence + Limitations */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-          <div className="text-sm font-bold text-[var(--color-text)]">{t("interpretationConfidence")}</div>
-          <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            {(() => {
-              const lvl = analysis.confidence?.level;
-              if (!lvl) return "-";
-              const k = `confidence${lvl}`;
-              const l = t(k);
-              return l === k ? lvl : l;
-            })()}
+      {/* Signal Quality Hint */}
+      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          {t("confidenceHint")}
+        </p>
+        {analysis?.signal_quality_score != null && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-[var(--color-text-secondary)]">{t("signalQuality_score")}:</span>
+            <span className={`text-sm font-bold ${analysis.signal_quality_score >= 70 ? "text-green-600 dark:text-green-400" : analysis.signal_quality_score >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>{Number(analysis.signal_quality_score).toFixed(2)}/100</span>
           </div>
-          <div className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{analysis.confidence?.reason || ""}</div>
-        </div>
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 lg:col-span-2">
-          <div className="text-sm font-bold text-[var(--color-text)]">{t("whatDataCannotTell")}</div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--color-text-secondary)]">
-            {(analysis.limitations || []).map((x: string, i: number) => (
-              <li key={i}>{x}</li>
-            ))}
-          </ul>
-        </div>
+        )}
       </div>
 
       {/* Disclaimer */}
@@ -177,11 +151,7 @@ function ExplanationCards({ analysis }: { analysis: any }) {
 function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string, string> | undefined }) {
   const { t } = useLang();
   if (!bandpowerPercent || Object.keys(bandpowerPercent).length === 0) return null;
-  // 固定频段展示顺序：α β δ θ γ（a, b, d, t, g）
-  const BAND_DISPLAY_ORDER = ["alpha", "beta", "delta", "theta", "gamma"];
-  const entries = BAND_DISPLAY_ORDER
-    .filter((b) => bandpowerPercent[b] !== undefined)
-    .map((b) => [b, bandpowerPercent[b]] as [string, string]);
+  const entries = Object.entries(bandpowerPercent);
   const maxVal = Math.max(...entries.map(([, v]) => parseFloat(v)), 1);
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
@@ -198,11 +168,10 @@ function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string,
                   style={{
                     width: `${Math.min((num / maxVal) * 100, 100)}%`,
                     backgroundColor:
-                      band === "delta" ? "#ef4444" :
-                      band === "alpha" ? "#3b82f6" :
-                      band === "theta" ? "#facc15" :
-                      band === "beta"  ? "#22c55e" :
-                      band === "gamma" ? "#a855f7" : "#ef4444",
+                      band === "delta" ? "#8b5cf6" :
+                      band === "theta" ? "#06b6d4" :
+                      band === "alpha" ? "#10b981" :
+                      band === "beta"  ? "#f59e0b" : "#ef4444",
                   }}
                 />
               </div>
@@ -218,8 +187,6 @@ function BandpowerChart({ bandpowerPercent }: { bandpowerPercent: Record<string,
 /* ── 导出 PDF：新窗口打开报告 HTML 再打印 ─────────────────────── */
 
 function buildReportHtml(report: StoredReport, lang: string, t: (key: string) => string): string {
-  const esc = (s: any): string =>
-    String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const a = report.analysis as any;
   const bp = a?.bandpower as Record<string, number> | undefined;
   const scores = a?.eeg_literacy_scores as Record<string, number> | undefined;
@@ -246,7 +213,7 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>NeuroAccess Report - ${esc(report.fileName)}</title>
+<title>NeuroAccess Report - ${report.fileName}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; background: #fff; padding: 40px; max-width: 900px; margin: 0 auto; }
@@ -286,13 +253,13 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
 </head>
 <body>
   <h1>NeuroAccess EEG Report</h1>
-  <p class="subtitle">${esc(report.fileName)} &nbsp;·&nbsp; ${esc(report.date)}</p>
+  <p class="subtitle">${report.fileName} &nbsp;·&nbsp; ${report.date}</p>
 
   <div class="meta-grid">
-    <div class="meta-item"><div class="meta-label">${t("fileName")}</div><div class="meta-value">${esc(report.fileName)}</div></div>
-    <div class="meta-item"><div class="meta-label">${t("date")}</div><div class="meta-value">${esc(report.date)}</div></div>
-    <div class="meta-item"><div class="meta-label">${t("mode")}</div><div class="meta-value">${esc(t(modeKey[report.mode] || report.mode))}</div></div>
-    <div class="meta-item"><div class="meta-label">${t("signalQuality")}</div><div class="meta-value">${a?.signal_quality_score != null ? Number(Number(a.signal_quality_score).toFixed(3)) : "-"}</div></div>
+    <div class="meta-item"><div class="meta-label">${t("fileName")}</div><div class="meta-value">${report.fileName}</div></div>
+    <div class="meta-item"><div class="meta-label">${t("date")}</div><div class="meta-value">${report.date}</div></div>
+    <div class="meta-item"><div class="meta-label">${t("mode")}</div><div class="meta-value">${report.mode}</div></div>
+    <div class="meta-item"><div class="meta-label">${t("signalQuality")}</div><div class="meta-value">${a?.signal_quality_score != null ? Number(Number(a.signal_quality_score).toFixed(2)) : "-"}</div></div>
     <div class="meta-item"><div class="meta-label">${t("channelCount")}</div><div class="meta-value">${a?.channel_count ?? "-"}</div></div>
     <div class="meta-item"><div class="meta-label">${t("samplingRate")}</div><div class="meta-value">${a?.sampling_rate ?? "-"} Hz</div></div>
   </div>
@@ -303,8 +270,8 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
     ${Object.entries(bp).map(([band, value]) => {
       const max = Math.max(...Object.values(bp));
       const pct = max > 0 ? (Number(value) / max) * 100 : 0;
-      const color = band === "delta" ? "#ef4444" : band === "alpha" ? "#3b82f6" : band === "theta" ? "#facc15" : band === "beta" ? "#22c55e" : band === "gamma" ? "#a855f7" : "#ef4444";
-      return `<div class="bp-row"><span class="bp-label">${esc(band)}</span><div class="bp-bar"><div class="bp-fill" style="width:${pct}%;background:${color}"></div></div><span class="bp-val">${Number(value).toFixed(1)}</span></div>`;
+      const color = band === "delta" ? "#8b5cf6" : band === "theta" ? "#06b6d4" : band === "alpha" ? "#10b981" : band === "beta" ? "#f59e0b" : "#ef4444";
+      return `<div class="bp-row"><span class="bp-label">${band}</span><div class="bp-bar"><div class="bp-fill" style="width:${pct}%;background:${color}"></div></div><span class="bp-val">${Number(value).toFixed(1)}</span></div>`;
     }).join("")}
   </div>` : ""}
 
@@ -315,18 +282,18 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
       const v = scores[it.key] ?? 0;
       const barColors = ["#3b82f6","#10b981","#8b5cf6","#f59e0b","#f43f5e"];
       const idx = scoreList.indexOf(it);
-      return `<div class="score-row"><span class="score-label">${esc(it.label)}</span><div class="score-bar"><div class="score-fill" style="width:${Math.min(100,Math.max(0,v))}%;background:${barColors[idx]}"></div></div><span class="score-val">${v}</span></div>`;
+      return `<div class="score-row"><span class="score-label">${it.label}</span><div class="score-bar"><div class="score-fill" style="width:${Math.min(100,Math.max(0,v))}%;background:${barColors[idx]}"></div></div><span class="score-val">${v}</span></div>`;
     }).join("")}
   </div>` : ""}
 
   ${explanations ? `
   <h2>Interpretations</h2>
   <div style="margin-bottom:20px">
-    ${expCards.map(c => `<div class="exp-card"><div class="exp-hint">${esc(c.hint)}</div><div class="exp-title">${esc(c.label)}</div><div class="exp-text">${esc(explanations[c.key] || "-")}</div></div>`).join("")}
+    ${expCards.map(c => `<div class="exp-card"><div class="exp-hint">${c.hint}</div><div class="exp-title">${c.label}</div><div class="exp-text">${explanations[c.key] || "-"}</div></div>`).join("")}
   </div>
-  <div class="two-col">
-    <div class="confidence-box"><div class="box-title">${esc(t("interpretationConfidence"))}</div><div class="box-text">${a?.confidence?.level ? (() => { const k = `confidence${a.confidence.level}`; const l = t(k); return esc(l === k ? a.confidence.level : l); })() : "-"}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${esc(a?.confidence?.reason || "")}</div></div>
-    <div class="limitations-box"><div class="box-title">${esc(t("whatDataCannotTell"))}</div><ul style="padding-left:18px;font-size:12px;color:#374151;line-height:1.7">${(a?.limitations || []).map((x: any)=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+  <div class="confidence-box" style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px">
+    <div style="font-size:12px;color:#6b7280;line-height:1.6">${t("confidenceHint")}</div>
+    ${a?.signal_quality_score != null ? `<div style="font-size:12px;color:#6b7280;margin-top:6px">Signal Quality: ${Number(a.signal_quality_score).toFixed(2)}/100</div>` : ""}
   </div>` : ""}
 
   ${disclaimer ? `<div class="disclaimer"><strong>${t("nonMedicalDisclaimer")}：</strong>${disclaimer}</div>` : ""}
@@ -347,31 +314,36 @@ function buildReportHtml(report: StoredReport, lang: string, t: (key: string) =>
 
 /* ── Reports Page ─────────────────────────────────────────────── */
 
-type ReportFilter = "all" | "favorites" | "eeg";
+type ReportFilter = "all" | "analysis" | "eeg";
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<StoredReport[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [reports, setReports] = useState<StoredReport[]>(() => {
+    try { return loadReports(); } catch { return []; }
+  });
   const [selected, setSelected] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<StoredReport | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
-  const [showFormula, setShowFormula] = useState(false);
   const [filter, setFilter] = useState<ReportFilter>("all");
   const { lang, t } = useLang();
   const { user, loading } = useAuth();
-  const router = useRouter();
 
-  // 加载时从 localStorage 读取报告
+  // 加载时从 localStorage 读取报告 + 每2秒自动刷新
   useEffect(() => {
     if (!loading) {
-      setReports(loadReports());
-      try { setFavorites(getFavorites()); } catch {}
-      // 与服务器对账：服务器为真相源，排除已删 id、丢弃本地残留（已删/过期快照）
-      reconcileReportsWithServer().then((merged) => {
-        if (merged !== null) setReports(merged);
-      });
+      const reports = loadReports();
+      console.log(`[ReportsPage] loaded ${reports.length} reports:`, reports.map(r => ({ id: r.id, name: r.fileName })));
+      setReports(reports);
+      const interval = setInterval(() => {
+        const fresh = loadReports();
+        console.log(`[ReportsPage] refresh: ${fresh.length} reports`);
+        setReports(fresh);
+      }, 2000);
+      return () => clearInterval(interval);
     }
   }, [loading]);
+
+  // 诊断：显示当前 reports 状态
+  console.log(`[ReportsPage] render: ${reports.length} reports, ids: ${reports.map(r => r.id).join(",")}`);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
@@ -381,8 +353,8 @@ export default function ReportsPage() {
 
   const filteredReports = reports.filter((r) => {
     if (filter === "all") return true;
-    if (filter === "favorites") return favorites.includes(r.id);
-    if (filter === "eeg") return !!(r.hasEegData || r.eegData);
+    if (filter === "analysis") return true;
+    if (filter === "eeg") return !!r.eegData;
     return true;
   });
 
@@ -410,32 +382,27 @@ export default function ReportsPage() {
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
-    const id = deleteTarget.id;
-    // 本地记录已删 id（永久保留，不再清除），服务器也会记录删除墓碑 → 已删报告不会被拉回
-    markDeleted(id);
-    setReports((prev) => prev.filter((r) => r.id !== id));
-    deleteReportFromStorage(id);
-    deleteServerReport(id).catch(() => {});
-    setSelected((prev) => prev.filter((x) => x !== id));
+    setReports((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+    deleteReportFromStorage(deleteTarget.id);
+    setSelected((prev) => prev.filter((id) => id !== deleteTarget.id));
     setDeleteTarget(null);
   };
 
   const confirmBatchDelete = () => {
     setReports((prev) => prev.filter((r) => !selected.includes(r.id)));
-    selected.forEach((id) => {
-      markDeleted(id);
-      deleteReportFromStorage(id);
-      deleteServerReport(id).catch(() => {});
-    });
+    selected.forEach((id) => deleteReportFromStorage(id));
     setSelected([]);
     setBatchDeleteOpen(false);
   };
 
-  const handleCompare = () => {
-    if (selected.length === 2) {
-      sessionStorage.setItem("neuroaccess-compare-ids", JSON.stringify(selected));
-      router.push("/reports/compare");
-    }
+  const statCards = [
+    { labelKey: "totalReports", value: filteredReports.length, icon: FileText },
+  ];
+
+  const forceRefresh = () => {
+    const fresh = loadReports();
+    console.log(`[ReportsPage] manual refresh: ${fresh.length} reports`, fresh.map(r => ({ id: r.id, name: r.fileName })));
+    setReports(fresh);
   };
 
   if (loading) {
@@ -474,95 +441,52 @@ export default function ReportsPage() {
     >
       <section className="mx-auto max-w-6xl px-3 sm:px-5 py-4 sm:py-8 pb-[env(safe-area-inset-bottom,16px)]">
         {/* 标题栏 */}
-        <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{t("reportsTitle")}</h1>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{t("reportsSubtitle")}</p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-[var(--color-text)]">{reports.length}</span>
-              <span className="text-sm text-[var(--color-text-secondary)]">{t("totalReports") || "总报告数"}</span>
-            </div>
           </div>
           <div className="flex items-center gap-2">
-            {selected.length === 2 ? (
+            {selected.length > 0 ? (
               <button
-                onClick={handleCompare}
-                className="flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-medium text-[var(--color-surface)] shadow-lg shadow-[var(--color-primary)]/10 transition-all duration-300 hover:opacity-90"
+                onClick={() => setBatchDeleteOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-red-600/10 transition-all duration-300 hover:bg-red-700"
               >
-                <GitCompare className="h-4 w-4" />
-                {t("compareSelected")}
+                <Trash2 className="h-4 w-4" />
+                {t("batchDeleteCount").replace("{count}", String(selected.length))}
               </button>
-            ) : (
-              <Link
-                href="/reports/compare"
-                className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
-              >
-                <GitCompare className="h-4 w-4" />
-                {t("compareReports")}
-              </Link>
-            )}
-            <button onClick={() => setShowFormula(true)} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]">
-              {t("scoringLogic")}
+            ) : null}
+            {/* 手动刷新按钮 */}
+            <button
+              onClick={forceRefresh}
+              className="flex items-center gap-2 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)]"
+              title="Force refresh reports"
+            >
+              ↻ Refresh
             </button>
           </div>
         </div>
 
-        {/* 统计卡片已移除 */}
-
-        {/* 筛选栏 */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <button
-            onClick={() => setFilter("all")}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-              filter === "all"
-                ? "bg-amber-500 text-white"
-                : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-            }`}
-          >
-            {t("allReports") || "All"}
-          </button>
-          <button
-            onClick={() => setFilter("favorites")}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-              filter === "favorites"
-                ? "bg-amber-500 text-white"
-                : "bg-[var(--color-bg)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-            }`}
-          >
-            <Star className={`inline h-3 w-3 mr-1 ${filter === "favorites" ? "fill-current" : ""}`} />
-            {t("favorites") || "Favorites"}
-          </button>
-          {selected.length > 0 && (
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const next = new Set(favorites);
-                  const allSelected = selected.every((id) => next.has(id));
-                  if (allSelected) {
-                    selected.forEach((id) => next.delete(id));
-                  } else {
-                    selected.forEach((id) => next.add(id));
-                  }
-                  const list = Array.from(next);
-                  saveFavorites(list);
-                  setFavorites(list);
-                }}
-                className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition-colors"
-                title={t("batchFavorite") || "批量收藏"}
+        {/* 统计卡片 */}
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {statCards.map((card, i) => {
+            const Icon = card.icon;
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.0125 }}
+                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
               >
-                <Star className="h-3 w-3" />
-                {t("batchFavorite") || "批量收藏"}
-              </button>
-              <button
-                onClick={() => setBatchDeleteOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 transition-colors"
-                title={t("delete") || "批量删除"}
-              >
-                <Trash2 className="h-3 w-3" />
-                {t("batchDeleteCount").replace("{count}", String(selected.length))}
-              </button>
-            </div>
-          )}
+                <div className="mb-2 flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                  <span className="text-xs text-[var(--color-text-secondary)]">{t(card.labelKey)}</span>
+                </div>
+                <div className="text-xl font-bold text-[var(--color-text)]">{card.value}</div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* 报告列表 */}
@@ -579,7 +503,7 @@ export default function ReportsPage() {
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
             {/* 表头 — 桌面端显示，移动端隐藏 */}
-            <div className="hidden sm:grid grid-cols-[40px_1fr_140px_80px_100px_120px] gap-4 px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)]">
+            <div className="hidden sm:grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)]">
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -590,8 +514,7 @@ export default function ReportsPage() {
               </div>
               <div>{t("fileName")}</div>
               <div>{t("date")}</div>
-              <div className="text-center">{t("duration") || "时长"}</div>
-              <div className="text-center">{t("quality")}</div>
+              <div>{t("quality")}</div>
               <div className="text-right">{t("actions")}</div>
             </div>
 
@@ -604,7 +527,7 @@ export default function ReportsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                   transition={{ delay: i * 0.0125 }}
-                  className="sm:grid grid-cols-[40px_1fr_140px_80px_100px_120px] gap-4 px-5 py-3.5 border-t border-[var(--color-border)] hover:bg-[var(--color-bg)]/50 transition-colors items-center"
+                  className="sm:grid grid-cols-[40px_1fr_140px_100px_120px] gap-4 px-5 py-3.5 border-t border-[var(--color-border)] hover:bg-[var(--color-bg)]/50 transition-colors items-center"
                 >
                   {/* 移动端：卡片式布局 */}
                   <div className="sm:hidden flex flex-col gap-2 w-full">
@@ -620,31 +543,19 @@ export default function ReportsPage() {
                         <FileText className="h-4 w-4 flex-shrink-0 text-[var(--color-text-secondary)]" />
                         <span className="truncate text-sm font-mono">{report.fileName}</span>
                       </div>
-                      <div className="flex items-center justify-center flex-shrink-0">
-                        <span className={`text-sm ${scoreColor(report.quality)}`}>
-                          {report.quality != null ? Number(report.quality).toFixed(0) : "-"}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
+                        <span className={`text-xs font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                          {Number(report.quality).toFixed(2)}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between pl-8">
                       <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
                         <Calendar className="h-3 w-3" />
-                        <span>{report.date}</span>
-                        <span>·</span>
-                        <span>{formatDuration(report.analysis, t)}</span>
+                        {report.date}
                       </div>
                       <div className="flex items-center gap-0.5">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const next = toggleFavorite(report.id);
-                            setFavorites((prev) => next ? [...prev, report.id] : prev.filter((x) => x !== report.id));
-                          }}
-                          className={`rounded-lg p-1.5 transition-colors ${favorites.includes(report.id) ? "text-amber-500" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-amber-500"}`}
-                          title="Favorite"
-                        >
-                          <Star className={`h-3.5 w-3.5 ${favorites.includes(report.id) ? "fill-current" : ""}`} />
-                        </button>
                         <Link href={`/reports/${report.id}`} onClick={(e) => e.stopPropagation()} className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]" title={t("viewDetail")}>
                           <Eye className="h-3.5 w-3.5" />
                         </Link>
@@ -675,26 +586,13 @@ export default function ReportsPage() {
                     <Calendar className="h-3 w-3" />
                     {report.date}
                   </div>
-                  <div className="flex items-center justify-center text-xs text-[var(--color-text-secondary)]">
-                    {formatDuration(report.analysis, t)}
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <span className={`text-sm ${scoreColor(report.quality)}`}>
-                      {report.quality != null ? Number(report.quality).toFixed(0) : "-"}
+                  <div className="flex items-center gap-1.5">
+                    <div className={`h-2 w-2 rounded-full ${report.quality >= 70 ? "bg-green-500" : report.quality >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
+                    <span className={`text-sm font-medium ${report.quality >= 70 ? "text-green-600 dark:text-green-400" : report.quality >= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                      {Number(report.quality).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const next = toggleFavorite(report.id);
-                        setFavorites((prev) => next ? [...prev, report.id] : prev.filter((x) => x !== report.id));
-                      }}
-                      className={`rounded-lg p-2 transition-colors ${favorites.includes(report.id) ? "text-amber-500" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-amber-500"}`}
-                      title="Favorite"
-                    >
-                      <Star className={`h-4 w-4 ${favorites.includes(report.id) ? "fill-current" : ""}`} />
-                    </button>
                     <Link href={`/reports/${report.id}`} onClick={(e) => e.stopPropagation()} className="rounded-lg p-2 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] inline-flex" title={t("viewDetail")}>
                       <Eye className="h-4 w-4" />
                     </Link>
@@ -711,22 +609,6 @@ export default function ReportsPage() {
             </AnimatePresence>
           </div>
         )}
-
-        {/* 浮动对比按钮：选 2 个时显示 */}
-        <AnimatePresence>
-          {false && selected.length === 2 && (
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              onClick={() => router.push(`/reports/compare?ids=${selected[0]},${selected[1]}`)}
-              className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] px-5 py-3 text-sm font-semibold text-white shadow-2xl hover:opacity-90 transition-opacity"
-            >
-              <GitCompare className="h-4 w-4" />
-              {t("compareReports") || "对比选中的 2 个报告"}
-            </motion.button>
-          )}
-        </AnimatePresence>
       </section>
 
       {/* 批量删除确认弹窗 */}
@@ -814,48 +696,6 @@ export default function ReportsPage() {
                   {t("confirm")}
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Scoring Formula Modal */}
-      <AnimatePresence>
-        {showFormula && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowFormula(false)}
-          >
-            <motion.div
-              className="mx-4 w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-6 shadow-2xl"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="mb-4 text-lg font-bold text-[var(--color-text)]">{t("scoringLogic")}</h3>
-              <div className="space-y-3 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                <p className="font-mono text-[var(--color-text)]">{t("scoringFormulaDesc")}</p>
-                <p>{t("scoringNoiseDesc")}</p>
-                <p>{t("scoringArtifactDesc")}</p>
-                <p className="font-semibold text-[var(--color-text)]">{t("scoringRangeTitle")}</p>
-                <ul className="list-inside list-disc space-y-1">
-                  <li>{t("scoringRangeExcellent")}</li>
-                  <li>{t("scoringRangeGood")}</li>
-                  <li>{t("scoringRangeFair")}</li>
-                  <li>{t("scoringRangePoor")}</li>
-                  <li>{t("scoringRangeBad")}</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => setShowFormula(false)}
-                className="mt-5 w-full rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg)]"
-              >
-                {t("close")}
-              </button>
             </motion.div>
           </motion.div>
         )}

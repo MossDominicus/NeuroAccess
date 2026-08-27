@@ -49,7 +49,21 @@ export default function SurveyPanel() {
 
   // Check if already submitted (local + server)
   useEffect(() => {
-    if (loadSurvey()) { setSubmitted(true); return; }
+    const local = loadSurvey();
+    if (local) {
+      setSubmitted(true);
+      // 本地已有问卷但服务器可能未收到 → 幂等补传
+      const token = typeof window !== "undefined" ? localStorage.getItem("neuroaccess-token") : null;
+      if (token) {
+        fetch("/api/survey/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(local),
+        }).then(r => r.json()).then(d => { if (d?.success) console.log("[Survey] resync ok"); })
+          .catch(() => {});
+      }
+      return;
+    }
     const token = typeof window !== "undefined" ? localStorage.getItem("neuroaccess-token") : null;
     if (!token) return;
     fetch("/api/survey/status", { headers: { Authorization: `Bearer ${token}` } })
@@ -84,7 +98,7 @@ export default function SurveyPanel() {
 
   const allAnswered = q1 && q2 && q3 && q4 && q6;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!allAnswered) return;
     const data = {
       q1: getEffectiveQ1(),
@@ -98,20 +112,25 @@ export default function SurveyPanel() {
     };
     saveSurvey(data);
     const token = typeof window !== "undefined" ? localStorage.getItem("neuroaccess-token") : null;
-    fetch("/api/survey/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(data),
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (!d?.success) console.warn("[Survey] submit:", d?.error);
-        else console.log("[Survey] saved");
-      })
-      .catch((e) => console.warn("[Survey] submit failed:", e));
+    try {
+      const r = await fetch("/api/survey/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      const d = await r.json().catch(() => null);
+      if (d?.success === true) {
+        console.log("[Survey] saved");
+      } else {
+        // 服务器未确认：本地已保存，稍后挂载时会自动补传
+        console.warn("[Survey] submit pending, saved locally:", d?.error);
+      }
+    } catch (e) {
+      console.warn("[Survey] submit failed, saved locally:", e);
+    }
     setSubmitted(true);
   };
 

@@ -16,15 +16,24 @@ import {
   Check,
 } from "lucide-react";
 import { useLang } from "@/lib/language-context";
+import { formatDuration } from "@/lib/duration";
 import { useAuth } from "@/lib/auth-context";
-import { StoredReport } from "@/lib/reports-storage";
+import { StoredReport, loadReports, fetchServerReport } from "@/lib/reports-storage";
+import { isPlaceholderSvg } from "@/lib/waveform-svg";
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
+const modeKey: Record<string, string> = {
+  Beginner: "beginnerModeLabel",
+  Student: "studentModeLabel",
+  Research: "researchModeLabel",
+};
+
 function scoreColor(q: number | null | undefined): string {
   if (q == null) return "text-[var(--color-text-secondary)]";
-  if (q >= 70) return "text-emerald-600 dark:text-emerald-400 font-bold";
-  if (q >= 50) return "text-yellow-600 dark:text-yellow-400 font-bold";
+  if (q >= 80) return "text-emerald-600 dark:text-emerald-400 font-bold";
+  if (q >= 60) return "text-yellow-600 dark:text-yellow-400 font-bold";
+  if (q >= 40) return "text-orange-600 dark:text-orange-400 font-bold";
   return "text-red-600 dark:text-red-400 font-bold";
 }
 
@@ -83,11 +92,15 @@ export default function ComparePage() {
   useEffect(() => {
     if (!loading) {
       try {
-        const stored = JSON.parse(
-          localStorage.getItem("neuroaccess-reports") || "[]"
-        );
-        const list = Array.isArray(stored) ? stored : [];
+        const list = loadReports();
         setReports(list);
+        // 直接进入 /reports/compare 时本地缓存可能还没同步（reconcile 在报告列表页/登录时执行），
+        // 这里主动做一次服务端对账，确保下拉框有报告可选。
+        import("@/lib/reports-storage").then(({ reconcileReportsWithServer }) =>
+          reconcileReportsWithServer().then((merged) => {
+            if (merged !== null) setReports(merged);
+          })
+        ).catch(() => {});
 
         // 优先级 1: URL ?ids=xxx,yyy 参数
         const urlIds = (searchParams?.get("ids") || "").split(",").filter(Boolean);
@@ -122,6 +135,29 @@ export default function ComparePage() {
     () => reports.find((r) => r.id === selB) || null,
     [reports, selB]
   );
+
+  // 列表里的报告是轻量摘要（无波形）。选中后若缺 waveform_preview，
+  // 从服务器拉取完整报告补全波形，供 MiniWaveform 渲染。
+  useEffect(() => {
+    let cancelled = false;
+    const ensureFull = async (id: string) => {
+      if (!id || cancelled) return;
+      const cur = reports.find((r) => r.id === id);
+      if (cur && ((cur.analysis as any)?.waveform_preview || cur.eegData)) return;
+      const full = await fetchServerReport(id).catch(() => null);
+      if (!cancelled && full?.analysis) {
+        setReports((prev) =>
+          prev.map((r) =>
+            r.id === id ? { ...r, analysis: full.analysis, eegData: full.eegData } : r
+          )
+        );
+      }
+    };
+    ensureFull(selA);
+    ensureFull(selB);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selA, selB]);
 
   const availableReports = useMemo(
     () =>
@@ -287,6 +323,18 @@ export default function ComparePage() {
           </div>
         </div>
 
+        {/* 交换 A/B 按钮：把右侧报告放到左边（或反之），让用户决定哪份在右边 */}
+        {reportA && reportB && (
+          <div className="-mt-2 mb-6 flex justify-center">
+            <button
+              onClick={() => { setSelA(selB); setSelB(selA); }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text)]"
+            >
+              <GitCompare className="h-3.5 w-3.5" /> {t("swapAB") || "交换 A/B"}
+            </button>
+          </div>
+        )}
+
         {/* Comparison content */}
         <AnimatePresence>
           {reportA && reportB ? (
@@ -417,10 +465,8 @@ export default function ComparePage() {
                         },
                         {
                           label: t("duration"),
-                          a:
-                            (reportA.analysis as any)?.duration ?? "-",
-                          b:
-                            (reportB.analysis as any)?.duration ?? "-",
+                          a: formatDuration(reportA.analysis, t),
+                          b: formatDuration(reportB.analysis, t),
                         },
                         {
                           label: t("date"),
@@ -429,8 +475,8 @@ export default function ComparePage() {
                         },
                         {
                           label: t("mode"),
-                          a: reportA.mode,
-                          b: reportB.mode,
+                          a: t(modeKey[reportA.mode] || reportA.mode),
+                          b: t(modeKey[reportB.mode] || reportB.mode),
                         },
                       ] as { label: string; a: any; b: any }[]).map(
                         (row, i) => (
@@ -455,10 +501,18 @@ export default function ComparePage() {
                 </div>
               </section>
 
-              {/* ── Bandpower comparison ─────────────────────── */}
+              {/* ── Bandpower comparison (百分比，跨文件可比) ───── */}
               {(() => {
-                const bpA = getBandpower(reportA);
-                const bpB = getBandpower(reportB);
+                // 用 bandpower_percent（百分比）对比：绝对功率受幅值/量纲影响（模拟器 vs 真实差异巨大），
+                // 百分比是频段占比，跨文件可比，且与报告详情页一致
+                const pctA = getBandpowerPercent(reportA);
+                const pctB = getBandpowerPercent(reportB);
+                const bpA: Record<string, number> = {};
+                const bpB: Record<string, number> = {};
+                for (const b of Object.keys(bandLabels)) {
+                  bpA[b] = parseFloat(String((pctA as any)[b] || 0)) || 0;
+                  bpB[b] = parseFloat(String((pctB as any)[b] || 0)) || 0;
+                }
                 const bpAll = { ...bpA, ...bpB };
                 if (Object.keys(bpAll).length === 0) return null;
 
@@ -474,115 +528,71 @@ export default function ComparePage() {
                         <BarChart3 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                       </div>
                       <h2 className="text-base font-bold">
-                        {t("bandpower")}
+                        {t("bandpower")} (%)
                       </h2>
                     </div>
 
-                    <div className="space-y-4">
-                      {(() => {
-                        const allBpVals = bandKeys.flatMap((b) => [
-                          bpA[b] || 0,
-                          bpB[b] || 0,
-                        ]);
-                        const globalMax = Math.max(...allBpVals, 1);
-                        return bandKeys.map((band) => {
-                          const valA = bpA[band] || 0;
-                          const valB = bpB[band] || 0;
-                          const max = globalMax;
-                          return (
-                          <div key={band}>
-                            <div className="mb-1 flex items-center gap-2">
-                              <span className="w-14 text-xs font-medium capitalize text-[var(--color-text-secondary)]">
-                                {band}
-                              </span>
-                              <span className="text-[10px] tabular-nums text-[var(--color-text-secondary)]">
-                                A: {Number(valA).toFixed(1)}
-                              </span>
-                              <span className="text-[10px] tabular-nums text-[var(--color-text-secondary)]">
-                                B: {Number(valB).toFixed(1)}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              {/* Report A bar */}
-                              <div className="h-3 flex-1 overflow-hidden rounded-full bg-[var(--color-border)]">
-                                <motion.div
-                                  className="h-full rounded-full"
-                                  initial={{ width: 0 }}
-                                  animate={{
-                                    width: `${Math.min((valA / max) * 100, 100)}%`,
-                                  }}
-                                  transition={{
-                                    duration: 0.6,
-                                    delay: 0.1,
-                                  }}
-                                  style={{
-                                    backgroundColor: bandColors[band],
-                                    opacity: 1,
-                                  }}
-                                />
-                              </div>
-                              {/* Report B bar */}
-                              <div className="h-3 flex-1 overflow-hidden rounded-full bg-[var(--color-border)]">
-                                <motion.div
-                                  className="h-full rounded-full"
-                                  initial={{ width: 0 }}
-                                  animate={{
-                                    width: `${Math.min((valB / max) * 100, 100)}%`,
-                                  }}
-                                  transition={{
-                                    duration: 0.6,
-                                    delay: 0.2,
-                                  }}
-                                  style={{
-                                    backgroundColor: bandColors[band],
-                                    opacity: 0.5,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                    </div>
-
-                    {/* Percent comparison */}
-                    {(() => {
-                      const pctA = getBandpowerPercent(reportA);
-                      const pctB = getBandpowerPercent(reportB);
-                      const pctKeys = bandKeys.filter(
-                        (b) => (pctA as any)[b] || (pctB as any)[b]
-                      );
-                      if (pctKeys.length === 0) return null;
-
-                      return (
-                        <div className="mt-6 border-t border-[var(--color-border)] pt-6">
-                          <div className="mb-3 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-                            {t("bandpowerPercent")}
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                            {pctKeys.map((band) => (
-                              <div
-                                key={band}
-                                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-center"
-                              >
-                                <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-secondary)]">
-                                  {band}
-                                </div>
-                                <div className="flex items-center justify-center gap-2 text-xs">
-                                  <span className="font-mono tabular-nums text-[var(--color-text)]">
-                                    A: {(pctA as any)[band] || "-"}
-                                  </span>
-                                  <span className="font-mono tabular-nums text-[var(--color-text)]">
-                                    B: {(pctB as any)[band] || "-"}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                    {/* 左右两列：A 报告全部频段在左卡片、B 报告全部频段在右卡片 */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      {/* Report A card */}
+                      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+                        <div className="mb-3 text-xs font-medium text-[var(--color-text-secondary)] truncate">
+                          <span className="text-blue-500 font-bold mr-1">A</span>
+                          {t("reportA")}: {reportA.fileName}
                         </div>
-                      );
-                    })()}
+                        <div className="space-y-3">
+                          {bandKeys.map((band) => {
+                            const val = bpA[band] || 0;
+                            return (
+                              <div key={band}>
+                                <div className="mb-1 flex items-center justify-between text-xs">
+                                  <span className="capitalize text-[var(--color-text-secondary)]">{band}</span>
+                                  <span className="font-mono tabular-nums text-[var(--color-text)]">{Number(val).toFixed(1)}%</span>
+                                </div>
+                                <div className="h-2.5 overflow-hidden rounded-full bg-[var(--color-border)]">
+                                  <motion.div
+                                    className="h-full rounded-full"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min(val, 100)}%` }}
+                                    transition={{ duration: 0.6 }}
+                                    style={{ backgroundColor: bandColors[band] }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {/* Report B card */}
+                      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+                        <div className="mb-3 text-xs font-medium text-[var(--color-text-secondary)] truncate">
+                          <span className="text-violet-500 font-bold mr-1">B</span>
+                          {t("reportB")}: {reportB.fileName}
+                        </div>
+                        <div className="space-y-3">
+                          {bandKeys.map((band) => {
+                            const val = bpB[band] || 0;
+                            return (
+                              <div key={band}>
+                                <div className="mb-1 flex items-center justify-between text-xs">
+                                  <span className="capitalize text-[var(--color-text-secondary)]">{band}</span>
+                                  <span className="font-mono tabular-nums text-[var(--color-text)]">{Number(val).toFixed(1)}%</span>
+                                </div>
+                                <div className="h-2.5 overflow-hidden rounded-full bg-[var(--color-border)]">
+                                  <motion.div
+                                    className="h-full rounded-full"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min(val, 100)}%` }}
+                                    transition={{ duration: 0.6 }}
+                                    style={{ backgroundColor: bandColors[band], opacity: 0.85 }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 );
               })()}
@@ -687,9 +697,9 @@ export default function ComparePage() {
 
               {/* ── Waveform Preview ─────────────────────────── */}
               {(() => {
-                const hasEegA = !!(reportA as any)?.eegData;
-                const hasEegB = !!(reportB as any)?.eegData;
-                if (!hasEegA && !hasEegB) return null;
+                // 列表接口返回的是轻量摘要（无波形），即使 ensureFull 补全失败，
+                // 这里也始终展示"波形对比"区块（内部用服务器 SVG 兜底），避免区块空白。
+                if (!reportA && !reportB) return null;
 
                 return (
                   <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
@@ -703,14 +713,14 @@ export default function ComparePage() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      {hasEegA && (
+                      {reportA && (
                         <MiniWaveform
                           report={reportA}
                           label={t("reportA")}
                           color="#3b82f6"
                         />
                       )}
-                      {hasEegB && (
+                      {reportB && (
                         <MiniWaveform
                           report={reportB}
                           label={t("reportB")}
@@ -752,8 +762,14 @@ function MiniWaveform({
   color: string;
 }) {
   const { t } = useLang();
-  const eegData = (report as any).eegData;
-  if (!eegData) return null;
+  const wp = (report as any)?.analysis?.waveform_preview;
+  const eegData = wp || null;
+  const hasChannels = !!(eegData?.channels && Object.keys(eegData.channels).length > 0);
+  // 列表摘要是轻量数据（无波形）。本地无波形时回退到服务器 SVG 渲染
+  // （与报告详情波形页 /api/waveform-image 同源，读 DB 全分辨率波形），保证对比页始终能看到波形。
+  const serverSvg = hasChannels
+    ? null
+    : `/api/waveform-image?rid=${encodeURIComponent(report.id)}&page=0&_t=${Date.now()}`;
 
   return (
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
@@ -762,7 +778,16 @@ function MiniWaveform({
           {label}: {report.fileName}
         </span>
       </div>
-      <CanvasWaveform eegData={eegData} color={color} />
+      {hasChannels ? (
+        <CanvasWaveform eegData={eegData} color={color} />
+      ) : serverSvg && !isPlaceholderSvg(serverSvg) ? (
+        <img
+          src={serverSvg}
+          alt={`EEG ${report.fileName}`}
+          className="w-full rounded-lg"
+          style={{ height: 120, background: "var(--color-bg)", objectFit: "cover", objectPosition: "left center" }}
+        />
+      ) : null}
       <div className="mt-2 text-[10px] text-[var(--color-text-secondary)]">
         {t("channelCount")}: {(report.analysis as any)?.channel_count || "-"}
       </div>
@@ -819,6 +844,15 @@ function CanvasWaveform({
       channels = eegData.channels.map((ch: any) =>
         (Array.isArray(ch) ? ch : []).map((v: any) => Number(v) || 0)
       );
+    } else if (
+      eegData?.channels &&
+      typeof eegData.channels === "object" &&
+      !Array.isArray(eegData.channels)
+    ) {
+      // shape: { channels: { name: number[] } }  ← waveform_preview 结构
+      channels = Object.values(eegData.channels as Record<string, number[]>).map(
+        (ch: any) => (Array.isArray(ch) ? ch : []).map((v: any) => Number(v) || 0)
+      );
     } else if (eegData?.data && Array.isArray(eegData.data)) {
       if (Array.isArray(eegData.data[0])) {
         channels = (eegData.data as number[][]).map((ch) =>
@@ -851,8 +885,12 @@ function CanvasWaveform({
       const range = max - min || 1;
       const amp = (channelHeight * 0.35) / range;
 
-      // Draw grid line
-      ctx.strokeStyle = "var(--color-border)";
+      // Draw grid line（canvas 2D 不解析 CSS var，取实际色值）
+      let borderColor = "#e5e7eb";
+      try {
+        borderColor = getComputedStyle(document.documentElement).getPropertyValue("--color-border").trim() || borderColor;
+      } catch {}
+      ctx.strokeStyle = borderColor;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(0, midY);
@@ -863,9 +901,11 @@ function CanvasWaveform({
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      const step = Math.max(1, Math.floor(data.length / w));
+      // 数据点少于像素宽度时把波形拉伸铺满整个区域（短文件不再只占左侧一小截），
+      // 数据点多时按比例采样每个像素列的代表点。
+      const nD = data.length;
       for (let x = 0; x < w; x++) {
-        const idx = Math.min(x * step, data.length - 1);
+        const idx = nD <= 1 ? 0 : Math.min(Math.round((x / Math.max(1, w - 1)) * (nD - 1)), nD - 1);
         const y = midY - (data[idx] - min) * amp + (range * amp) / 2;
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);

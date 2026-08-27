@@ -1,7 +1,7 @@
 "use client";
 
 import { useLang } from "@/lib/language-context";
-import { User, GraduationCap, Microscope, Shield, AlertTriangle } from "lucide-react";
+import { User, GraduationCap, Microscope } from "lucide-react";
 
 type ExplanationData = {
   explanations?: {
@@ -43,10 +43,35 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
     }
   }
 
-  // disclaimer 兼容字符串和对象
-  const disclaimerText: string = data?.disclaimer
-    ? (typeof data.disclaimer === "string" ? data.disclaimer : (((data.disclaimer as Record<string, string | undefined>)[lang]) || data.disclaimer.en || ""))
-    : "";
+  // 强制三层解释长度严格递增：入门 < 进阶 < 研究。
+  // 旧报告/个别 AI 输出可能低档反而更长（用户多次反馈"学习/进阶档怎么比研究档还长"），
+  // 生成端已尽力保证，但历史固化内容不会自动重排 → 这里在展示端按句截断低档，保证层次不乱。
+  const MODE_ORDER = ["beginner", "student", "research"];
+  function cutBySentence(text: string, maxLen: number): string {
+    if (!text || text.length <= maxLen) return text;
+    const segs = String(text).split(/(?<=[。！？；；\n.!?])/);
+    let buf = "";
+    for (const sg of segs) {
+      if (sg && buf.length + sg.length <= maxLen) buf += sg;
+      else if (sg) break;
+    }
+    const out = buf.trim();
+    return out || (String(text).slice(0, Math.max(1, maxLen)).trim() + "…");
+  }
+  for (let pass = 0; pass < 5; pass++) {
+    let changed = false;
+    for (let i = 1; i < MODE_ORDER.length; i++) {
+      const prevK = MODE_ORDER[i - 1];
+      const curK = MODE_ORDER[i];
+      const prev = explanations[prevK];
+      const cur = explanations[curK];
+      if (prev && cur && prev.length >= cur.length) {
+        explanations[prevK] = cutBySentence(prev, Math.max(30, cur.length - 1));
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
 
   const modes = [
     {
@@ -74,12 +99,6 @@ export default function AIExplanation({ data }: { data: ExplanationData | null |
       iconColor: "text-purple-600 dark:text-purple-400",
     },
   ];
-
-  const levelClass: Record<string, string> = {
-    High: "text-green-700 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-950/30 dark:border-green-800",
-    Moderate: "text-yellow-700 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-950/30 dark:border-yellow-800",
-    Low: "text-red-700 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950/30 dark:border-red-800",
-  };
 
   return (
     <div className="space-y-6">

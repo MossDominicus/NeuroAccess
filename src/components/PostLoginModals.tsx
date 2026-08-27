@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { Shield, ExternalLink } from "lucide-react";
+import { Shield, ExternalLink, LogOut } from "lucide-react";
 
 export default function PostLoginModals() {
   const { t, lang } = useLang();
-  const { user, token, termsAccepted, needsUsernameSetup, acceptTerms, setNeedsUsernameSetup, updateUser } = useAuth();
+  const router = useRouter();
+  const { user, token, termsAccepted, needsUsernameSetup, acceptTerms, setNeedsUsernameSetup, updateUser, logout } = useAuth();
 
   const [showTerms, setShowTerms] = useState(false);
   const [showUsernameSetup, setShowUsernameSetup] = useState(false);
@@ -52,6 +54,8 @@ export default function PostLoginModals() {
         if (agreedDisclaimer) {
           try { localStorage.setItem("neuroaccess-disclaimer-accepted", "true"); } catch {}
         }
+        // 通知已挂载的 DisclaimerModal 立即关闭，避免已打开的弹窗残留
+        try { window.dispatchEvent(new Event("neuroaccess:disclaimer-accepted")); } catch {}
         setShowTerms(false);
         // Check if needs username setup
         if (needsUsernameSetup) {
@@ -227,6 +231,18 @@ export default function PostLoginModals() {
                 ) : (
                   t("acceptTermsBtn")
                 )}
+              </button>
+              {/* 不愿意接受条款的退出入口：清会话并回登录页，避免用户被锁死在弹窗里 */}
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  router.push("/login");
+                }}
+                className="w-full py-2 px-4 rounded-xl border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] text-xs transition-colors flex items-center justify-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                {t("logout") || "退出登录"}
               </button>
             </div>
           </div>

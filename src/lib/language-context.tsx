@@ -112,22 +112,18 @@ export function LanguageProvider({ children, initialLang }: { children: ReactNod
   const [lang, setLangState] = useState<Lang>(initialLang || "en");
   const [isReady, setIsReady] = useState(false);
 
-  // Mount 后检测语言（localStorage 优先 → 系统语言检测）
-  // 如果服务端已传入 initialLang，跳过检测（避免覆盖）
+  // Mount 后应用语言偏好：用户显式保存的 localStorage 优先于 SSR 推断的 initialLang。
+  // （SSR 的 initialLang 只用于首屏初始渲染，避免无 cookie 时 Accept-Language
+  //   覆盖用户已保存的选择。）
   useEffect(() => {
-    if (initialLang) {
-      setIsReady(true);
-      return;
-    }
     try {
-      // 1. 优先：用户已保存的语言偏好（localStorage）
       const saved = localStorage.getItem("neuroaccess-language");
       if (saved && LANGUAGES.includes(saved as Lang)) {
         setLangState(saved as Lang);
         setIsReady(true);
         return;
       }
-      // 2. 无保存值：检测系统语言
+      // 无保存值：检测系统语言（SSR 已按 Accept-Language 推断过，这里兜底）
       const detected = detectSystemLanguage();
       setLangState(detected);
       setIsReady(true);

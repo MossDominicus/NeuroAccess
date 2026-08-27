@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useLang } from "@/lib/language-context";
 
 interface Props {
   siteKey: string;
@@ -10,9 +11,11 @@ interface Props {
 }
 
 export default function TurnstileModal({ siteKey, open, onVerify, onClose }: Props) {
+  const { t } = useLang();
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const cbName = useRef(`__turnstile_cb_${Date.now()}`);
+  const expName = useRef(`__turnstile_exp_${Date.now()}`);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -22,8 +25,18 @@ export default function TurnstileModal({ siteKey, open, onVerify, onClose }: Pro
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       onVerify(token);
     };
+    // token 过期/失效：重置控件并清空隐藏输入，提示用户重新验证。
+    // 不要复用成功回调——否则会把 undefined token 发去登录/注册（后端拒绝→弹窗闪烁）。
+    const doExpired = () => {
+      if (widgetId.current && (window as any).turnstile) {
+        try { (window as any).turnstile.reset(widgetId.current); } catch {}
+      }
+      const resp = containerRef.current?.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
+      if (resp) { try { resp.value = ""; } catch {} }
+    };
 
     (window as any)[cbName.current] = doVerify;
+    (window as any)[expName.current] = doExpired;
 
     const renderWidget = () => {
       if (!containerRef.current) return;
@@ -33,7 +46,9 @@ export default function TurnstileModal({ siteKey, open, onVerify, onClose }: Pro
         widgetId.current = (window as any).turnstile.render(containerRef.current, {
           sitekey: siteKey,
           callback: cbName.current,
-          "expired-callback": cbName.current,
+          "expired-callback": expName.current,
+          "error-callback": expName.current,
+          size: "flexible",
           theme: "auto",
         });
         // 轮询 hidden input，兜底 callback 不触发的情况
@@ -69,21 +84,22 @@ export default function TurnstileModal({ siteKey, open, onVerify, onClose }: Pro
         widgetId.current = null;
       }
       delete (window as any)[cbName.current];
+      delete (window as any)[expName.current];
     };
   }, [open, siteKey]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[var(--color-surface)] rounded-2xl p-8 shadow-2xl border border-[var(--color-border)] max-w-sm w-full mx-4 text-center relative">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-[var(--color-surface)] rounded-2xl p-4 sm:p-6 shadow-2xl border border-[var(--color-border)] max-w-sm w-full text-center relative max-h-[90vh] overflow-y-auto">
         <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mx-auto mb-3">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-primary)]"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
         </div>
-        <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">人机验证</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">{t("humanVerification")}</h3>
         <div ref={containerRef} className="flex justify-center" />
         {onClose && (
-          <button onClick={onClose} className="mt-4 px-4 py-2 rounded-xl text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">取消</button>
+          <button onClick={onClose} className="mt-4 px-4 py-2 rounded-xl text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">{t("cancel")}</button>
         )}
       </div>
     </div>

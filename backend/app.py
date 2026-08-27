@@ -6,6 +6,7 @@ NeuroAccess Backend v2.0 — 快速分析架构
 """
 import os
 import sys
+import math
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 import concurrent.futures
@@ -85,14 +86,50 @@ def _check_code_rate_limit(key: str, cooldown_sec: int = 3) -> bool:
         _code_rate_limit[key] = now
         return True
 
-def _bg_generate_explanations(aid: str, enhanced: Dict, lang: str):
-    """后台线程：生成 AI 解释并存入缓存"""
+def _bg_generate_explanations(aid: str, enhanced: Dict, lang: str, report_payload=None):
+    """后台线程：生成 AI 解释并存入缓存；解释完成后把报告落库（含全分辨率波形）。
+
+    report_payload 为 /api/analyze 构建的完整报告（analysis 目前是模板解释）。
+    生成完成后用 AI 解释替换 analysis.explanations 再入库 —— 保证报告列表里
+    只会出现"AI 解释已就绪"的报告，不会出现"解释还在生成"的半成品。
+    即使生成失败，也会用模板解释入库，保证用户的分析结果不丢失。
+    """
+    def _save_report(payload: Dict):
+        try:
+            if not payload:
+                return
+            _conn = get_db()
+            _conn.execute(
+                """INSERT INTO reports (id, user_id, file_name, date, mode, quality, language, data)
+                   VALUES (?,?,?,?,?,?,?,?)
+                   ON CONFLICT(id) DO UPDATE SET data=excluded.data""",
+                (payload.get("id"), payload.get("user_id"), payload.get("file_name"),
+                 payload.get("date"), payload.get("mode") or "Beginner",
+                 float(payload.get("quality") or 0) or 0, payload.get("language") or "zh",
+                 json.dumps(payload.get("report"), ensure_ascii=False)),
+            )
+            _conn.commit()
+            _conn.close()
+        except Exception as e:
+            print(f"[BG-EXPLAIN] report save failed for {aid}: {e}", flush=True)
+
     try:
         explanations = generate_explanations(enhanced, lang)
         _cache_explanations(aid, {"explanations": explanations, "ready": True})
     except Exception as e:
         print(f"[BG-EXPLAIN] Failed for {aid}: {e}", flush=True)
         _cache_explanations(aid, {"explanations": None, "ready": True, "error": str(e)})
+        explanations = None
+    # 解释生成完成（或失败）后落库：用 AI 解释替换模板解释
+    if report_payload:
+        try:
+            _rp = json.loads(json.dumps(report_payload, ensure_ascii=False))  # 深拷贝
+            if explanations:
+                _an = _rp.get("report", {}).get("analysis") or {}
+                _an["explanations"] = explanations
+            _save_report(_rp)
+        except Exception as e:
+            print(f"[BG-EXPLAIN] finalize report failed for {aid}: {e}", flush=True)
 
 BASE_DIR   = os.path.dirname(__file__)
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -498,8 +535,28 @@ def require_user_id(request: Request):
     return uid
 
 
+def _downsample_waveform_preview(wp, target_pts=800):
+    """Downsample waveform_preview time series to shrink /api/analyze JSON (avoid 6MB blob freezing the frontend).
+    Full-resolution waveform stays in DB, read by /api/waveform-image (SVG) endpoint."""
+    if not wp or not isinstance(wp, dict):
+        return wp
+    times = wp.get("times") or []
+    chs = wp.get("channels") or {}
+    n = len(times)
+    if n <= target_pts or not chs:
+        return wp
+    step = n / target_pts
+    idxs = [min(n - 1, int(round(i * step))) for i in range(target_pts)]
+    new_times = [times[i] for i in idxs]
+    new_chs = {name: [vals[i] for i in idxs] for name, vals in chs.items()}
+    out = dict(wp)
+    out["times"] = new_times
+    out["channels"] = new_chs
+    return out
+
+
 @app.post("/api/analyze")
-async def analyze(file: UploadFile = File(...), language: str = Form("zh"), current_user_id: int = Depends(require_user_id)):
+async def analyze(file: UploadFile = File(...), language: str = Form("zh"), report_id: str = Form(None), current_user_id: int = Depends(require_user_id)):
     """
     快速分析 EDF 文件（v2.0）
     - 不调用 Ollama AI
@@ -554,10 +611,6 @@ async def analyze(file: UploadFile = File(...), language: str = Form("zh"), curr
         analysis_id = hashlib.md5((file_path + str(_time.time())).encode()).hexdigest()[:12]
         _cache_explanations(analysis_id, {"explanations": None, "ready": False})
         
-        # ── 后台异步生成 AI 解释 ─────────────────────────────────
-        threading.Thread(target=_bg_generate_explanations,
-                        args=(analysis_id, enhanced, lang), daemon=True).start()
-        
         analysis_out = {
             **enhanced,
             "explanations": template_explanations,
@@ -569,7 +622,55 @@ async def analyze(file: UploadFile = File(...), language: str = Form("zh"), curr
             "file_size_mb": saved.get("file_size_mb", 0) or raw_result.get("file_size_mb", 0),
         }
         
-        return {"success": True, "file_name": file_name, "analysis": analysis_out}
+        # ── 服务端落地全分辨率波形（供 /api/waveform-image SVG 端点使用）──
+        # 响应只回传降采样预览，避免 6MB JSON 卡死前端；全分辨率存 DB，SVG 端点读 DB。
+        # 注意：报告在后台线程生成完 AI 解释后才入库 —— 保证报告列表不会出现
+        # "解释还在生成"的半成品报告。
+        _report_payload = None
+        try:
+            _wp = analysis_out.get("waveform_preview") or {}
+            _eeg = {
+                "success": True,
+                "file_name": file_name,
+                "channel_names": analysis_out.get("channel_names", []),
+                "sampling_rate": analysis_out.get("sampling_rate"),
+                "duration_seconds": analysis_out.get("duration_seconds"),
+                "times": _wp.get("times", []),
+                "channels": _wp.get("channels", {}),
+                "total_channels": len(analysis_out.get("channel_names", []) or []),
+                "total_samples": len(_wp.get("times", []) or []),
+            }
+            _saved_report = {
+                "id": report_id or analysis_id,
+                "fileName": file_name,
+                "date": _time.strftime("%Y-%m-%d %H:%M:%S"),
+                "mode": "Beginner",
+                "quality": analysis_out.get("signal_quality_score", 0) or 0,
+                "language": lang,
+                "analysis": analysis_out,
+                "eegData": _eeg,
+            }
+            _report_payload = {
+                "id": report_id or analysis_id,
+                "user_id": current_user_id,
+                "file_name": file_name,
+                "date": _saved_report["date"],
+                "mode": "Beginner",
+                "quality": float(analysis_out.get("signal_quality_score", 0) or 0),
+                "language": lang,
+                "report": _saved_report,
+            }
+        except Exception as _se:
+            print("[analyze] report payload build skipped:", _se)
+
+        # ── 后台异步生成 AI 解释（完成后自动落库）──────────────
+        threading.Thread(target=_bg_generate_explanations,
+                        args=(analysis_id, enhanced, lang, _report_payload), daemon=True).start()
+
+        # 响应只回传降采样后的波形预览（~800 点/通道），大幅减小 JSON 体积
+        resp_analysis = dict(analysis_out)
+        resp_analysis["waveform_preview"] = _downsample_waveform_preview(analysis_out.get("waveform_preview"), 800)
+        return {"success": True, "file_name": file_name, "analysis": resp_analysis}
         
     except ValueError as e:
         return {"success": False, "file_name": file_name, "error": str(e)}
@@ -931,28 +1032,29 @@ def captcha_verify(qid: str = Form(...), answer: str = Form(...)):
     return {"success": False, "error": "答案错误"}
 
 # ── Cloudflare Turnstile 人机验证（已弃用，保留兼容）─────────
+# ── 自建人机验证（不依赖外部 CDN，中国大陆可用）──
+# ── Cloudflare Turnstile 人机验证 ──
+import urllib.request as _urllib_req
+
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 
 def verify_turnstile(token: str) -> bool:
-    """验证 Turnstile 令牌。未配置密钥时跳过验证（开发模式）。"""
-    if not TURNSTILE_SECRET_KEY:
-        return True  # 未配置密钥，跳过验证（本地开发/测试）
+    """验证 Cloudflare Turnstile 令牌。无令牌直接失败；未配置密钥时放行（开发环境）。"""
     if not token:
         return False
-    import urllib.request, urllib.parse
+    if not TURNSTILE_SECRET_KEY:
+        return True
     try:
-        data = urllib.parse.urlencode({
-            "secret": TURNSTILE_SECRET_KEY,
-            "response": token,
-        }).encode()
-        req = urllib.request.Request(
+        data = _urllib_parse.urlencode({"secret": TURNSTILE_SECRET_KEY, "response": token}).encode()
+        req = _urllib_req.Request(
             "https://challenges.cloudflare.com/turnstile/v0/siteverify",
             data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with _urllib_req.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read().decode())
-            return bool(result.get("success", False))
+        return bool(result.get("success"))
     except Exception:
         return False
 
@@ -962,12 +1064,11 @@ def auth_register(username: str = Form(...), email: str = Form(...),
                   cf_turnstile_response: str = Form(""), invite_code: str = Form("")):
     if not AUTH_AVAILABLE:
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
-    # 先验证注册验证码（不管 Turnstile）
-    if not verify_registration_code(email, code):
-        return {"success": False, "error": "验证码无效或已过期"}
-    # 验证码正确 → 需要人机验证
+    # 先人机验证（不消耗验证码），再校验验证码，避免验证码被提前消耗导致人机验证重试失败
     if not verify_turnstile(cf_turnstile_response):
         return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
+    if not verify_registration_code(email, code):
+        return {"success": False, "error": "验证码无效或已过期"}
     try:
         user = create_user(username, email, password)
         # 学校邀请码：注册时填写则自动加入对应学校
@@ -1104,14 +1205,14 @@ def auth_login_with_code(email: str = Form(...), code: str = Form(...),
         return {"success": False, "error": f"认证模块不可用: {AUTH_IMPORT_ERROR}"}
     try:
         from auth import get_user_by_email
-        if not verify_verification_code(email=email, code=code, purpose="login"):
-            return {"success": False, "error": "验证码无效或已过期"}
+        # 先人机验证（不消耗验证码），再校验验证码，避免验证码被提前消耗导致人机验证重试失败
+        if not verify_turnstile(cf_turnstile_response):
+            return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
         user = get_user_by_email(email)
         if not user:
             return {"success": False, "error": "账号不存在"}
-        # 验证码正确 → 需要人机验证
-        if not verify_turnstile(cf_turnstile_response):
-            return {"success": False, "needsCaptcha": True, "error": "请完成人机验证"}
+        if not verify_verification_code(email=email, code=code, purpose="login"):
+            return {"success": False, "error": "验证码无效或已过期"}
         token = create_access_token({"sub": str(user["id"]), "username": user["username"]})
         terms_accepted = user.get("terms_accepted", 0)
         needs_username_setup = (user["username"] == "User" or user["username"].strip() == "")
@@ -1644,6 +1745,70 @@ async def submit_feedback(request: Request):
 
 
 # =================================================================
+# v2.1: 命名自定义预设（模拟器）——保存到账号，跨设备同步
+# =================================================================
+
+@app.get("/api/sim-presets")
+async def get_sim_presets(request: Request):
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return {"success": False, "error": "Not authenticated"}
+        payload = verify_token(auth_header[7:].strip())
+        if not payload:
+            return {"success": False, "error": "Invalid token"}
+        user_id = int(payload["sub"])
+        conn = get_db()
+        conn.execute("CREATE TABLE IF NOT EXISTS sim_presets (user_id INTEGER PRIMARY KEY, data TEXT)")
+        row = conn.execute("SELECT data FROM sim_presets WHERE user_id=?", (user_id,)).fetchone()
+        conn.close()
+        try:
+            presets = json.loads(row[0]) if row else []
+        except Exception:
+            presets = []
+        if not isinstance(presets, list):
+            presets = []
+        return {"success": True, "presets": presets}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.put("/api/sim-presets")
+async def put_sim_presets(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    presets = body.get("presets", [])
+    if not isinstance(presets, list):
+        return {"success": False, "error": "Invalid presets"}
+    # 数量与名称长度限制
+    presets = [p for p in presets if isinstance(p, dict) and isinstance(p.get("name"), str) and isinstance(p.get("params"), dict)]
+    presets = presets[:50]
+    for p in presets:
+        p["name"] = p["name"][:20]
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return {"success": False, "error": "Not authenticated"}
+        payload = verify_token(auth_header[7:].strip())
+        if not payload:
+            return {"success": False, "error": "Invalid token"}
+        user_id = int(payload["sub"])
+        conn = get_db()
+        conn.execute("CREATE TABLE IF NOT EXISTS sim_presets (user_id INTEGER PRIMARY KEY, data TEXT)")
+        conn.execute(
+            "INSERT INTO sim_presets (user_id, data) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data",
+            (user_id, json.dumps(presets, ensure_ascii=False)),
+        )
+        conn.commit()
+        conn.close()
+        return {"success": True, "presets": presets}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# =================================================================
 # Survey API
 # =================================================================
 
@@ -1800,19 +1965,41 @@ async def api_save_report(report: Dict[str, Any], credentials: HTTPAuthorization
                                     target[tier] = txt
         except Exception:
             pass
-        data_json = json.dumps(report, ensure_ascii=False)
         conn = get_db()
-        conn.execute(
-            """INSERT INTO reports (id, user_id, file_name, date, mode, quality, language, data)
-               VALUES (?,?,?,?,?,?,?,?)
-               ON CONFLICT(id) DO UPDATE SET
-                 user_id=excluded.user_id, file_name=excluded.file_name, date=excluded.date,
-                 mode=excluded.mode, quality=excluded.quality, language=excluded.language, data=excluded.data""",
-            (rid, uid,
-             str(report.get("fileName", "")), str(report.get("date", "")),
-             str(report.get("mode", "Beginner")), float(report.get("quality", 0) or 0),
-             str(report.get("language", "zh")), data_json),
-        )
+        existing = conn.execute("SELECT data FROM reports WHERE id=?", (rid,)).fetchone()
+        if existing:
+            # 行已存在（/api/analyze 已落地全分辨率）→ 保留全分辨率波形，仅更新元数据并合并 explanations
+            try:
+                ex = json.loads(existing[0])
+                inc_an = report.get("analysis") or {}
+                if inc_an.get("explanations"):
+                    ex.setdefault("analysis", {})["explanations"] = inc_an["explanations"]
+                ex_wp = ((ex.get("analysis") or {}).get("waveform_preview") or {}).get("channels") or {}
+                inc_wp = (inc_an.get("waveform_preview") or {}).get("channels") or {}
+                ex_pts = len(next(iter(ex_wp.values()), [])) if ex_wp else 0
+                inc_pts = len(next(iter(inc_wp.values()), [])) if inc_wp else 0
+                if ex_pts >= inc_pts and ex_wp:
+                    inc_an["waveform_preview"] = (ex["analysis"])["waveform_preview"]
+                    report["analysis"] = inc_an
+            except Exception:
+                pass
+            data_json = json.dumps(report, ensure_ascii=False)
+            conn.execute(
+                """UPDATE reports SET user_id=?, file_name=?, date=?, mode=?, quality=?, language=?, data=? WHERE id=?""",
+                (uid, str(report.get("fileName", "")), str(report.get("date", "")),
+                 str(report.get("mode", "Beginner")), float(report.get("quality", 0) or 0),
+                 str(report.get("language", "zh")), data_json, rid),
+            )
+        else:
+            data_json = json.dumps(report, ensure_ascii=False)
+            conn.execute(
+                """INSERT INTO reports (id, user_id, file_name, date, mode, quality, language, data)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (rid, uid,
+                 str(report.get("fileName", "")), str(report.get("date", "")),
+                 str(report.get("mode", "Beginner")), float(report.get("quality", 0) or 0),
+                 str(report.get("language", "zh")), data_json),
+            )
         conn.commit()
         return {"success": True}
     except Exception as e:
@@ -1827,10 +2014,35 @@ def api_list_reports(credentials: HTTPAuthorizationCredentials = Depends(securit
         rows = conn.execute(
             "SELECT data FROM reports WHERE user_id=? ORDER BY created_at DESC", (uid,)
         ).fetchall()
-        reports = [json.loads(r["data"]) for r in rows]
+        # 列表只返回轻量摘要：去掉大体积字段（波形预览/频段波形/EEG 原始波形），
+        # 否则多份报告时响应可达几十 MB，移动端拉取/对账极慢且本地存储失败。
+        # 详情页需要完整波形时走 /api/reports/get 单独拉取。
+        reports = []
+        for r in rows:
+            rep = json.loads(r["data"])
+            rep["hasEegData"] = bool(rep.get("eegData"))
+            rep["eegData"] = None
+            an = rep.get("analysis") or {}
+            an.pop("waveform_preview", None)
+            an.pop("band_waveforms", None)
+            reports.append(rep)
         return {"success": True, "reports": reports}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def _localize_report_artifacts(report: Dict[str, Any], lang: str) -> None:
+    """Ensure stored artifact descriptions match the report language."""
+    targets = []
+    analysis = report.get("analysis") or {}
+    sq = analysis.get("signal_quality") or analysis.get("signalQuality") or {}
+    if isinstance(sq, dict) and isinstance(sq.get("possible_artifacts"), list):
+        targets.append(sq["possible_artifacts"])
+    if isinstance(analysis.get("possible_artifacts"), list):
+        targets.append(analysis["possible_artifacts"])
+    for arr in targets:
+        for i, text in enumerate(arr):
+            arr[i] = i18n.localize_artifact_text(text, lang)
 
 
 @app.post("/api/reports/get")
@@ -1846,7 +2058,10 @@ async def api_get_report(body: Dict[str, Any], credentials: HTTPAuthorizationCre
         ).fetchone()
         if not row:
             return {"success": False, "error": "Report not found"}
-        return {"success": True, "report": json.loads(row["data"])}
+        report = json.loads(row["data"])
+        lang = normalize_language(report.get("language", "zh"))
+        _localize_report_artifacts(report, lang)
+        return {"success": True, "report": report}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1894,15 +2109,15 @@ except Exception as _sim_e:
 # 波形图像端点：返回纯 SVG，前端用 <img> 直接加载，绕过 React canvas
 # =================================================================
 @app.get("/api/waveform-image")
-def waveform_image(rid: str = ""):
-    """根据报告ID返回波形SVG图像"""
-    svg = gen_waveform_svg(rid)
+def waveform_image(rid: str = "", page: int = 0):
+    """根据报告ID返回波形SVG图像（page: 0-based 页号，每屏 10 秒，-1/缺省=整段兼容）"""
+    svg = gen_waveform_svg(rid, page=page)
     from fastapi.responses import Response
     return Response(content=svg, media_type="image/svg+xml",
-                    headers={"Cache-Control": "private, max-age=300"})
+                    headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 
-def gen_waveform_svg(rid: str) -> str:
+def gen_waveform_svg(rid: str, page: int = -1) -> str:
     """从数据库读取报告数据，生成纯SVG波形图（每通道一条原始波形曲线，统一颜色）"""
     def esc(s):
         return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
@@ -1931,33 +2146,65 @@ def gen_waveform_svg(rid: str) -> str:
 
         times = wp.get("times", [])
 
+        # ── 分页窗口：page>=0 时每屏 10 秒（长文件逐页浏览），缺省(-1)整段兼容 ──
+        t0_all = float(times[0]) if len(times) > 1 else 0.0
+        dur_all = (float(times[-1]) - t0_all) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
+        dur_all = max(dur_all, 1e-9)
+        PAGE_SECONDS = 10
+        if page >= 0 and dur_all > 30:
+            total_pages = max(1, int(math.ceil(dur_all / PAGE_SECONDS)))
+            page = max(0, min(int(page), total_pages - 1))
+            t_w0 = t0_all + page * PAGE_SECONDS
+            t_w1 = min(t0_all + dur_all, t_w0 + PAGE_SECONDS)
+            if len(times) > 1:
+                from bisect import bisect_left
+                i0 = bisect_left(times, t_w0)
+                i1 = min(npts, bisect_left(times, t_w1) + 1)
+                times = times[i0:i1]
+                chs = {_c: [vals[i] for i in range(i0, i1)] for _c, vals in chs.items()}
+                npts = len(times)
+            else:
+                i0 = int(page * npts / total_pages)
+                i1 = min(npts, i0 + max(1, int(math.ceil(npts / total_pages))))
+                times = times[i0:i1]
+                chs = {_c: [vals[i] for i in range(i0, i1)] for _c, vals in chs.items()}
+                npts = len(times)
+        # 限制单页 SVG 渲染点数（窗口已裁剪，防御极端情况）
+        MAX_RENDER_PTS = 3000
+        if npts > MAX_RENDER_PTS:
+            _step = npts / MAX_RENDER_PTS
+            _idxs = [min(npts - 1, int(round(i * _step))) for i in range(MAX_RENDER_PTS)]
+            times = [times[i] for i in _idxs]
+            chs = {_c: [vals[i] for i in _idxs] for _c, vals in chs.items()}
+            npts = len(times)
+
         # 所有通道统一颜色（不再用颜色区分任何波形）
         LINE_COLOR = "#38bdf8"  # 统一的浅蓝
 
-        # 时间轴：SVG 固定合理宽度，x 坐标按真实时间映射到固定宽度内，
-        # 时间刻度按真实时长分布（5 秒文件标 0~5s，3 分钟文件标 0~180s）。
+        # 时间轴：每屏固定宽度（10 秒 → 1000px），x 坐标按窗口时间映射
         LW = 65  # 左侧通道名宽度
-        PLOT_W = 835  # 波形绘图区固定宽度
         t0 = float(times[0]) if len(times) > 1 else 0.0
         dur = (float(times[-1]) - t0) if len(times) > 1 else (npts / float(wp.get("sampling_rate") or 128))
         dur = max(dur, 1e-9)
+        # 统一绘图宽度：所有时长文件波形一致铺满显示区域（短文件不再只有 835px 偏窄留白）
+        PLOT_W = 1300
         W = LW + PLOT_W + 15
         # 自适应行高：通道多时压扁，保证 64/128 通道也能一屏放下
-        # 64ch → 8px/行 → 542px；128ch → 4px/行 → 542px
-        laneH = max(4, min(24, int(520 / nch)))
+        laneH = max(10, min(22, int(640 / nch)))  # 固定总高度(~640px)
         H = laneH * nch + 30
 
         svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" style="background:#1a1a2e;font-family:monospace">']
+        # 全局统一比例：用所有通道合并后的 p95，保留各通道真实振幅差异（避免每条都填满、像人工生成）
+        _allv = sorted([abs(v) for _vals in chs.values() for v in _vals])
+        gp95 = _allv[min(int(len(_allv)*0.95), len(_allv)-1)] or 1
         for i, ch in enumerate(ch_names):
             y = i * laneH + laneH//2
             svg.append(f'<line x1="{LW}" y1="{y}" x2="{W}" y2="{y}" stroke="#333" stroke-width="0.5" stroke-dasharray="3 3"/>')
             svg.append(f'<text x="{LW-4}" y="{y+3}" fill="#aab" font-size="{min(11, max(8, 200//nch))}" text-anchor="end">{esc(ch)}</text>')
             vals = chs[ch]
             if len(vals) < 2: continue
-            vabs = sorted([abs(v) for v in vals])
-            p95 = vabs[min(int(len(vabs)*0.95), len(vabs)-1)] or 1
-            sc = (laneH * 0.5) / (2 * p95)
-            cl = laneH * 0.5 / sc
+            sc = (laneH * 0.45) / gp95  # 全局统一比例，保留各通道真实振幅差异
+            cl = gp95
             if len(times) == len(vals):
                 pts = "M" + "".join(f" {LW + (float(times[j])-t0)/dur*PLOT_W:.1f},{y - max(-cl, min(cl, vals[j]))*sc:.2f}" for j in range(len(vals)))
             else:

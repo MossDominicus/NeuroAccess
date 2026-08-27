@@ -20,8 +20,11 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const { lang: ctxLang } = useLang();
   const effectiveLang = ctxLang || lang;
 
+  // 已登录则重定向到首页：token 一旦设置即跳转，不等人机验证/对账流程完成。
   useEffect(() => {
-    if (token) { router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800); }
+    if (token) {
+      router.push("/");
+    }
   }, [token]);
 
   const tf = (key: string, fallback: string) => {
@@ -37,6 +40,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const [inviteCode, setInviteCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [codeSentMsg, setCodeSentMsg] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
@@ -44,6 +48,7 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const [turnstileOpen, setTurnstileOpen] = useState(false);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
   const pendingRegRef = useRef<{ username: string; email: string; password: string; code: string; inviteCode?: string } | null>(null);
+  const turnstileRetryRef = useRef(0);
   const [devCode, setDevCode] = useState("");
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sendingRef = useRef(false);
@@ -56,9 +61,15 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
 
   const handleSendCode = async () => {
     if (!email || countdown > 0 || sendingRef.current) return;
+    // 发送前先校验邮箱格式，非法则本地提示，不发请求
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      setError(tf("invalidEmail", "Please enter a valid email address") || "Please enter a valid email address");
+      return;
+    }
     sendingRef.current = true;
     setSending(true);
     setError("");
+    setCodeSentMsg(false);
     setDevCode("");
     try {
       const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/register-verification-code`, {
@@ -70,12 +81,14 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
       try { data = await resp.json(); } catch { data = { detail: tf("sendCodeFailed", "Failed to send verification code") }; }
       if (resp.ok && data.success) {
         setCountdown(60);
+        setCodeSentMsg(true);
         if (countdownRef.current) clearInterval(countdownRef.current);
         countdownRef.current = setInterval(() => {
           setCountdown(prev => { if (prev <= 1) { clearInterval(countdownRef.current!); countdownRef.current = null; return 0; } return prev - 1; });
         }, 1000);
         if (process.env.NODE_ENV === "development" && data.dev_code) { setDevCode(data.dev_code); }
       } else {
+        setCodeSentMsg(false);
         setError(data.detail || data.error || tf("sendCodeFailed", "Failed to send verification code"));
       }
     } catch (err: any) {
@@ -90,8 +103,8 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
     setSubmitting(true);
     try {
       const result = await register(username, email, password, code, undefined, inviteCode);
-      if (result.success) { router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800); }
-      else if (result.needsCaptcha && turnstileSiteKey) {
+      if (result.success) { router.push("/"); }
+      else if (result.needsCaptcha) {
         pendingRegRef.current = { username, email, password, code, inviteCode };
         setTurnstileOpen(true);
       }
@@ -104,16 +117,34 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
   const handleTurnstileVerify = async (cfToken: string) => {
     try {
       const pending = pendingRegRef.current;
-      if (!pending) { setError("验证状态丢失，请重新注册"); setTurnstileOpen(false); return; }
+      if (!pending) { setError(tf("verificationStateLost", "Verification state lost, please register again")); setTurnstileOpen(false); return; }
       const result = await register(pending.username, pending.email, pending.password, pending.code, cfToken, pending.inviteCode);
-      if (result.success) { window.location.assign("/"); }
+      if (result.success) { turnstileRetryRef.current = 0; window.location.assign("/"); }
+      else if (result.needsCaptcha) {
+        // token 无效/过期：保留 pending，重开验证弹窗重试；超过 3 次停止，避免无限闪烁
+        turnstileRetryRef.current += 1;
+        if (turnstileRetryRef.current >= 3) {
+          pendingRegRef.current = null;
+          setTurnstileOpen(false);
+          setError(tf("verificationFailed", "Human verification failed, please try again"));
+          return;
+        }
+        pendingRegRef.current = pending;
+        setTurnstileOpen(false);
+        setTimeout(function(){ setTurnstileOpen(true); }, 60);
+        return;
+      }
       else { setTurnstileOpen(false); setError(result.error || tf("registerFailed", "Registration failed")); }
-    } catch (err: any) { setTurnstileOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
-    finally { pendingRegRef.current = null; }
+      pendingRegRef.current = null;
+    } catch (err: any) {
+      pendingRegRef.current = null;
+      setTurnstileOpen(false);
+      setError(err.message || tf("networkErrorMsg", "Network error"));
+    }
   };
 
   return (
-    <motion.div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] relative" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.05 }}>
+    <motion.div className="min-h-full flex items-center justify-center bg-[var(--color-bg)] relative z-10 pb-16" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.05 }}>
       <div className="absolute top-4 right-4 z-20"><AuthSettingsBar /></div>
       <div className="w-full max-w-md p-5 sm:p-8 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] mx-3 sm:mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200/50 dark:border-blue-800/30 text-xs leading-relaxed text-[var(--color-text)]">
@@ -129,9 +160,22 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
           <div>
             <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("username", "Username")}</label>
             <input type="text" value={username}
-              onChange={(e) => { const v = e.target.value; if (v === "") { setUsername(v); setError(tf("usernameRequired", "Please enter a username")); return; } const firstChar = Array.from(v)[0]||""; const isLetterStart = /^\p{L}/u.test(firstChar); if (!isLetterStart) { setError(tf("usernameMustStartWithLetter", "Username must start with a letter")); return; } if (/[!@#$%^&*()+\=\[\]{}|\\;:'"`/<>?~.,。]/.test(v)) { setError(tf("usernameNoSpecialChars", "Username cannot contain special characters")); return; } if (/\s{2,}/.test(v)) { setError(tf("noConsecutiveSpaces", "Username cannot have consecutive spaces")); return; } const vlen = Array.from(v).filter(ch => !/[\u0300-\u036f\u0483-\u0489]/.test(ch)).length; if (vlen >= 1 && vlen <= 20) { setError(""); } else if (vlen > 20) { setError(tf("usernameTooLong", "Username must be at most 20 characters")); } setUsername(v); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setUsername(v); // 始终同步 state，避免显示值与提交值不一致
+                if (v === "") { setError(tf("usernameRequired", "Please enter a username")); return; }
+                const firstChar = Array.from(v)[0]||"";
+                const isLetterStart = /^\p{L}/u.test(firstChar);
+                if (!isLetterStart) { setError(tf("usernameMustStartWithLetter", "Username must start with a letter")); return; }
+                if (/[!@#$%^&*()+\=\[\]{}|\\;:'"`/<>?~.,。]/.test(v)) { setError(tf("usernameNoSpecialChars", "Username cannot contain special characters")); return; }
+                if (/\s{2,}/.test(v)) { setError(tf("noConsecutiveSpaces", "Username cannot have consecutive spaces")); return; }
+                const vlen = Array.from(v).filter(ch => !/[\u0300-\u036f\u0483-\u0489]/.test(ch)).length;
+                if (vlen >= 2 && vlen <= 20) { setError(""); }
+                else if (vlen === 1) { setError(tf("usernameTooShort", "Username must be at least 2 characters")); }
+                else if (vlen > 20) { setError(tf("usernameTooLong", "Username must be at most 20 characters")); }
+              }}
               className="w-full px-3.5 py-2.5 rounded-xl border transition-colors bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-primary)]/30"
-              placeholder={tf("username", "Username")} required minLength={1} maxLength={20} />
+              placeholder={tf("username", "Username")} required minLength={2} maxLength={20} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("email", "Email")}</label>
@@ -154,6 +198,11 @@ export default function RegisterForm({ lang }: RegisterFormProps) {
               <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
                 {tf("emailNotConfigured", "Email service not configured, dev code")}: <code className="font-mono font-bold text-base">{devCode}</code>
               </p>)}
+            {codeSentMsg && (
+              <p className="mt-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-lg px-3 py-2">
+                {tf("codeSentToEmail", "Verification code sent to your email, valid for 10 minutes")}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-[var(--color-text)]">{tf("inviteCode", "School invite code (optional)")}</label>

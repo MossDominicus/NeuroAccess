@@ -35,7 +35,7 @@ class ReportErrorBoundary extends Component<{ children: ReactNode; fallback: str
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [report, setReport] = useState<StoredReport | null | undefined>(
     undefined
   ); // undefined=loading, null=not found
@@ -52,35 +52,55 @@ export default function ReportDetailPage() {
       return;
     }
     const found = getReportById(id);
-    setReport(found);
 
-    // 报告数据：优先服务端完整数据，localStorage 兜底
-    // （localStorage 可能存的旧版带不完整通道数，服务端 analysis.waveform_preview 永远有全通道）
+    // 本地波形状态：有波形且为新格式（wpSchema===2）才是真实波形；旧格式(min/max成对)是假波形，需从服务器取新波形。
+    const localWp = (found?.analysis as any)?.waveform_preview;
+    const hasLocalWp = !!(localWp?.channels && Object.keys(localWp.channels).length > 0);
+    const localWpStale = hasLocalWp && (!localWp.wpSchema || localWp.wpSchema < 2);
+    // 列表接口不再下发波形（轻量摘要）→ 本地报告可能是"无波形的摘要"。
+    // 摘要先不渲染：等服务器完整报告到达再一次性渲染，避免波形页先显示服务端压缩版、
+    // 切走再切回才变正确版的闪烁。本地已有真实波形时立即渲染（零延迟）。
+    const localHasWaveform = hasLocalWp || !!((found?.analysis as any)?.band_waveforms);
+    setReport(localHasWaveform ? found : undefined);
+    // 后台同步：把服务端最新数据写回 localStorage 供下次打开更全。
+    // 本地缺报告/缺波形、或本地波形是旧格式（假波形）时，用服务端完整报告渲染（一次性补齐真实波形）；
+    // 本地已有新格式波形则绝不 setReport 覆盖已显示页面 —— 打开瞬间零延迟、无内容变化。
+    // 注意：本地完全找不到报告时不能直接显示"没有报告"——本地缓存可能因存储配额被压缩掉，
+    // 必须从服务器拉取；拉不到才真的是没有。
     const loadServerReport = async () => {
-      if (!found || !token) return;
       const serverReport = await fetchServerReport(id).catch(() => null);
-      if (!cancelled) setReport(serverReport?.analysis ? (serverReport as StoredReport) : found);
       if (serverReport?.analysis) {
+        if (!cancelled && (!found || !hasLocalWp || localWpStale)) {
+          setReport(serverReport as StoredReport);
+        }
         try { addReport(serverReport as StoredReport); } catch {}
+      } else if (!found && !cancelled) {
+        // 本地与服务器都没有 → 才是真的不存在
+        setReport(null);
+      } else if (!cancelled && !localHasWaveform) {
+        // 服务器取不到完整报告但本地有摘要 → 用摘要兜底（至少能看文字分析，波形显示不可用）
+        setReport(found);
       }
-      // 无论报告来自服务器还是本地，都按 analysis_id 拉取 AI 解释缓存
-      const aid = (serverReport?.analysis || found.analysis)?.analysis_id;
+      // 仅静默写回 AI 解释缓存到本地（下次打开即用），不触发任何重渲染
+      const aid = (serverReport?.analysis || found?.analysis)?.analysis_id;
       if (aid) {
         fetch(`/api/analysis/explanations/${aid}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
           .then((r) => r.json())
           .then((data) => {
-            if (data.success && data.explanations && !cancelled) {
+            if (data.success && data.explanations) {
+              const enriched = {
+                ...(serverReport || found),
+                analysis: { ...(serverReport || found).analysis, explanations: data.explanations },
+              } as StoredReport;
+              try {
+                addReport(enriched);
+              } catch {}
+              // 同步更新当前 report state，避免深链/新会话首屏仍显示模板文案
               setReport((prev) =>
                 prev ? { ...prev, analysis: { ...prev.analysis, explanations: data.explanations } } : prev
               );
-              try {
-                addReport({
-                  ...(serverReport || found),
-                  analysis: { ...(serverReport || found).analysis, explanations: data.explanations },
-                } as StoredReport);
-              } catch {}
             }
           })
           .catch(() => {});
@@ -144,7 +164,7 @@ export default function ReportDetailPage() {
           {t("reports")}
         </Link>
         <button
-          onClick={() => downloadCSV(report.id, report.fileName || "report")}
+          onClick={() => downloadCSV(report.id, report.fileName || "report", lang)}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] transition-colors"
           title="Download CSV data"
         >

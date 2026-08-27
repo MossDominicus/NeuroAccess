@@ -20,10 +20,12 @@ export default function LoginForm({ lang }: LoginFormProps) {
   const { lang: ctxLang } = useLang();
   const effectiveLang = ctxLang || lang;
 
-  // 已登录则重定向到首页
+  // 已登录则重定向到首页：token 一旦由 login() 设置即触发跳转，
+  // 不等 login() 内部的同步对账（await syncReportsOnLogin）跑完——
+  // 移动端慢网络下若等对账完成再跳，用户会感觉"人机验证通过后没跳转"。
   useEffect(() => {
     if (token) {
-      router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
+      router.push("/");
     }
   }, [token]);
 
@@ -43,11 +45,13 @@ export default function LoginForm({ lang }: LoginFormProps) {
 
   // ── Shared state ──
   const [error, setError] = useState("");
+  const [codeSentMsg, setCodeSentMsg] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // ── Turnstile 人机验证 ──
   const [turnstileOpen, setTurnstileOpen] = useState(false);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
   const pendingLoginRef = useRef<{ type: "password" | "code"; args: Record<string, string> } | null>(null);
+  const turnstileRetryRef = useRef(0);
 
   // Cleanup countdown
   useEffect(() => {
@@ -73,9 +77,10 @@ export default function LoginForm({ lang }: LoginFormProps) {
     try {
       const result = await login(usernameOrEmail, password);
       if (result.success) {
-        router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
-      } else if (result.needsCaptcha && turnstileSiteKey) {
+        router.push("/");
+      } else if (result.needsCaptcha) {
         pendingLoginRef.current = { type: "password", args: { usernameOrEmail, password } };
+        turnstileRetryRef.current = 0;
         setTurnstileOpen(true);
       } else {
         setError(result.error || tf("loginFailed", "Login failed"));
@@ -95,9 +100,10 @@ export default function LoginForm({ lang }: LoginFormProps) {
     try {
       const result = await loginWithCode(codeEmail, code);
       if (result.success) {
-        router.push("/"); setTimeout(() => { window.location.replace("/"); }, 800);
-      } else if (result.needsCaptcha && turnstileSiteKey) {
+        router.push("/");
+      } else if (result.needsCaptcha) {
         pendingLoginRef.current = { type: "code", args: { codeEmail, code } };
+        turnstileRetryRef.current = 0;
         setTurnstileOpen(true);
       } else {
         setError(result.error || tf("verificationCodeFailed", "Verification failed"));
@@ -112,6 +118,11 @@ export default function LoginForm({ lang }: LoginFormProps) {
   // ── Send login code ──
   const handleSendCode = async () => {
     if (!codeEmail.trim() || codeCountdown > 0 || sendingRef.current) return;
+    // 发送前先校验邮箱格式，非法则本地提示，不发请求
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(codeEmail.trim())) {
+      setError(tf("invalidEmail", "Please enter a valid email address") || "Please enter a valid email address");
+      return;
+    }
     sendingRef.current = true;
     setCodeSending(true);
     setError("");
@@ -119,6 +130,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
       const result = await sendLoginCode(codeEmail.trim());
       if (result.success) {
         setCodeCountdown(60);
+        setCodeSentMsg(true);
         if (countdownRef.current) clearInterval(countdownRef.current);
         countdownRef.current = setInterval(() => {
           setCodeCountdown((prev) => {
@@ -131,9 +143,11 @@ export default function LoginForm({ lang }: LoginFormProps) {
           });
         }, 1000);
       } else {
+        setCodeSentMsg(false);
         setError(result.error || tf("sendCodeFailed", "Failed to send code"));
       }
     } catch (err: any) {
+      setCodeSentMsg(false);
       setError(err.message || tf("networkErrorMsg", "Network error"));
     } finally {
       sendingRef.current = false;
@@ -146,34 +160,55 @@ export default function LoginForm({ lang }: LoginFormProps) {
     try {
       const pending = pendingLoginRef.current;
       if (!pending) { setTurnstileOpen(false); return; }
-      let result: { success: boolean; error?: string; termsAccepted?: boolean; needsUsernameSetup?: boolean };
+      let result: { success: boolean; error?: string; needsCaptcha?: boolean; termsAccepted?: boolean; needsUsernameSetup?: boolean };
       if (pending.type === "password") {
         result = await login(pending.args.usernameOrEmail, pending.args.password, cfToken);
       } else {
         result = await loginWithCode(pending.args.codeEmail, pending.args.code, cfToken);
       }
-      if (result.success) { window.location.replace("/"); }
+      if (result.success) { turnstileRetryRef.current = 0; window.location.replace("/"); }
+      else if (result.needsCaptcha) {
+        // token 无效/过期：保留 pending，重开验证弹窗重试；超过 3 次停止，避免无限闪烁
+        turnstileRetryRef.current += 1;
+        if (turnstileRetryRef.current >= 3) {
+          pendingLoginRef.current = null;
+          setTurnstileOpen(false);
+          setError(tf("verificationFailed", "Human verification failed, please try again") || "Human verification failed, please try again");
+          return;
+        }
+        pendingLoginRef.current = pending;
+        setTurnstileOpen(false);
+        setTimeout(function(){ setTurnstileOpen(true); }, 60);
+        return;
+      }
       else { setTurnstileOpen(false); setError(result.error || tf("loginFailed", "Login failed")); }
-    } catch (err: any) { setTurnstileOpen(false); setError(err.message || tf("networkErrorMsg", "Network error")); }
-    finally { pendingLoginRef.current = null; }
+      pendingLoginRef.current = null;
+    } catch (err: any) {
+      pendingLoginRef.current = null;
+      setTurnstileOpen(false);
+      setError(err.message || tf("networkErrorMsg", "Network error"));
+    }
   };
 
   // ── Switch modes ──
   const switchToCodeMode = () => {
     setUseCode(true);
     setError("");
-    setCodeEmail(usernameOrEmail);
+    setCodeSentMsg(false);
+    // 仅当输入看起来像邮箱时才预填（用户名不是邮箱，不能拿去收验证码）
+    setCodeEmail(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(usernameOrEmail.trim()) ? usernameOrEmail.trim() : "");
     setCode("");
   };
   const switchToPasswordMode = () => {
     setUseCode(false);
     setError("");
+    setCodeSentMsg(false);
     setCode("");
   };
 
   return (
     <motion.div
-      className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] relative"
+      className="min-h-full flex items-center justify-center bg-[var(--color-bg)] relative z-10 pb-16"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.05 }}
@@ -220,9 +255,9 @@ export default function LoginForm({ lang }: LoginFormProps) {
                   )}
                 </button>
               </div>
-              <button type="button" onClick={switchToCodeMode} className="mt-1.5 text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity">
-                {tf("forgotPassword", "Forgot password?")}
-              </button>
+                <button type="button" onClick={switchToCodeMode} className="mt-1.5 text-xs text-[var(--color-primary)] hover:opacity-80 transition-opacity">
+                  {tf("useCodeLogin", "Log in with code")}
+                </button>
             </div>
 
             {error && (
@@ -256,6 +291,12 @@ export default function LoginForm({ lang }: LoginFormProps) {
                 </button>
               </div>
             </div>
+
+            {codeSentMsg && (
+              <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm">
+                {tf("codeSentToEmail", "Verification code sent to your email, valid for 10 minutes")}
+              </div>
+            )}
 
             {error && (
               <div role="alert" aria-live="assertive" className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm">

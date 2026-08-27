@@ -1,13 +1,17 @@
 "use client";
 
+import { getText } from "@/lib/translations";
+import type { Lang } from "@/lib/translations";
+
 /**
  * CSV 下载：直接导出每个通道的原始波形时间序列 (μV)，
  * 每列一个通道。
  */
-export async function downloadCSV(reportId: string, fileName: string) {
+export async function downloadCSV(reportId: string, fileName: string, lang: Lang = "en") {
+  const tx = (key: string) => getText(lang, key);
   try {
     const token = typeof window !== "undefined" ? localStorage.getItem("neuroaccess-token") || "" : "";
-    if (!token) { return void alert("请先登录"); }
+    if (!token) { return void alert(tx("pleaseLoginFirst")); }
 
     // 1. 从服务器拉报告
     const resp = await fetch("/api/reports/get", {
@@ -16,7 +20,7 @@ export async function downloadCSV(reportId: string, fileName: string) {
       body: JSON.stringify({ id: reportId }),
     });
     const data = await resp.json();
-    if (!data?.success || !data?.report) { return void alert("服务器取报告失败"); }
+    if (!data?.success || !data?.report) { return void alert(tx("serverFetchReportFailed")); }
 
     const report = data.report;
     const analysis = report.analysis || report;
@@ -67,6 +71,6 @@ export async function downloadCSV(reportId: string, fileName: string) {
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
   } catch (e) {
     console.error("CSV error:", e);
-    alert("下载失败: " + (e as Error).message);
+    alert(tx("downloadFailed") + (e as Error).message);
   }
 }

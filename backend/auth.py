@@ -28,7 +28,7 @@ if not _SECRET_KEY:
         print("   Set JWT_SECRET_KEY environment variable in production.", file=sys.stderr)
 SECRET_KEY = _SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 365
+ACCESS_TOKEN_EXPIRE_DAYS = 60
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -123,6 +123,17 @@ def init_db():
         )
         """
     )
+    # 删除墓碑：报告一旦删除即永久记录，服务器拒绝再次保存/恢复，跨设备生效
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS deleted_reports (
+            report_id TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (report_id, user_id)
+        )
+        """
+    )
     # Add feedback table for permanent feedback storage (replaces fragile file log)
     conn.execute(
         """
@@ -193,6 +204,11 @@ def init_db():
     # users 增加 org_id（学生注册时填邀请码自动入校）
     try:
         conn.execute("ALTER TABLE users ADD COLUMN org_id INTEGER")
+    except Exception:
+        pass
+    # users 增加 is_test（admin 面板区分测试账号）
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN is_test INTEGER DEFAULT 0")
     except Exception:
         pass
     conn.commit()

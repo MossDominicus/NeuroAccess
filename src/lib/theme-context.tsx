@@ -18,14 +18,16 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
-
-  useEffect(() => {
+  // 惰性初始化：客户端直接读 localStorage，避免首帧用默认 light 覆盖已保存的 dark 造成"闪亮"
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
     try {
-      const saved = localStorage.getItem("theme") as Theme;
-      if (saved) setThemeState(saved);
-    } catch {}
-  }, []);
+      const saved = localStorage.getItem("theme") as Theme | null;
+      return saved === "dark" || saved === "system" ? saved : "light";
+    } catch {
+      return "light";
+    }
+  });
 
   // 同步 document.documentElement.class
   useEffect(() => {
@@ -41,7 +43,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
 
     applyTheme(theme);
-    localStorage.setItem("theme", theme);
+    try { localStorage.setItem("theme", theme); } catch {}
 
     // 监听系统主题变化（仅 system 模式需要）
     if (theme === "system") {

@@ -2,7 +2,6 @@
 
 import { translations } from "@/lib/translations";
 import { useLang } from "@/lib/language-context";
-import Link from "next/link";
 
 interface PublicPreviewFooterProps {
   lang?: string;
@@ -20,21 +19,18 @@ export default function PublicPreviewFooter({ lang: serverLang }: PublicPreviewF
   return (
     <footer className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)]/50 px-6 py-3 text-center text-xs text-[var(--color-text-secondary)]">
       <div className="flex items-center justify-center gap-2 flex-wrap">
-        <Link href="/disclaimer" className="underline hover:text-[var(--color-primary)] transition-colors">
+        {/* 原生 <a> 全页导航，避免 next/link 客户端路由在该环境不提交导致链接点不动 */}
+        <a href="/disclaimer" className="underline hover:text-[var(--color-primary)] transition-colors">
           {tf("disclaimerTitle", "Disclaimer")}
-        </Link>
+        </a>
         <span className="text-[var(--color-border)]">·</span>
-        <Link href="/privacy" className="underline hover:text-[var(--color-primary)] transition-colors">
+        <a href="/privacy" className="underline hover:text-[var(--color-primary)] transition-colors">
           {tf("privacyPolicy", "Privacy Policy")}
-        </Link>
+        </a>
         <span className="text-[var(--color-border)]">·</span>
-        <Link href="/terms" className="underline hover:text-[var(--color-primary)] transition-colors">
+        <a href="/terms" className="underline hover:text-[var(--color-primary)] transition-colors">
           {tf("termsOfService", "Terms of Service")}
-        </Link>
-        <span className="text-[var(--color-border)]">·</span>
-        <Link href="/schools" className="underline hover:text-[var(--color-primary)] transition-colors">
-          {tf("freeForSchools", "Free for Schools")}
-        </Link>
+        </a>
       </div>
     </footer>
   );

@@ -15,6 +15,7 @@ v2.0 性能优化：
 import mne
 import numpy as np
 import os
+import re
 from typing import Dict, List, Any, Optional
 from scipy.signal import butter, filtfilt, welch
 
@@ -29,20 +30,27 @@ BANDS = {
     'theta': (4, 8),
     'alpha': (8, 13),
     'beta':  (13, 30),
-    'gamma': (30, 100),
+    'gamma': (30, 45),
 }
 
 
 def band_limits(band_name: str, sfreq: float) -> tuple:
     """返回某个频段在该采样率下实际可计算的频率范围。
 
-    gamma 上限受奈奎斯特频率约束：128 Hz 采样只能可靠评估到 64 Hz，
+    gamma 上限受奈奎斯特频率约束：128 Hz 采样只能可靠评估到 ~63 Hz，
     250 Hz 采样到 125 Hz（>100 则仍取 100）。低采样率时 gamma 频段
     自动截断，保证报告数值可信。
+
+    注意：上限严格低于奈奎斯特 1 Hz，避免 butter 带通滤波器的 Wn 取到
+    1.0 导致「Digital filter critical frequencies must be 0 < Wn < 1」
+    错误（例如 128 Hz 时 gamma 上限若取 64 Hz 会退化、整段频段波形失败）。
     """
     low, high = BANDS.get(band_name, (0.5, 100))
     nyq = sfreq / 2.0
-    return (low, min(high, nyq))
+    hi = min(high, nyq - 1.0)
+    if hi <= low:
+        hi = low + 1.0
+    return (low, hi)
 
 # ── 文件格式支持 ──────────────────────────────────────
 # 支持 EDF / BDF / GDF 1.99（加载与单位统一由 _load_raw_any / _raw_to_uv 处理）
@@ -248,8 +256,8 @@ def fast_preview_window(file_path: str, duration_sec: float = 8.0,
     data_uv = _raw_to_uv(raw, start=0, stop=total_n)
     times = raw.times[:total_n]
     
-    # 下采样到 ~1200 点
-    target_points = 1200
+    # 下采样点数随时长增加：保留足够采样率以显示真实高频细节（避免波形过于平滑、像假的）
+    target_points = min(20000, max(2000, int(round(duration_sec * 80))))
     step = max(1, len(times) // target_points)
     if len(times) // step < 500:
         step = max(1, len(times) // 500)
@@ -406,7 +414,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         return {
             "signal_quality_score": 0.0,
             "noisy_channels": [],
-            "possible_artifacts": ["数据过短"],
+            "possible_artifacts": [i18n.get_artifact_text(lang, "short_recording")],
             "missing_data": False,
             "clipping_detected": False,
             "high_frequency_noise": False,
@@ -430,7 +438,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         return {
             "signal_quality_score": 0.0,
             "noisy_channels": list(ch_names),
-            "possible_artifacts": ["Flat / no signal (dead channel or disconnected)"],
+            "possible_artifacts": [i18n.get_artifact_text(lang, "flat_no_signal")],
             "missing_data": True,
             "clipping_detected": False,
             "high_frequency_noise": False,
@@ -444,7 +452,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             },
         }
 
-    # ── 组件 1: SNR 信噪比 (0~25分) ─────────────────
+    # ── 组件 1: SNR 信噪比 (0~15分) ─────────────────
     # Welch PSD 每通道
     nperseg = min(int(4.0 * min(sfreq, n_samples // 30)), 1024, n_samples)
     nperseg = max(nperseg, 16)
@@ -498,7 +506,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
     component_snr = float(np.mean(snr_scores)) if snr_scores else 20.0
 
-    # ── 组件 2: 通道一致性 (0~20分) ───────────────────
+    # ── 组件 2: 通道一致性 (0~10分) ───────────────────
     # 计算相邻通道间的 Pearson 相关系数（取所有通道对的均值）
     if var_mean <= 1e-6:
         # 全平坦/无信号：通道间无任何有意义的差异，一致性视为 0
@@ -529,7 +537,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     # 0→1.0, 0.01→1.85, 0.05→4.55, 0.10→6.7, 0.20→8.8, 0.50→10.0
     component_consistency = max(0.0, min(10.0, 1.0 + 9.0 * (1.0 - np.exp(-abs(avg_correlation) / 0.10))))
 
-    # ── 组件 3: 伪影检测 (0 ~ -25分扣分) ──────────────
+    # ── 组件 3: 伪影检测 (0 ~ -10分扣分) ──────────────
     # 3a. 峰度异常
     data_centered = data_uv - means
     m2 = np.mean(data_centered ** 2, axis=1)
@@ -590,6 +598,28 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
     if max_amp > 150:
         spike_score = min(5, (max_amp - 150) / 100)
         artifact_penalty += spike_score
+
+    # ── 瞬态尖峰样活动检测（客观指标，供 AI 解释描述信号特征）────
+    # 定义：单个样本相对所在通道基线偏移 > 3×通道标准差（尖峰样快速偏转）。
+    # 指标 = 各通道"活跃通道占比"的中位数 + 活跃通道数，只做统计描述，不做疾病推断。
+    transient_ratio = 0.0
+    transient_channels = 0
+    if n_samples > 50 and n_ch > 0:
+        _safe_std = np.where(stds > 0, stds, 1.0)
+        _trans_abs = np.abs(data_uv - means) > 3 * _safe_std
+        per_ch_ratio = np.mean(_trans_abs, axis=1)
+        transient_ratio = float(np.median(per_ch_ratio))
+        # 活跃通道：该通道瞬态样本占比 > 0.5%
+        transient_channels = int(np.sum(per_ch_ratio > 0.005))
+    # 级别判定：以"活跃通道覆盖比例"为主（尖峰样活动通常广泛分布），ratio 为辅
+    ch_cover = (transient_channels / n_ch) if n_ch else 0.0
+    transient_activity_level = "none"
+    if ch_cover >= 0.5 or (ch_cover >= 0.3 and transient_ratio > 0.008):
+        transient_activity_level = "high"
+    elif ch_cover >= 0.35 or (ch_cover >= 0.2 and transient_ratio > 0.006):
+        transient_activity_level = "moderate"
+    elif ch_cover > 0.15 and transient_ratio > 0.002:
+        transient_activity_level = "mild"
 
     artifact_penalty = min(artifact_penalty, 10)
 
@@ -679,7 +709,7 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
 
     integrity_penalty = min(integrity_penalty, 15)
 
-    # ── 组件 6: 基线稳定性 (0 ~ -8分扣分) ─────────────
+    # ── 组件 6: 基线稳定性 (0 ~ -10分扣分) ─────────────
     # 慢漂移检测：逐通道计算绝对漂移量（μV），避免比值法被大幅信号掩盖
     drift_penalty = 0.0
     if n_samples > 500:
@@ -735,12 +765,19 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
         possible_artifacts.append(i18n.get_artifact_text(lang, "large_values"))
     if outlier_pct > 0.02:
         possible_artifacts.append(i18n.get_artifact_text(lang, "many_outliers"))
+    if transient_activity_level != "none":
+        # 客观信号特征描述（不涉及疾病判断）
+        _tlv = i18n.get_artifact_text(lang, "transient_level_" + transient_activity_level)
+        possible_artifacts.append(
+            i18n.get_artifact_text(lang, "transient_spikes", _tlv,
+                                   f"{transient_ratio * 100:.1f}", transient_channels, n_ch)
+        )
     if clipping_detected:
-        possible_artifacts.append("Signal clipping detected")
+        possible_artifacts.append(i18n.get_artifact_text(lang, "clipping"))
     if drift_penalty >= 3:
-        possible_artifacts.append("Baseline drift")
+        possible_artifacts.append(i18n.get_artifact_text(lang, "baseline_drift"))
     if flat_channels:
-        possible_artifacts.append(f"{len(flat_channels)} flat/disconnected channel(s)")
+        possible_artifacts.append(i18n.get_artifact_text(lang, "flat_channels", len(flat_channels)))
 
     print(f"[QualityScore] score={quality_score:.1f}  snr={component_snr:.1f}  consistency={component_consistency:.1f}  spectral={spectral_score:.1f}  base={base_score:.1f}  artifact_pen={artifact_penalty:.1f}  integrity_pen={integrity_penalty:.1f}  drift_pen={drift_penalty:.1f}")
     return {
@@ -761,6 +798,12 @@ def quick_signal_quality(data_uv: np.ndarray, ch_names: List[str], lang: str = "
             "integrity_penalty": round(integrity_penalty, 2),
             "drift_penalty": round(drift_penalty, 2),
             "base_score": round(base_score, 2),
+            "transient_activity": {
+                "level": transient_activity_level,
+                "ratio_pct": round(transient_ratio * 100, 2),
+                "channels": transient_channels,
+                "max_amplitude_uv": round(max_amp, 1),
+            },
         },
     }
 
@@ -837,15 +880,19 @@ def quick_band_waveforms_from_data(data_uv: np.ndarray, sfreq: float, times: np.
         result: Dict[str, Any] = {"times": times_list}
         
         for band_name, (low, high) in BANDS.items():
-            lo, hi = band_limits(band_name, sfreq)
-            # gamma 在低采样率下若可用带宽过窄则跳过（避免滤波器退化）
-            if hi - lo < 2.0:
+            try:
+                lo, hi = band_limits(band_name, sfreq)
+                # gamma 在低采样率下若可用带宽过窄则跳过（避免滤波器退化）
+                if hi - lo < 2.0:
+                    result[band_name] = []
+                    continue
+                b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
+                filtered = filtfilt(b, a, data_uv, axis=1)
+                avg = np.nanmean(filtered, axis=0)
+                result[band_name] = avg.tolist()
+            except Exception as e:
+                print(f"[WARN] band waveform {band_name} failed: {e}")
                 result[band_name] = []
-                continue
-            b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
-            filtered = filtfilt(b, a, data_uv, axis=1)
-            avg = np.nanmean(filtered, axis=0)
-            result[band_name] = avg.tolist()
         
         return result
     except Exception as e:
@@ -873,19 +920,338 @@ def quick_band_waveforms(file_path: str, duration_seconds: float = 10.0) -> Dict
         result: Dict[str, Any] = {"times": times_list}
         
         for band_name, (low, high) in BANDS.items():
-            lo, hi = band_limits(band_name, sfreq)
-            if hi - lo < 2.0:
+            try:
+                lo, hi = band_limits(band_name, sfreq)
+                if hi - lo < 2.0:
+                    result[band_name] = []
+                    continue
+                b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
+                filtered = filtfilt(b, a, data_uv, axis=1)
+                avg = np.nanmean(filtered, axis=0)
+                result[band_name] = avg.tolist()
+            except Exception as e:
+                print(f"[WARN] band waveform {band_name} failed: {e}")
                 result[band_name] = []
-                continue
-            b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
-            filtered = filtfilt(b, a, data_uv, axis=1)
-            avg = np.nanmean(filtered, axis=0)
-            result[band_name] = avg.tolist()
         
         return result
     except Exception as e:
         print(f"[WARN] quick_band_waveforms filter failed: {e}")
-        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": []}
+        return {"times": [], "delta": [], "theta": [], "alpha": [], "beta": [], "gamma": []}
+
+
+# =====================================================================
+# 特殊波形检测（尖波/锐波、睡眠纺锤、慢波、K复合波、mu节律、SMR、
+# 三相波、周期性放电）——检测到才返回 present=True，报告只显示有的。
+# =====================================================================
+
+def _bandpass_uv(data: np.ndarray, lo: float, hi: float, sfreq: float) -> Optional[np.ndarray]:
+    nyq = sfreq / 2.0
+    hi = min(hi, nyq - 1.0)
+    if hi <= lo:
+        return None
+    b, a = butter(4, [lo / nyq, hi / nyq], btype="band")
+    return filtfilt(b, a, data, axis=1)
+
+
+def _rms_envelope(x: np.ndarray, win: int) -> np.ndarray:
+    """逐通道滑动 RMS 包络（每通道一条曲线），win 为窗口采样点数。"""
+    kernel = np.ones(win) / win
+    out = np.sqrt(np.apply_along_axis(lambda v: np.convolve(v * v, kernel, mode="same"), 1, x))
+    return out
+
+
+def _contiguous_over(over: np.ndarray, gap: int) -> List[np.ndarray]:
+    """把过阈值索引按 gap 间隔切分成若干连通段（每个段视为一个事件）。"""
+    idx = np.where(over)[0]
+    if len(idx) == 0:
+        return []
+    split_at = np.where(np.diff(idx) > gap)[0] + 1
+    return [g for g in np.split(idx, split_at) if len(g) > 0]
+
+
+def _rel_high_thr(x: np.ndarray, mult: float, floor_uv: float) -> float:
+    """相对高阈值：中位数 + max(mult×MAD, floor_uv)。自适应通道波动尺度，避免振幅异常通道失控。"""
+    med = float(np.median(x))
+    mad = float(np.median(np.abs(x - med))) * 1.4826
+    return med + max(mult * mad, floor_uv)
+
+
+def _detect_spikes(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """尖波/锐波（癫痫样放电）：高通 1-40Hz 后检测 <150ms 的相对高幅瞬态尖峰。"""
+    try:
+        hp = _bandpass_uv(data_uv, 1.0, 40.0, sfreq)
+        if hp is None:
+            return {"present": False, "count": 0}
+        total = 0
+        amp_max = 0.0
+        hit_chs: List[str] = []
+        for i in range(hp.shape[0]):
+            x = hp[i]
+            thr = _rel_high_thr(x, 10.0, 50.0)
+            segs = _contiguous_over(x > thr, int(sfreq * 0.15))
+            for g in segs:
+                if g[-1] - g[0] <= int(sfreq * 0.15):  # 事件持续 <150ms
+                    total += 1
+                    peak = float(np.max(x[g[0]:g[-1] + 1]))
+                    if peak > amp_max:
+                        amp_max = peak
+                    if ch_names[i] not in hit_chs:
+                        hit_chs.append(ch_names[i])
+        if total >= 2:
+            return {"present": True, "count": min(total, 200), "channels": hit_chs[:6],
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_spindles(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """睡眠纺锤：11-16Hz 带通，包络连续 >0.5s 的相对超阈值段记为一次纺锤。"""
+    try:
+        b = _bandpass_uv(data_uv, 11.0, 16.0, sfreq)
+        if b is None:
+            return {"present": False, "count": 0}
+        env = _rms_envelope(b, int(sfreq * 0.3))
+        total = 0
+        amp_max = 0.0
+        hit_chs: List[str] = []
+        for i in range(env.shape[0]):
+            e = env[i]
+            thr = _rel_high_thr(e, 3.0, 10.0)
+            segs = _contiguous_over(e > thr, int(sfreq * 0.5))
+            n = sum(1 for g in segs if len(g) >= int(sfreq * 0.5))
+            if n:
+                total += n
+                hit_chs.append(ch_names[i])
+                for g in segs:
+                    pk = float(np.max(e[g[0]:g[-1] + 1]))
+                    if pk > amp_max:
+                        amp_max = pk
+        if total >= 1:
+            return {"present": True, "count": min(total, 100), "channels": hit_chs[:6],
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_slow_waves(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """慢波（0.5-2Hz，深睡）：带通后找相对高幅（8×MAD 且 ≥80µV）的显著慢半波。"""
+    from scipy.signal import find_peaks
+    try:
+        b = _bandpass_uv(data_uv, 0.5, 2.0, sfreq)
+        if b is None:
+            return {"present": False, "count": 0}
+        total = 0
+        amp_max = 0.0
+        hit_chs: List[str] = []
+        min_dist = int(sfreq * 0.3)
+        for i in range(b.shape[0]):
+            x = b[i]
+            thr = _rel_high_thr(x, 8.0, 80.0)
+            prom = max(2.0 * (float(np.median(np.abs(x - np.median(x)))) * 1.4826), 40.0)
+            pos_p, _ = find_peaks(x, distance=min_dist, prominence=prom)
+            neg_p, _ = find_peaks(-x, distance=min_dist, prominence=prom)
+            n = 0
+            for p in pos_p:
+                if x[p] > thr:
+                    n += 1
+                    if x[p] > amp_max:
+                        amp_max = x[p]
+            for p in neg_p:
+                if -x[p] > thr:
+                    n += 1
+            if n >= 2:
+                total += n // 2  # 一个慢波 ≈ 一个正半波 + 一个负半波
+                hit_chs.append(ch_names[i])
+        if total >= 2:
+            return {"present": True, "count": min(total, 200), "channels": hit_chs[:6],
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_k_complexes(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """K复合波：0.5-2Hz 的相对极大负向波（10×MAD 且 ≥120µV），睡眠特征。"""
+    from scipy.signal import find_peaks
+    try:
+        b = _bandpass_uv(data_uv, 0.5, 2.0, sfreq)
+        if b is None:
+            return {"present": False, "count": 0}
+        total = 0
+        amp_max = 0.0
+        hit_chs: List[str] = []
+        min_dist = int(sfreq * 0.4)
+        for i in range(b.shape[0]):
+            x = b[i]
+            med = float(np.median(x))
+            mad = float(np.median(np.abs(x - med))) * 1.4826
+            thr_neg = med - max(10.0 * mad, 120.0)  # 大负波阈值
+            prom = max(3.0 * mad, 50.0)
+            neg_p, _ = find_peaks(-x, distance=min_dist, prominence=prom)
+            det = [p for p in neg_p if x[p] < thr_neg]
+            n = len(det)
+            if n:
+                total += n
+                hit_chs.append(ch_names[i])
+                for p in det:
+                    dip = float(med - x[p])  # 偏离中值的负向深度
+                    if dip > amp_max:
+                        amp_max = dip
+        if total >= 1:
+            return {"present": True, "count": min(total, 100), "channels": hit_chs[:6],
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_mu_rhythm(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """Mu 节律（8-13Hz，中央区）：优先看中央区通道（C3/C4/Cz/CP 等）的 alpha 包络强度。"""
+    try:
+        def _is_central(nm: str) -> bool:
+            up = re.sub(r"[^A-Z0-9]", "", nm.upper())  # "EEG C4" -> "EEGC4"
+            if "C" not in up:
+                return False
+            if re.search(r"[FPTO]", up.replace("C", "")):  # 去掉 C 后仍含 F/P/T/O → 非纯中央
+                return False
+            return True
+        central = [i for i, nm in enumerate(ch_names) if _is_central(nm)]
+        if not central:
+            return {"present": False, "count": 0}
+        sub = data_uv[central]
+        b = _bandpass_uv(sub, 8.0, 13.0, sfreq)
+        if b is None:
+            return {"present": False, "count": 0}
+        env = _rms_envelope(b, int(sfreq * 0.4))
+        med = float(np.median(env))
+        mad = float(np.median(np.abs(env - med))) * 1.4826
+        thr = med + max(3.0 * mad, 10.0)
+        frac = float(np.mean(env > thr))
+        if frac > 0.15:  # 超阈值时间占比 >15%
+            amp_max = float(np.max(env[env > thr])) if np.any(env > thr) else 0.0
+            return {"present": True, "count": int(round(frac * env.shape[1] / sfreq)),
+                    "channels": [ch_names[i] for i in central][:6],
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_smr(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """SMR 感觉运动节律（12-15Hz）：全通道平均包络强度。"""
+    try:
+        b = _bandpass_uv(data_uv, 12.0, 15.0, sfreq)
+        if b is None:
+            return {"present": False, "count": 0}
+        env = _rms_envelope(b, int(sfreq * 0.4))
+        med = float(np.median(env))
+        mad = float(np.median(np.abs(env - med))) * 1.4826
+        thr = med + max(3.0 * mad, 8.0)
+        frac = float(np.mean(env > thr))
+        if frac > 0.15:
+            amp_max = float(np.max(env[env > thr])) if np.any(env > thr) else 0.0
+            return {"present": True, "count": int(round(frac * env.shape[1] / sfreq)),
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_triphasic(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """三相波（1-3Hz，负-正-负，代谢性脑病）：检测单个周期内至少 3 次极性交替的高幅波。"""
+    from scipy.signal import find_peaks
+    try:
+        b = _bandpass_uv(data_uv, 1.0, 3.0, sfreq)
+        if b is None:
+            return {"present": False, "count": 0}
+        total = 0
+        amp_max = 0.0
+        hit_chs: List[str] = []
+        for i in range(b.shape[0]):
+            x = b[i]
+            mad = float(np.median(np.abs(x - np.median(x)))) * 1.4826
+            prom = max(3.0 * mad, 30.0)
+            pos_p, _ = find_peaks(x, distance=int(sfreq * 0.15), prominence=prom)
+            neg_p, _ = find_peaks(-x, distance=int(sfreq * 0.15), prominence=prom)
+            # 组合交替序列长度
+            events = sorted([(p, 1) for p in pos_p] + [(p, -1) for p in neg_p])
+            alt = 0
+            prev_sign = 0
+            for _, s in events:
+                if s != prev_sign:
+                    alt += 1
+                    prev_sign = s
+            n_tri = alt // 3  # 每 3 次交替 ≈ 一个三相波
+            if n_tri >= 2:
+                total += n_tri
+                hit_chs.append(ch_names[i])
+                for p, s in events:
+                    pk = float(x[p]) if s > 0 else -float(x[p])
+                    if pk > amp_max:
+                        amp_max = pk
+        if total >= 1:
+            return {"present": True, "count": total, "channels": hit_chs[:6],
+                    "amplitude_uv": round(amp_max, 1)}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def _detect_periodic(data_uv: np.ndarray, ch_names: List[str], sfreq: float) -> Dict[str, Any]:
+    """周期性放电（如 PLEDs）：基于尖峰事件时间间隔的规律性判断。"""
+    try:
+        hp = _bandpass_uv(data_uv, 1.0, 40.0, sfreq)
+        if hp is None:
+            return {"present": False, "count": 0}
+        best = 0
+        amp_max = 0.0
+        for i in range(hp.shape[0]):
+            x = hp[i]
+            med = float(np.median(x))
+            mad = float(np.median(np.abs(x - med))) * 1.4826
+            thr = med + max(6.0 * mad, 45.0)
+            segs = _contiguous_over(x > thr, int(sfreq * 0.2))
+            times = [(g[0] + g[-1]) / 2.0 / sfreq for g in segs if g[-1] - g[0] <= int(sfreq * 0.2)]
+            # 记录这些规律尖峰段的最大峰值
+            for g in segs:
+                if g[-1] - g[0] <= int(sfreq * 0.2):
+                    pk = float(np.max(x[g[0]:g[-1] + 1]))
+                    if pk > amp_max:
+                        amp_max = pk
+            if len(times) >= 4:
+                diffs = np.diff(times)
+                if len(diffs) >= 3:
+                    cv = float(np.std(diffs) / (np.mean(diffs) + 1e-9))
+                    if cv < 0.3:  # 间隔高度规律
+                        best = max(best, len(times))
+        if best >= 4:
+            return {"present": True, "count": best,
+                    "amplitude_uv": round(amp_max, 1) if amp_max > 0 else 0.0}
+        return {"present": False, "count": 0}
+    except Exception:
+        return {"present": False, "count": 0}
+
+
+def detect_special_waveforms(data_uv: Optional[np.ndarray], ch_names: List[str],
+                             sfreq: float) -> Dict[str, Any]:
+    """检测 8 种特殊波形。data_uv 为 (n_ch, n_samples) 的 µV 数据。
+
+    返回 {key: {present, count, channels?, amplitude_uv?}}——报告只显示 present=True 的。
+    """
+    if data_uv is None or data_uv.ndim != 2 or data_uv.shape[1] < int(sfreq * 2):
+        return {}
+    return {
+        "spikes": _detect_spikes(data_uv, ch_names, sfreq),  # 尖波/锐波（癫痫样放电）
+        "sleep_spindles": _detect_spindles(data_uv, ch_names, sfreq),
+        "slow_waves": _detect_slow_waves(data_uv, ch_names, sfreq),
+        "k_complexes": _detect_k_complexes(data_uv, ch_names, sfreq),
+        "mu_rhythm": _detect_mu_rhythm(data_uv, ch_names, sfreq),
+        "smr": _detect_smr(data_uv, ch_names, sfreq),
+        "triphasic_waves": _detect_triphasic(data_uv, ch_names, sfreq),
+        "periodic_discharges": _detect_periodic(data_uv, ch_names, sfreq),
+    }
 
 
 # =====================================================================
@@ -973,6 +1339,9 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
     else:
         band_waveforms = quick_band_waveforms(file_path, duration_seconds=10.0)
     
+    # ── 4.5 特殊波形检测（尖波/纺锤/慢波/K复合波/mu/SMR/三相波/周期放电）────
+    special_waveforms = detect_special_waveforms(seg_data_uv, seg_ch_names, seg_sfreq)
+    
     # ── 5. 组合结果 ─────────────────────────────────────
     def _safe(v):
         if isinstance(v, (np.integer, np.int32, np.int64)):
@@ -1004,6 +1373,7 @@ def analyze_edf(file_path: str, lang: str = "zh") -> Dict[str, Any]:
         },
         "waveform_preview": waveform_preview,
         "band_waveforms": band_waveforms,
+        "special_waveforms": special_waveforms,
         "literacy_scores": literacy,
         "what_this_data_cannot_tell": [
             "智商", "性格", "心理健康", "疾病", "情绪", "ADHD", "抑郁症"

@@ -56,3 +56,36 @@ next-env.d.ts
 
 # 部署配置（含密钥，不提交）
 ecosystem.config.js
+
+# 用户数据与数据库（不公开）
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+backend/uploads/
+backend/*.log
+backend/explanations_cache.json
+backend/wf_sample.svg
+backend/diag_waveform.py
+backend/patch_prompt_disclaimer.py
+backend/scan_limit.py
+
+# 内部部署与文档（不公开）
+docs/outreach/
+nginx-admin.conf
+.next-deploy.tar.gz
+deploy/
+deploy_logo.sh
+AUDIT_REPORT.md
+AUDIT_REPORT_FINAL.md
+DELIVERY_REPORT.md
+DEPLOYMENT.md
+FINAL_AUDIT_REPORT.md
+FINAL_DELIVERY.md
+FINAL_STATUS_REPORT.md
+QA_REPORT_2026-07-25.md
+RELEASE_NOTES.md
+
+# 调试/测试页（不公开）
+public/debug-waveform.html
+public/eeg-waveform-test.html
+public/turnstile-test.html

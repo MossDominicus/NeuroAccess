@@ -34,7 +34,7 @@ export default function FrequencyChart({ frequencyData }: FrequencyChartProps) {
   // 保证旧报告也能显示频率分布，无需重新分析。
   if (distributionData.length === 0) {
     const bp = frequencyData.average_bandpower || frequencyData.bandpower || {};
-    const bandCenters: Record<string, number> = { delta: 2.5, theta: 6.5, alpha: 10, beta: 22 };
+    const bandCenters: Record<string, number> = { delta: 2.5, theta: 6.5, alpha: 10, beta: 22, gamma: 37.5 };
     distributionData = Object.keys(bp)
       .filter((k) => bandCenters[k] !== undefined && typeof (bp as any)[k] === "number")
       .map((k) => ({ frequency: bandCenters[k], power: Number((bp as any)[k]) }));

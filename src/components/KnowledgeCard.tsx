@@ -6,7 +6,7 @@ import { useLang } from "@/lib/language-context";
 
 export interface KnowledgeCardData {
   id: string;
-  category: "brainwaves" | "technical" | "artifacts";
+  category: "brainwaves" | "technical" | "artifacts" | "special";
   icon: string; // 希腊字母或字符
   iconColor: string;
   title: string;

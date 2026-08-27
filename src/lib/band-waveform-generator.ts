@@ -61,7 +61,7 @@ const BANDS: { name: string; low: number; high: number }[] = [
   { name: "theta", low: 4, high: 8 },
   { name: "alpha", low: 8, high: 13 },
   { name: "beta",  low: 13, high: 30 },
-  { name: "gamma", low: 30, high: 100 },
+  { name: "gamma", low: 30, high: 45 },
 ];
 
 /**

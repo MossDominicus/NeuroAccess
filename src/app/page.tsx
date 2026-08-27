@@ -4,8 +4,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useLang } from "@/lib/language-context";
+import { formatDuration } from "@/lib/duration";
 import { useAuth } from "@/lib/auth-context";
 import { useAnalysis } from "@/lib/analysis-context";
+import DownloadDataButton from "@/components/DownloadDataButton";
+import { useDownloadBtnHidden } from "@/lib/download-btn-state";
 import {
   UploadCloud,
   DownloadCloud,
@@ -64,7 +67,7 @@ function OverviewCard({ analysis }: { analysis: any }) {
     { label: t("fileName"),    value: analysis.file_name || "-" },
     { label: t("channelCount"), value: analysis.channel_count ?? "-" },
     { label: t("samplingRate"), value: analysis.sampling_rate ?? "-" },
-    { label: t("duration"),     value: analysis.duration ?? "-" },
+    { label: t("duration"),     value: formatDuration(analysis, t) },
     { label: t("signalQuality"), value: analysis.signal_quality_score != null ? Number(analysis.signal_quality_score).toFixed(0) : "-" },
   ];
   return (
@@ -259,6 +262,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 function DashboardInner() {
   const { t } = useLang();
   const { user, loading } = useAuth();
+  const downloadHidden = useDownloadBtnHidden();
   const {
     files, running, paused, expandId, setExpandId,
     handleFileSelect, removeFile, clearAll, startAnalysis, pauseAnalysis, resumeAnalysis, retryFile,
@@ -387,16 +391,9 @@ function DashboardInner() {
           </div>
         )}
 
-        {/* 黄色下载测试文件按钮（仪表盘右下角固定，分析时隐藏） */}
-        {!hasActiveAnalysis && (
-          <a
-            href="/test-sample.edf"
-            download="test_16ch_128hz.edf"
-            className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 active:bg-yellow-500 text-yellow-800 font-semibold text-sm px-5 py-3 shadow-md transition-colors"
-          >
-            <DownloadCloud className="h-5 w-5" />
-            <span>{t("downloadTestEEG")}</span>
-          </a>
+        {/* 下载测试文件按钮（弹窗选择学习包；可隐藏移入设置） */}
+        {!hasActiveAnalysis && !downloadHidden && (
+          <DownloadDataButton fixed />
         )}
 
         {/* File list */}

@@ -21,8 +21,22 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // 静态资源（JS/CSS chunk）：内容哈希命名，长期缓存即可，哈希变了浏览器自然更新
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        // 页面 HTML 文档：禁止缓存。
+        // Next.js 强制 HTML 为 no-cache；Cloudflare 会把 no-cache 改写为 max-age=60，
+        // 导致用户拿到旧 HTML → 旧 JS chunk。用 CDN-Cache-Control: no-store 让 Cloudflare 不缓存。
         source: "/(.*)",
-        headers: securityHeaders,
+        headers: [
+          ...securityHeaders,
+          { key: "Cache-Control", value: "no-store" },
+          { key: "CDN-Cache-Control", value: "no-store" },
+        ],
       },
     ];
   },

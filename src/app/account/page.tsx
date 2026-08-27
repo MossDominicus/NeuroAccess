@@ -64,6 +64,9 @@ export default function AccountPage() {
     if (vlen < 1) {
       return { ok: false, error: t(lang, "usernameRequired") };
     }
+    if (vlen < 2) {
+      return { ok: false, error: t(lang, "usernameTooShort") };
+    }
     if (vlen > 20) {
       return { ok: false, error: t(lang, "usernameTooLong") };
     }
@@ -419,7 +422,7 @@ export default function AccountPage() {
                     }`}
                     style={{ backgroundColor: color }}
                   >
-                    {getDisplayInitial(user.username || "?")}
+                    {getDisplayInitial(editUsername || user?.username || "?")}
                   </button>
                 ))}
               </div>

@@ -55,6 +55,13 @@ function clearAuthCookie() {
   document.cookie = `neuroaccess-token=; path=/; ${SECURE_COOKIE}SameSite=Lax; max-age=0`;
 }
 
+// 读取 cookie（与中间件/服务端保持同一来源，避免 localStorage 与 cookie 不同步）
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 interface ConsentRecord {
   accepted: boolean;
   acceptedAt: string;
@@ -137,24 +144,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── 跨设备报告同步 ──────────────────────────
-  // 会话有效（登录成功 / 启动校验 / 页面重新可见）时调用：把本机独有报告推送到服务端，
-  // 并拉取其它设备的报告。服务端是多设备真相源，本地 localStorage 仅作离线缓存。
+  // 会话有效（登录成功 / 启动校验 / 页面重新可见）时调用：
+  // 以服务器为真相源对账——拉取服务器报告、排除已删 id、丢弃本地残留（已删/过期快照）。
   const syncReportsOnLogin = useCallback(async () => {
     try {
-      const { loadReports, saveReports, fetchServerReports, syncReportToServer } =
-        await import("@/lib/reports-storage");
-      const serverReports = await fetchServerReports();
-      if (serverReports === null) return; // 网络异常 / 未登录：保留本地，不改动
-      const localReports = loadReports();
-      const serverIds = new Set(serverReports.map((r: any) => r.id));
-      const localOnly = localReports.filter((r: any) => !serverIds.has(r.id));
-      // 把本机独有（尚未上云）的报告推送到服务端
-      for (const r of localOnly) {
-        try { await syncReportToServer(r); } catch {}
-      }
-      // 合并：服务端报告作为真相源覆盖本地同名报告 + 本机独有报告，写回本地缓存
-      const merged = [...serverReports, ...localOnly];
-      saveReports(merged);
+      const { reconcileReportsWithServer } = await import("@/lib/reports-storage");
+      await reconcileReportsWithServer();
     } catch {}
   }, []);
 
@@ -164,12 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "GET",
         headers: { Authorization: `Bearer ${tok}` },
       });
-      // 401 = 凭证失效 / 用户已被删除 → 静默处理，不自动退出（用户要求永久保留登录）
+      // 401 = 凭证确实失效 / 用户已被删除 → 与服务器保持一致，清除本地会话
       if (resp.status === 401) {
-        // 不退出登录，保留当前状态
+        handleSessionInvalid();
         return;
       }
       if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.user) {
+          setUser(data.user);
+          try { localStorage.setItem("neuroaccess-user", JSON.stringify(data.user)); } catch {}
+        }
         // 会话有效：同步跨设备报告（推送本机独有 + 拉取其它设备）
         await syncReportsOnLogin();
       }
@@ -181,13 +181,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // 加载 token、用户、同意记录
     try {
-      const savedToken = localStorage.getItem("neuroaccess-token");
+      // 优先读取 cookie（服务端/中间件的鉴权来源），与服务器保持一致，
+      // 避免仅读 localStorage 导致的“已登录却显示未登录 / 登录页死循环”不同步。
+      const cookieToken = readCookie("neuroaccess-token");
+      const savedToken = cookieToken || localStorage.getItem("neuroaccess-token");
       const savedUser = localStorage.getItem("neuroaccess-user");
-      if (savedToken && savedUser) {
-        const parsedUser = JSON.parse(savedUser);
+      if (savedToken) {
+        let parsedUser = null;
+        if (savedUser) { try { parsedUser = JSON.parse(savedUser); } catch {} }
         setToken(savedToken);
-        setUser(parsedUser);
-        // 关键修复：向服务端校验会话是否仍然有效（账号可能已在其它设备被注销）
+        if (parsedUser) setUser(parsedUser);
+        // 向服务端校验会话是否仍然有效，并补全用户信息（localStorage 可能缺失）
         validateSession(savedToken);
       }
       // 检查本地 consent 记录（页面刷新时不显示弹窗）
@@ -246,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        setAuthCookie(data.token, 2592000);
+        setAuthCookie(data.token, 5184000);
         scheduleLogout(data.token);
 
         const nu = !!data.needs_username_setup;
@@ -282,7 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        setAuthCookie(data.token, 2592000);
+        setAuthCookie(data.token, 5184000);
         scheduleLogout(data.token);
 
         // 新注册用户需要同意条款
@@ -293,7 +297,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearConsent();
         // 清除可能遗留的旧账号 local 数据
         //（销号后从另一台设备重新注册，旧 localStorage 还在）
-        localStorage.removeItem("neuroaccess-reports");
+        const { clearReportsForUser } = await import("@/lib/reports-storage");
+        clearReportsForUser(user?.id);
         localStorage.removeItem("neuroaccess-feedback");
         localStorage.removeItem("neuroaccess-survey");
         return { success: true };
@@ -342,7 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         localStorage.setItem("neuroaccess-token", data.token);
         localStorage.setItem("neuroaccess-user", JSON.stringify(data.user));
-        setAuthCookie(data.token, 2592000);
+        setAuthCookie(data.token, 5184000);
         scheduleLogout(data.token);
         const nu = !!data.needs_username_setup;
         setNeedsUsernameSetup(nu);
@@ -580,12 +585,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTermsAccepted(false);
         setNeedsUsernameSetup(false);
         localStorage.removeItem("neuroaccess-token");
+        // 删除账号：清除该用户的本地报告/收藏/已删记录缓存
+        const { clearReportsForUser } = await import("@/lib/reports-storage");
+        clearReportsForUser(user?.id);
         localStorage.removeItem("neuroaccess-user");
-        localStorage.removeItem("neuroaccess-reports");
         localStorage.removeItem("neuroaccess-feedback");
         localStorage.removeItem("neuroaccess-survey");
-        // 删除账号时清除同意记录
+        // 删除账号时清除同意记录，同时清掉认证 Cookie（与 logout/handleSessionInvalid 一致），
+        // 否则销号后 cookie 残留（max-age 60 天）会导致下次访问短暂显示"已登录"
         clearConsent();
+        clearAuthCookie();
         return { success: true };
       }
       return { success: false, error: result.error || tf("deleteAccountFailed", "Account deletion failed") };

@@ -130,36 +130,99 @@ _ARTIFACT_TEXTS: Dict[str, Dict[str, str]] = {
         "many_noisy_channels": "过多噪声通道，可能存在肌电伪影",
         "large_values": "检测到异常大值，可能存在工频干扰",
         "many_outliers": "检测到过多异常值，可能存在运动伪影",
+        "transient_spikes": "瞬时尖波样活动：{0}（{1}% 样本，{2}/{3} 通道）",
+        "transient_level_mild": "轻度",
+        "transient_level_moderate": "中度",
+        "transient_level_high": "高度",
+        "clipping": "检测到信号削波",
+        "baseline_drift": "基线漂移",
+        "flat_channels": "{0} 个平坦/断开通道",
+        "short_recording": "记录时间过短",
+        "flat_no_signal": "平坦/无信号（通道断开或失效）",
     },
     "en": {
         "many_noisy_channels": "Excessive noisy channels; possible EMG artifact",
         "large_values": "Abnormally large values detected; possible power-line interference",
         "many_outliers": "Excessive outliers detected; possible movement artifact",
+        "transient_spikes": "Transient spike-like activity: {0} ({1}% samples, {2}/{3} channels)",
+        "transient_level_mild": "mild",
+        "transient_level_moderate": "moderate",
+        "transient_level_high": "high",
+        "clipping": "Signal clipping detected",
+        "baseline_drift": "Baseline drift",
+        "flat_channels": "{0} flat/disconnected channel(s)",
+        "short_recording": "Recording too short",
+        "flat_no_signal": "Flat / no signal (dead channel or disconnected)",
     },
     "es": {
         "many_noisy_channels": "Canales ruidosos excesivos; posible artefacto EMG",
         "large_values": "Valores anormalmente grandes detectados; posible interferencia de línea eléctrica",
         "many_outliers": "Valores atípicos excesivos detectados; posible artefacto de movimiento",
+        "transient_spikes": "Actividad transitoria tipo pico: {0} ({1}% de muestras, {2}/{3} canales)",
+        "transient_level_mild": "leve",
+        "transient_level_moderate": "moderada",
+        "transient_level_high": "alta",
+        "clipping": "Recorte de señal detectado",
+        "baseline_drift": "Deriva de línea base",
+        "flat_channels": "{0} canal(es) plano(s)/desconectado(s)",
+        "short_recording": "Grabación demasiado corta",
+        "flat_no_signal": "Plano / sin señal (canal desconectado o fallido)",
     },
     "fr": {
         "many_noisy_channels": "Canaux bruyants excessifs; possible artefact EMG",
         "large_values": "Valeurs anormalement élevées détectées; possible interférence de ligne électrique",
         "many_outliers": "Valeurs aberrantes excessives détectées; possible artefact de mouvement",
+        "transient_spikes": "Activité transitoire en pointe : {0} ({1}% des échantillons, {2}/{3} canaux)",
+        "transient_level_mild": "légère",
+        "transient_level_moderate": "modérée",
+        "transient_level_high": "élevée",
+        "clipping": "Écrêtage du signal détecté",
+        "baseline_drift": "Dérive de la ligne de base",
+        "flat_channels": "{0} canal(aux) plat(s)/déconnecté(s)",
+        "short_recording": "Enregistrement trop court",
+        "flat_no_signal": "Plat / pas de signal (canal déconnecté ou défaillant)",
     },
     "de": {
         "many_noisy_channels": "Übermäßig verrauschte Kanäle; mögliches EMG-Artefakt",
         "large_values": "Abnorm große Werte erkannt; mögliche Netzfrequenzstörung",
         "many_outliers": "Übermäßige Ausreißer erkannt; mögliches Bewegungsartefakt",
+        "transient_spikes": "Transiente spike-artige Aktivität: {0} ({1}% der Samples, {2}/{3} Kanäle)",
+        "transient_level_mild": "leicht",
+        "transient_level_moderate": "mäßig",
+        "transient_level_high": "hoch",
+        "clipping": "Signalclipping erkannt",
+        "baseline_drift": "Basisliniendrift",
+        "flat_channels": "{0} flacher/getrennter Kanal/Kanäle",
+        "short_recording": "Aufzeichnung zu kurz",
+        "flat_no_signal": "Flach / kein Signal (Kanal getrennt oder defekt)",
     },
     "ja": {
         "many_noisy_channels": "ノイズチャネルが多すぎます; EMGアーティファクトの可能性があります",
         "large_values": "異常に大きな値が検出されました; 電源線干渉の可能性があります",
         "many_outliers": "異常値が多すぎます; 動きアーティファクトの可能性があります",
+        "transient_spikes": "過渡的な棘波様活動: {0}（サンプルの {1}%、{2}/{3} チャネル）",
+        "transient_level_mild": "軽度",
+        "transient_level_moderate": "中等度",
+        "transient_level_high": "高度",
+        "clipping": "信号のクリッピングが検出されました",
+        "baseline_drift": "ベースライン漂移",
+        "flat_channels": "{0} 個の平坦/切断チャネル",
+        "short_recording": "記録時間が短すぎます",
+        "flat_no_signal": "平坦/信号なし（チャネルが切断または故障）",
     },
     "ko": {
         "many_noisy_channels": "과도한 잡음 채널; EMG 아티팩트 가능성",
         "large_values": "비정상적으로 큰 값이 감지되었습니다; 전원선 간섭 가능성",
         "many_outliers": "과도한 이상값 감지; 움직임 아티팩트 가능성",
+        "transient_spikes": "일시적인 첨파형 활동: {0} (샘플의 {1}%, {2}/{3} 채널)",
+        "transient_level_mild": "경미함",
+        "transient_level_moderate": "중등도",
+        "transient_level_high": "높음",
+        "clipping": "신호 클리핑 감지됨",
+        "baseline_drift": "기준선 드리프트",
+        "flat_channels": "{0} 개의 평평/분리된 채널",
+        "short_recording": "기록 시간이 너무 짧습니다",
+        "flat_no_signal": "평탄 / 신호 없음 (채널 분리 또는 고장)",
     },
 }
 
@@ -258,9 +321,14 @@ _CONFIDENCE_LIMITATIONS: Dict[str, Dict[str, str]] = {
 def _get_text(mapping: Dict[str, any], lang: str, key: str, *args) -> str:
     """Fetch translated text. Falls back to English, then key itself."""
     texts = mapping.get(lang) or mapping.get("en", {})
-    text = texts.get(key, key)
+    text = texts.get(key)
+    if text is None:
+        text = mapping.get("en", {}).get(key, key)
     if args:
-        return text.format(*args)
+        try:
+            return text.format(*args)
+        except (IndexError, KeyError):
+            return text
     return text
 
 
@@ -274,6 +342,79 @@ def get_limitations(lang: str) -> List[str]:
 
 def get_artifact_text(lang: str, key: str, *args) -> str:
     return _get_text(_ARTIFACT_TEXTS, lang, key, *args)
+
+
+import re
+
+# Language-specific artifact text patterns used to reverse-engineer stored
+# English/Chinese artifact strings back into structured i18n keys.
+_TRANSIENT_RE = re.compile(
+    r"(?:Transient spike-like activity|瞬时尖波样活动)[:：]\s*(\S+)\s*[\(\(]\s*([\d.]+)%\s*(?:samples|样本)\s*,\s*(\d+)\s*/\s*(\d+)\s*(?:channels?|通道)\s*[\)\)]",
+    re.IGNORECASE,
+)
+_FLAT_CHANNELS_RE = re.compile(
+    r"^(?:(\d+)\s*flat/disconnected channel\(s\)|(\d+)\s*个平坦/断开通道)$",
+    re.IGNORECASE,
+)
+
+_LEVEL_MAP = {
+    "mild": "mild", "moderate": "moderate", "high": "high",
+    "轻度": "mild", "中度": "moderate", "高度": "high",
+    "leve": "mild", "moderada": "moderate", "alta": "high",
+    "légère": "mild", "modérée": "moderate", "élevée": "high",
+    "leicht": "mild", "mäßig": "moderate", "hoch": "high",
+    "軽度": "mild", "中等度": "moderate", "高度": "high",
+    "경미함": "mild", "중등도": "moderate", "높음": "high",
+}
+
+
+def localize_artifact_text(text: str, lang: str) -> str:
+    """Translate a stored artifact description into the requested language.
+
+    Supports reverse-mapping of historical English/Chinese strings as well as
+    re-localizing strings that are already in another language.
+    """
+    if not text or not isinstance(text, str):
+        return text
+    s = text.strip()
+    if not s:
+        return s
+
+    # Transient spike-like activity
+    m = _TRANSIENT_RE.search(s)
+    if m:
+        raw_level = m.group(1).lower()
+        level_key = "transient_level_" + _LEVEL_MAP.get(raw_level, "high")
+        return get_artifact_text(
+            lang, "transient_spikes",
+            get_artifact_text(lang, level_key),
+            m.group(2), m.group(3), m.group(4),
+        )
+
+    # Flat channels
+    m = _FLAT_CHANNELS_RE.search(s)
+    if m:
+        count = m.group(1) or m.group(2)
+        return get_artifact_text(lang, "flat_channels", int(count))
+
+    # Static texts — normalize by matching known English/Chinese forms and
+    # re-render via i18n key. Order does not matter because each key is unique.
+    lowered = s.lower()
+    mapping = [
+        (("baseline drift", "基线漂移"), "baseline_drift"),
+        (("signal clipping detected", "检测到信号削波"), "clipping"),
+        (("excessive noisy channels; possible emg artifact", "过多噪声通道，可能存在肌电伪影"), "many_noisy_channels"),
+        (("abnormally large values detected; possible power-line interference", "检测到异常大值，可能存在工频干扰"), "large_values"),
+        (("excessive outliers detected; possible movement artifact", "检测到过多异常值，可能存在运动伪影"), "many_outliers"),
+        (("recording too short", "数据过短", "记录时间过短"), "short_recording"),
+        (("flat / no signal (dead channel or disconnected)", "平坦/无信号（通道断开或失效）"), "flat_no_signal"),
+    ]
+    for needles, key in mapping:
+        if any(needle in lowered for needle in needles):
+            return get_artifact_text(lang, key)
+
+    # Already in target language or unknown — leave as-is.
+    return s
 
 
 def get_confidence_reason(lang: str, key: str, *args) -> str:
