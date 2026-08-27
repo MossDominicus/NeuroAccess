@@ -40,7 +40,7 @@ The project can be explored with sample EEG datasets, making it possible to lear
 
 ## Open Source
 
-NeuroAccess is developed openly on GitHub ([MossDominicus/NeuroAccess](https://github.com/MossDominicus/NeuroAccess)).
+NeuroAccess is developed openly on GitHub ([wmz205807/NeuroAccess](https://github.com/wmz205807/NeuroAccess)).
 
 The goal is not only to build a website, but to create an accessible open-source project that students, educators, researchers, and developers can explore, improve, and build upon.
 
